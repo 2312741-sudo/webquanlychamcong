@@ -94,7 +94,7 @@ export default function DashboardPage() {
               <YAxis tick={{ fontSize:10, fill:'var(--text-secondary)' }} tickLine={false} axisLine={false} />
               <Tooltip
                 contentStyle={{ borderRadius:10, border:'none', boxShadow:'0 4px 20px rgba(0,0,0,0.1)', fontSize:13 }}
-                formatter={(v: number) => [`${v}h`, 'Tổng giờ']}
+                formatter={(v: any) => [`${v}h`, 'Tổng giờ']}
               />
               <Line type="monotone" dataKey="hours" stroke="var(--primary)" strokeWidth={2.5} dot={{ r:3, fill:'var(--primary)' }} activeDot={{ r:5 }} />
             </LineChart>

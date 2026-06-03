@@ -359,16 +359,14 @@ export default function SchedulePage() {
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, color: 'var(--primary)', fontWeight: 600 }}>
                 <input 
                   type="checkbox" 
-                  disabled={!(shifts[editingCell.userId]?.[editingCell.dayKey] && (Array.isArray(shifts[editingCell.userId][editingCell.dayKey]) ? shifts[editingCell.userId][editingCell.dayKey] as string[] : [shifts[editingCell.userId][editingCell.dayKey] as string]).some(id => id !== 'delivery'))}
-                  checked={Array.isArray(shifts[editingCell.userId]?.[editingCell.dayKey]) 
-                    ? (shifts[editingCell.userId][editingCell.dayKey] as string[]).includes('delivery') 
-                    : shifts[editingCell.userId]?.[editingCell.dayKey] === 'delivery'}
+                  disabled={!(shifts[editingCell.userId]?.[editingCell.dayKey as keyof DaySchedule] || []).some(id => id !== 'delivery')}
+                  checked={(shifts[editingCell.userId]?.[editingCell.dayKey as keyof DaySchedule] || []).includes('delivery')}
                   onChange={() => toggleShiftForCell('delivery')}
                   style={{ transform: 'scale(1.2)' }}
                 />
                 Có chở hàng (được nhận phụ cấp)
               </label>
-              {!(shifts[editingCell.userId]?.[editingCell.dayKey] && (Array.isArray(shifts[editingCell.userId][editingCell.dayKey]) ? shifts[editingCell.userId][editingCell.dayKey] as string[] : [shifts[editingCell.userId][editingCell.dayKey] as string]).some(id => id !== 'delivery')) && (
+              {!(shifts[editingCell.userId]?.[editingCell.dayKey as keyof DaySchedule] || []).some(id => id !== 'delivery') && (
                 <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
                   * Cần chọn ít nhất 1 ca làm để có thể tích chở hàng
                 </div>
