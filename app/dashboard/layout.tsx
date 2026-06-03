@@ -57,6 +57,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return () => { unsubStore(); unsubMembers(); };
   }, [storeId]);
 
+  const currentMember = user ? members.find(m => m.userId === user.uid) : null;
+  const role = currentMember?.role;
+
+  // Quản lý chỉ được xem lịch làm
+  useEffect(() => {
+    if (role === 'manager') {
+      if (pathname !== '/dashboard/schedule') {
+        router.replace('/dashboard/schedule');
+      }
+    }
+  }, [role, pathname, router]);
+
   if (loading) return (
     <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'100vh', background:'var(--surface)' }}>
       <div style={{ textAlign:'center', display:'flex', flexDirection:'column', alignItems:'center', gap:16 }}>
@@ -69,18 +81,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const initials = user?.displayName
     ? user.displayName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
     : (user?.email?.[0] ?? 'U').toUpperCase();
-
-  const currentMember = user ? members.find(m => m.userId === user.uid) : null;
-  const role = currentMember?.role;
-
-  // Quản lý chỉ được xem lịch làm
-  useEffect(() => {
-    if (role === 'manager') {
-      if (pathname !== '/dashboard/schedule') {
-        router.replace('/dashboard/schedule');
-      }
-    }
-  }, [role, pathname, router]);
 
   const filteredNav = NAV.filter(item => {
     if (role === 'manager') {
