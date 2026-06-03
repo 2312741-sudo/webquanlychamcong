@@ -6,7 +6,7 @@ import { exportMonthlyAttendance } from '@/lib/exportExcel';
 import { AttendanceRecord, ScheduleModel } from '@/lib/types';
 
 export default function AttendancePage() {
-  const { storeId, members, currentUser, store } = useApp();
+  const { storeId, members, user, store } = useApp();
   const [currentMonth, setCurrentMonth] = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -95,9 +95,9 @@ export default function AttendancePage() {
 
     try {
       if (att) {
-        await editAttendance(storeId, att.id, ciDate, coDate, editForm.note, currentUser?.name || 'Admin');
+        await editAttendance(storeId, att.id, ciDate, coDate, editForm.note, user?.displayName || 'Admin');
       } else {
-        await createManualAttendance(storeId, userId, date, ciDate, coDate, editForm.note, currentUser?.name || 'Admin');
+        await createManualAttendance(storeId, userId, date, ciDate, coDate, editForm.note, user?.displayName || 'Admin');
       }
       alert('Đã lưu');
       setEditingCell(null);
