@@ -70,6 +70,43 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     ? user.displayName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
     : (user?.email?.[0] ?? 'U').toUpperCase();
 
+  const currentMember = user ? members.find(m => m.userId === user.uid) : null;
+  const role = currentMember?.role;
+
+  // Nếu đã load xong thông tin store mà member là nhân viên thì chặn
+  if (storeId && members.length > 0 && role === 'employee') {
+    return (
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'100vh', background:'var(--surface)' }}>
+        <div style={{ textAlign:'center', display:'flex', flexDirection:'column', alignItems:'center', gap:16, background:'white', padding:40, borderRadius:20, boxShadow:'0 10px 40px rgba(0,0,0,0.05)' }}>
+          <div style={{ fontSize:48 }}>📱</div>
+          <h2 style={{ margin:0, color:'var(--danger)' }}>Truy cập bị từ chối</h2>
+          <p style={{ margin:0, color:'var(--text-secondary)', maxWidth:300, lineHeight:1.5 }}>
+            Tài khoản nhân viên không được phép sử dụng trang quản lý Web. Vui lòng tải ứng dụng Mobile để chấm công và xem lịch làm.
+          </p>
+          <button onClick={signOut} className="btn btn-primary" style={{ marginTop:16 }}>
+            Đăng xuất
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Quản lý chỉ được xem lịch làm
+  useEffect(() => {
+    if (role === 'manager') {
+      if (pathname !== '/dashboard/schedule') {
+        router.replace('/dashboard/schedule');
+      }
+    }
+  }, [role, pathname, router]);
+
+  const filteredNav = NAV.filter(item => {
+    if (role === 'manager') {
+      return item.href === '/dashboard/schedule';
+    }
+    return true;
+  });
+
   return (
     <AppContext.Provider value={{ user, storeId, store, members }}>
       <div style={{ display:'flex', minHeight:'100vh' }}>
@@ -120,7 +157,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           {/* Nav */}
           <nav style={{ flex:1, padding:'12px 10px', display:'flex', flexDirection:'column', gap:2, overflowY:'auto' }}>
-            {NAV.map(item => {
+            {filteredNav.map(item => {
               const active = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
               return (
                 <Link key={item.href} href={item.href} onClick={() => setSidebarOpen(false)} style={{
@@ -150,7 +187,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <div style={{ fontSize:13, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                   {user?.displayName || user?.email}
                 </div>
-                <div style={{ fontSize:11, opacity:0.5 }}>Chủ / Quản lý</div>
+                <div style={{ fontSize:11, opacity:0.5 }}>
+                  {role === 'owner' ? 'Chủ cửa hàng' : role === 'manager' ? 'Quản lý' : 'Nhân viên'}
+                </div>
               </div>
               <button onClick={signOut} title="Đăng xuất" style={{
                 background:'rgba(255,255,255,0.1)', border:'none', color:'rgba(255,255,255,0.7)',
@@ -179,7 +218,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             >☰</button>
             <div style={{ flex:1 }}>
               <span style={{ fontSize:13, color:'var(--text-secondary)' }}>
-                {NAV.find(n => pathname === n.href || (n.href !== '/dashboard' && pathname.startsWith(n.href)))?.label ?? 'Dashboard'}
+                {filteredNav.find(n => pathname === n.href || (n.href !== '/dashboard' && pathname.startsWith(n.href)))?.label ?? 'Dashboard'}
               </span>
             </div>
             <div style={{ fontSize:13, color:'var(--text-secondary)', display:'flex', alignItems:'center', gap:6 }}>
