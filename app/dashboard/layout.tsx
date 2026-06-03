@@ -73,24 +73,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const currentMember = user ? members.find(m => m.userId === user.uid) : null;
   const role = currentMember?.role;
 
-  // Nếu đã load xong thông tin store mà member là nhân viên thì chặn
-  if (storeId && members.length > 0 && role === 'employee') {
-    return (
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'100vh', background:'var(--surface)' }}>
-        <div style={{ textAlign:'center', display:'flex', flexDirection:'column', alignItems:'center', gap:16, background:'white', padding:40, borderRadius:20, boxShadow:'0 10px 40px rgba(0,0,0,0.05)' }}>
-          <div style={{ fontSize:48 }}>📱</div>
-          <h2 style={{ margin:0, color:'var(--danger)' }}>Truy cập bị từ chối</h2>
-          <p style={{ margin:0, color:'var(--text-secondary)', maxWidth:300, lineHeight:1.5 }}>
-            Tài khoản nhân viên không được phép sử dụng trang quản lý Web. Vui lòng tải ứng dụng Mobile để chấm công và xem lịch làm.
-          </p>
-          <button onClick={signOut} className="btn btn-primary" style={{ marginTop:16 }}>
-            Đăng xuất
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   // Quản lý chỉ được xem lịch làm
   useEffect(() => {
     if (role === 'manager') {
@@ -103,6 +85,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const filteredNav = NAV.filter(item => {
     if (role === 'manager') {
       return item.href === '/dashboard/schedule';
+    }
+    if (role === 'employee') {
+      return false; // Không hiện menu nào
     }
     return true;
   });
@@ -229,13 +214,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           {/* Content */}
           <main style={{ flex:1, padding:24, overflow:'auto' }}>
-            {storeId ? children : (
+            {!storeId ? (
               <div className="empty-state">
                 <div className="empty-state-icon">🏪</div>
                 <div className="empty-state-text">Bạn chưa tham gia cửa hàng nào</div>
                 <div className="empty-state-sub">Vui lòng mở app điện thoại để tạo hoặc tham gia cửa hàng</div>
               </div>
-            )}
+            ) : role === 'employee' ? (
+              <div style={{ textAlign:'center', display:'flex', flexDirection:'column', alignItems:'center', gap:16, background:'white', padding:40, borderRadius:20, boxShadow:'0 10px 40px rgba(0,0,0,0.05)', maxWidth: 450, margin: '40px auto' }}>
+                <div style={{ fontSize:48 }}>📱</div>
+                <h2 style={{ margin:0, color:'var(--danger)' }}>Truy cập bị từ chối</h2>
+                <p style={{ margin:0, color:'var(--text-secondary)', lineHeight:1.5 }}>
+                  Tài khoản nhân viên không được phép sử dụng bảng điều khiển Web của cửa hàng <b>{store?.name}</b>. Vui lòng tải ứng dụng Mobile để chấm công.
+                </p>
+                {userStores.length > 1 && (
+                  <button onClick={() => setShowStoreSwitcher(true)} className="btn btn-primary" style={{ marginTop:16 }}>
+                    Chuyển sang cửa hàng khác
+                  </button>
+                )}
+              </div>
+            ) : children}
           </main>
         </div>
 
