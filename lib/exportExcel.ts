@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx';
 import * as ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
-import { Member, AttendanceRecord, ScheduleModel, Store, ShiftDefinition } from './types';
+import { Member, AttendanceRecord, ScheduleModel, Store, ShiftDefinition, DaySchedule } from './types';
 
 const DAY_KEYS = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
 const DAY_LABELS = ['Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7','Chủ nhật'];
@@ -53,6 +53,7 @@ export function exportMonthlyAttendance(
         const date = new Date(weekStart);
         date.setDate(date.getDate() + i);
         if (date.getFullYear() === Number(yearStr) && date.getMonth() + 1 === Number(monthStr)) {
+          const arr = (userShifts[dayKey as keyof typeof userShifts] || []) as string[];
           const validIds = new Set((store?.customShifts || []).map(s => s.id));
           const hasValidNormalShift = arr.some(id => {
             const baseId = id.split('|')[0];
@@ -116,6 +117,7 @@ export function exportMonthlySalary(
         const date = new Date(weekStart);
         date.setDate(date.getDate() + i);
         if (date.getFullYear() === Number(yearStr) && date.getMonth() + 1 === Number(monthStr)) {
+          const arr = (userShifts[dayKey as keyof typeof userShifts] || []) as string[];
           const validIds = new Set((store?.customShifts || []).map(s => s.id));
           const hasValidNormalShift = arr.some(id => {
             const baseId = id.split('|')[0];
@@ -226,7 +228,7 @@ export async function exportWeeklySchedule(
   let currentRow = 4;
 
   members.forEach(member => {
-    const daySchedule = schedule?.shifts[member.userId] || {};
+    const daySchedule = (schedule?.shifts[member.userId] || {}) as Partial<DaySchedule>;
     
     // Find max shifts per day for this employee to determine how many sub-rows they need
     let maxShifts = 1;
