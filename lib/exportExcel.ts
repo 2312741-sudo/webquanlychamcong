@@ -32,9 +32,8 @@ export function exportMonthlyAttendance(
   };
 
   const headers = [
-    'Tên nhân viên', 'Vai trò',
-    ...Array.from({ length: daysInMonth }, (_, i) => `Ngày ${i + 1}`),
-    'Tổng giờ', 'Số ca chở', 'Tiền chở', 'Số ca giao', 'Tiền giao'
+    'Nhân viên', 'Vai trò', 'Tổng giờ',
+    ...Array.from({ length: daysInMonth }, (_, i) => `Ngày ${i + 1}`)
   ];
 
   const rows = members.map(member => {
@@ -47,60 +46,22 @@ export function exportMonthlyAttendance(
       const h = att?.totalHours ?? 0;
       totalHours += h;
       if (att) {
-        const inD = formatTime(att.checkIn);
-        const outD = formatTime(att.checkOut);
-        let str = '';
-        if (inD) str += `${inD.getHours().toString().padStart(2, '0')}:${inD.getMinutes().toString().padStart(2, '0')}`;
-        str += '-';
-        if (outD) {
-          str += `${outD.getHours().toString().padStart(2, '0')}:${outD.getMinutes().toString().padStart(2, '0')}`;
-          if (inD && outD.getDate() !== inD.getDate()) str += '(+1)';
-        }
-        return `${str} (${h.toFixed(1)}h)`;
+        return `${h.toFixed(1)}h`;
       }
-      return '0h';
+      return '-';
     });
-    // Calculate delivery
-    let deliveryCount = 0;
-    let giaoHangCount = 0;
-    const [yearStr, monthStr] = month.split('-');
-    schedules.forEach(sched => {
-      const weekStart = new Date(sched.weekStart);
-      const userShifts = sched.shifts[member.userId];
-      if (!userShifts) return;
-      DAY_KEYS.forEach((dayKey, i) => {
-        const date = new Date(weekStart);
-        date.setDate(date.getDate() + i);
-        if (date.getFullYear() === Number(yearStr) && date.getMonth() + 1 === Number(monthStr)) {
-          const arr = (userShifts[dayKey as keyof typeof userShifts] || []) as string[];
-          const validIds = new Set((store?.customShifts || []).map(s => s.id));
-          const hasValidNormalShift = arr.some(id => {
-            const baseId = id.split('|')[0];
-            return baseId !== 'delivery' && baseId !== 'giaohang' && validIds.has(baseId);
-          });
-          if (arr.includes('delivery') && hasValidNormalShift) deliveryCount++;
-          if (arr.includes('giaohang') && hasValidNormalShift) giaoHangCount++;
-        }
-      });
-    });
-    const deliveryPay = deliveryCount * (store.deliveryAllowance || 0);
-    const giaoHangPay = giaoHangCount * (store.giaoHangAllowance || 0);
 
     return [
       member.name, 
       ROLE_LABELS[member.role] || member.role, 
-      ...dayCells, 
       `${totalHours.toFixed(1)}h`,
-      `${deliveryCount} ca`,
-      `${deliveryPay.toLocaleString('vi-VN')} vnđ`,
-      `${giaoHangCount} ca`,
-      `${giaoHangPay.toLocaleString('vi-VN')} vnđ`
+      ...dayCells
     ];
   });
 
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-  ws['!cols'] = [{ wch: 22 }, { wch: 12 }, ...Array(daysInMonth).fill({ wch: 16 }), { wch: 10 }, { wch: 10 }, { wch: 14 }, { wch: 10 }, { wch: 14 }];
+  ws['!cols'] = [{ wch: 22 }, { wch: 12 }, { wch: 10 }, ...Array(daysInMonth).fill({ wch: 10 })];
   XLSX.utils.book_append_sheet(wb, ws, 'Bảng Công');
   XLSX.writeFile(wb, `BangCong_${month}.xlsx`);
 }
