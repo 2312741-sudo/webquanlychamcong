@@ -26,6 +26,34 @@ export async function getUserStores(uid: string): Promise<Store[]> {
   return stores;
 }
 
+export async function getAdvancesInRange(storeId: string, startDate: string, endDate: string): Promise<AdvanceRequest[]> {
+  const q = query(
+    collection(db, 'stores', storeId, 'advanceRequests'),
+    where('monthKey', '>=', startDate.substring(0, 7)),
+    where('monthKey', '<=', endDate.substring(0, 7))
+  );
+  const snap = await getDocs(q);
+  // Filter by actual date
+  const all = snap.docs.map(d => {
+    const data = d.data();
+    return {
+      id: d.id,
+      ...data,
+      requestDate: data.requestDate?.toDate ? data.requestDate.toDate().toISOString() : new Date(data.requestDate).toISOString(),
+      approvedDate: data.approvedDate?.toDate ? data.approvedDate.toDate().toISOString() : (data.approvedDate ? new Date(data.approvedDate).toISOString() : undefined),
+    } as AdvanceRequest;
+  });
+  
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  end.setHours(23, 59, 59, 999);
+  
+  return all.filter(a => {
+    const d = new Date(a.requestDate);
+    return d >= start && d <= end;
+  });
+}
+
 export async function switchStore(uid: string, newStoreId: string): Promise<void> {
   await updateDoc(doc(db, 'users', uid), {
     currentStoreId: newStoreId
@@ -54,6 +82,17 @@ export async function getMonthAttendances(storeId: string, month: string): Promi
     collection(db, 'stores', storeId, 'attendances'),
     where('date', '>=', `${month}-01`),
     where('date', '<=', `${month}-31`),
+    orderBy('date')
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as AttendanceRecord));
+}
+
+export async function getAttendancesInRange(storeId: string, startDate: string, endDate: string): Promise<AttendanceRecord[]> {
+  const q = query(
+    collection(db, 'stores', storeId, 'attendances'),
+    where('date', '>=', startDate),
+    where('date', '<=', endDate),
     orderBy('date')
   );
   const snap = await getDocs(q);

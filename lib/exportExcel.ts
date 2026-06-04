@@ -20,23 +20,45 @@ export async function exportMonthlyAttendance(
   attendances: AttendanceRecord[],
   month: string,
   store: Store,
-  schedules: ScheduleModel[]
+  schedules: ScheduleModel[],
+  options?: { startDate?: Date; endDate?: Date }
 ) {
   const [year, mon] = month.split('-').map(Number);
-  const daysInMonth = new Date(year, mon, 0).getDate();
+  
+  let daysArray: { day: number, dateStr: string, label: string }[] = [];
+  if (options?.startDate && options?.endDate) {
+    let current = new Date(options.startDate);
+    const end = new Date(options.endDate);
+    while (current <= end) {
+      const d = current.getDate();
+      const m = current.getMonth() + 1;
+      const y = current.getFullYear();
+      const dateStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      daysArray.push({ day: d, dateStr, label: `${d}/${m}` });
+      current.setDate(current.getDate() + 1);
+    }
+  } else {
+    const daysInMonth = new Date(year, mon, 0).getDate();
+    daysArray = Array.from({ length: daysInMonth }, (_, i) => {
+      const d = i + 1;
+      const dateStr = `${month}-${String(d).padStart(2, '0')}`;
+      return { day: d, dateStr, label: `NGÀY ${d}` };
+    });
+  }
+
+  const themeColor = (store.themeColor || '#C8102E').replace('#', '');
+  const lightColorHex = getLightHex(themeColor);
 
   const headers = [
     'NHÂN VIÊN', 'VAI TRÒ', 'TỔNG GIỜ',
-    ...Array.from({ length: daysInMonth }, (_, i) => `NGÀY ${i + 1}`)
+    ...daysArray.map(d => d.label)
   ];
 
   const rows = members.map(member => {
     const memberAtts = attendances.filter(a => a.userId === member.userId);
     let totalHours = 0;
-    const dayCells = Array.from({ length: daysInMonth }, (_, i) => {
-      const day = i + 1;
-      const dateStr = `${month}-${String(day).padStart(2, '0')}`;
-      const att = memberAtts.find(a => a.date === dateStr);
+    const dayCells = daysArray.map(d => {
+      const att = memberAtts.find(a => a.date === d.dateStr);
       const h = att?.totalHours ?? 0;
       totalHours += h;
       if (att) {
@@ -57,19 +79,44 @@ export async function exportMonthlyAttendance(
   const sheet = workbook.addWorksheet('Bảng Công');
 
   const headerRow = sheet.addRow(headers);
-  headerRow.font = { bold: true };
+  headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  headerRow.eachCell(cell => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${themeColor}` } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+  });
   
-  rows.forEach(r => sheet.addRow(r));
+  rows.forEach(r => {
+    const row = sheet.addRow(r);
+    row.eachCell((cell, colNumber) => {
+      if (colNumber > 3) {
+        cell.alignment = { horizontal: 'center' };
+        if (cell.value && cell.value !== '-') {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightColorHex } };
+        }
+      }
+    });
+  });
 
   sheet.getColumn(1).width = 22;
   sheet.getColumn(2).width = 12;
   sheet.getColumn(3).width = 10;
-  for (let i = 4; i <= daysInMonth + 3; i++) {
+  for (let i = 4; i <= daysArray.length + 3; i++) {
     sheet.getColumn(i).width = 10;
   }
 
   const buffer = await workbook.xlsx.writeBuffer();
-  saveAs(new Blob([buffer]), `BangCong_${month}.xlsx`);
+  saveAs(new Blob([buffer]), `BangCong_${options?.startDate ? 'Filter' : month}.xlsx`);
+}
+
+function getLightHex(hex: string): string {
+  const c = hex.replace('#', '');
+  const r = parseInt(c.substring(0, 2), 16);
+  const g = parseInt(c.substring(2, 4), 16);
+  const b = parseInt(c.substring(4, 6), 16);
+  const lr = Math.min(255, Math.round(r + (255 - r) * 0.85)).toString(16).padStart(2, '0');
+  const lg = Math.min(255, Math.round(g + (255 - g) * 0.85)).toString(16).padStart(2, '0');
+  const lb = Math.min(255, Math.round(b + (255 - b) * 0.85)).toString(16).padStart(2, '0');
+  return `FF${lr}${lg}${lb}`.toUpperCase();
 }
 
 export async function exportDetailedInOut(
@@ -153,8 +200,12 @@ export async function exportMonthlySalary(
   month: string,
   store: Store,
   schedules: ScheduleModel[],
-  advances: AdvanceRequest[] = []
+  advances: AdvanceRequest[] = [],
+  options?: { startDate?: Date; endDate?: Date }
 ) {
+  const themeColor = (store.themeColor || '#C8102E').replace('#', '');
+  const lightColorHex = getLightHex(themeColor);
+
   const headers = [
     'TÊN NHÂN VIÊN', 'VAI TRÒ', 'LOẠI HĐ',
     'TỔNG GIỜ', 'GIỜ CHUẨN', 'LƯƠNG CƠ BẢN', 'SỐ CA CHỞ HÀNG', 'PHỤ CẤP CHỞ', 'SỐ CA GIAO', 'PHỤ CẤP GIAO', 'ĐÃ TẠM ỨNG', 'LƯƠNG THỰC NHẬN',
@@ -183,7 +234,12 @@ export async function exportMonthlySalary(
       DAY_KEYS.forEach((dayKey, i) => {
         const date = new Date(weekStart);
         date.setDate(date.getDate() + i);
-        if (date.getFullYear() === Number(yearStr) && date.getMonth() + 1 === Number(monthStr)) {
+        
+        const inRange = (options?.startDate && options?.endDate)
+          ? (date >= options.startDate && date <= options.endDate)
+          : (date.getFullYear() === Number(yearStr) && date.getMonth() + 1 === Number(monthStr));
+          
+        if (inRange) {
           const arr = (userShifts[dayKey as keyof typeof userShifts] || []) as string[];
           const validIds = new Set((store?.customShifts || []).map(s => s.id));
           const hasValidNormalShift = arr.some(id => {
@@ -225,9 +281,21 @@ export async function exportMonthlySalary(
   const sheet = workbook.addWorksheet('Lương Tháng');
 
   const headerRow = sheet.addRow(headers);
-  headerRow.font = { bold: true };
+  headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  headerRow.eachCell(cell => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${themeColor}` } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+  });
   
-  rows.forEach(r => sheet.addRow(r));
+  rows.forEach(r => {
+    const row = sheet.addRow(r);
+    row.eachCell((cell, colNumber) => {
+      if (colNumber > 3) {
+        cell.alignment = { horizontal: 'center' };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightColorHex } };
+      }
+    });
+  });
 
   sheet.columns = [
     { width: 22 }, { width: 12 }, { width: 16 }, { width: 10 }, { width: 10 },
@@ -235,7 +303,7 @@ export async function exportMonthlySalary(
   ];
 
   const buffer = await workbook.xlsx.writeBuffer();
-  saveAs(new Blob([buffer]), `BaoCaoLuong_${month}.xlsx`);
+  saveAs(new Blob([buffer]), `BaoCaoLuong_${options?.startDate ? 'Filter' : month}.xlsx`);
 }
 
 export async function exportWeeklySchedule(

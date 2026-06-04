@@ -1,9 +1,10 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useApp } from '../layout';
-import { getMonthAttendances, getSchedulesInRange, watchAdvances, createAdvanceRequest, updateAdvanceRequestStatus } from '@/lib/firestore';
+import { getMonthAttendances, getSchedulesInRange, watchAdvances, createAdvanceRequest, updateAdvanceRequestStatus, getAttendancesInRange, getAdvancesInRange } from '@/lib/firestore';
 import { exportMonthlySalary } from '@/lib/exportExcel';
 import { AttendanceRecord, ScheduleModel, DaySchedule, AdvanceRequest } from '@/lib/types';
+import ExportModal from '../components/ExportModal';
 import { auth } from '@/lib/firebase';
 
 export default function SalaryPage() {
@@ -19,6 +20,7 @@ export default function SalaryPage() {
   const [showAdvanceModal, setShowAdvanceModal] = useState(false);
   const [advanceAmount, setAdvanceAmount] = useState('');
   const [advanceNote, setAdvanceNote] = useState('');
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const currentUser = auth.currentUser;
   
   const currentMember = currentUser ? members.find(m => m.userId === currentUser.uid) : null;
@@ -87,10 +89,42 @@ export default function SalaryPage() {
     return count;
   };
 
-  const handleExport = () => {
-    if (!store) return;
-    // We pass schedules down to the export function so it can calculate delivery pay
-    exportMonthlySalary(activeMembers, attendances, currentMonth, store, schedules, advances);
+  const handleExportClick = () => {
+    setIsExportModalOpen(true);
+  };
+
+  const handleExportConfirm = async (filters: { memberId?: string, type: 'month' | 'range', month?: string, startDate?: string, endDate?: string }) => {
+    if (!store || !storeId) return;
+    try {
+      setLoading(true);
+      const filteredMembers = filters.memberId 
+        ? activeMembers.filter(m => m.userId === filters.memberId)
+        : activeMembers;
+        
+      let dataAttendances: AttendanceRecord[] = [];
+      let dataAdvances: AdvanceRequest[] = [];
+      let startObj: Date | undefined;
+      let endObj: Date | undefined;
+      
+      if (filters.type === 'month' && filters.month) {
+        dataAttendances = filters.month === currentMonth ? attendances : await getMonthAttendances(storeId, filters.month);
+        // Note: we can't easily get other month's advances if we don't fetch them, let's just pass empty or the current if it matches
+        dataAdvances = filters.month === currentMonth ? advances : [];
+      } else if (filters.type === 'range' && filters.startDate && filters.endDate) {
+        dataAttendances = await getAttendancesInRange(storeId, filters.startDate, filters.endDate);
+        dataAdvances = await getAdvancesInRange(storeId, filters.startDate, filters.endDate);
+        startObj = new Date(filters.startDate);
+        endObj = new Date(filters.endDate);
+      }
+      
+      const monthParam = filters.type === 'month' ? filters.month! : currentMonth;
+      await exportMonthlySalary(filteredMembers, dataAttendances, monthParam, store, schedules, dataAdvances, { startDate: startObj, endDate: endObj });
+    } catch (e) {
+      console.error(e);
+      alert('Lỗi xuất dữ liệu: ' + e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   let totalPayout = 0;
@@ -177,8 +211,8 @@ export default function SalaryPage() {
               💵 Xin ứng lương
             </button>
           )}
-          <button onClick={handleExport} className="btn btn-primary" style={{ background: 'var(--success)' }}>
-            📥 Xuất Excel
+          <button onClick={handleExportClick} className="btn btn-primary" style={{ background: 'var(--success)' }}>
+            <span className="material-icons" style={{ fontSize: 18, marginRight: 4 }}>download</span> Xuất Excel
           </button>
         </div>
       </div>
@@ -352,6 +386,14 @@ export default function SalaryPage() {
           </div>
         </div>
       )}
+
+      <ExportModal 
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        members={activeMembers}
+        onExport={handleExportConfirm}
+        title="Xuất Bảng Lương"
+      />
     </div>
   );
 }

@@ -1,9 +1,10 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useApp } from '../layout';
-import { getMonthAttendances, editAttendance, createManualAttendance, getSchedulesInRange } from '@/lib/firestore';
+import { getMonthAttendances, editAttendance, createManualAttendance, getSchedulesInRange, getAttendancesInRange } from '@/lib/firestore';
 import { exportMonthlyAttendance, exportDetailedInOut } from '@/lib/exportExcel';
 import { AttendanceRecord, ScheduleModel } from '@/lib/types';
+import ExportModal from '../components/ExportModal';
 
 export default function AttendancePage() {
   const { storeId, members, user, store } = useApp();
@@ -20,6 +21,9 @@ export default function AttendancePage() {
     date: string;
     att?: AttendanceRecord;
   } | null>(null);
+
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportMode, setExportMode] = useState<'summary'|'detailed'>('summary');
 
   const [editForm, setEditForm] = useState({
     checkInDate: '',
@@ -57,14 +61,49 @@ export default function AttendancePage() {
     return `${currentMonth}-${String(day).padStart(2, '0')}`;
   });
 
-  const handleExport = () => {
-    if (!store) return;
-    exportMonthlyAttendance(activeMembers, attendances, currentMonth, store, schedules);
+  const handleExportSummary = () => {
+    setExportMode('summary');
+    setIsExportModalOpen(true);
   };
 
   const handleExportDetailed = () => {
-    if (!store) return;
-    exportDetailedInOut(activeMembers, attendances, currentMonth);
+    setExportMode('detailed');
+    setIsExportModalOpen(true);
+  };
+
+  const handleExportConfirm = async (filters: { memberId?: string, type: 'month' | 'range', month?: string, startDate?: string, endDate?: string }) => {
+    if (!store || !storeId) return;
+    try {
+      setLoading(true);
+      const filteredMembers = filters.memberId 
+        ? activeMembers.filter(m => m.userId === filters.memberId)
+        : activeMembers;
+        
+      let dataAttendances: AttendanceRecord[] = [];
+      let startObj: Date | undefined;
+      let endObj: Date | undefined;
+      
+      if (filters.type === 'month' && filters.month) {
+        dataAttendances = filters.month === currentMonth ? attendances : await getMonthAttendances(storeId, filters.month);
+      } else if (filters.type === 'range' && filters.startDate && filters.endDate) {
+        dataAttendances = await getAttendancesInRange(storeId, filters.startDate, filters.endDate);
+        startObj = new Date(filters.startDate);
+        endObj = new Date(filters.endDate);
+      }
+      
+      if (exportMode === 'summary') {
+        const monthParam = filters.type === 'month' ? filters.month! : currentMonth;
+        await exportMonthlyAttendance(filteredMembers, dataAttendances, monthParam, store, schedules, { startDate: startObj, endDate: endObj });
+      } else {
+        const monthParam = filters.type === 'month' ? filters.month! : currentMonth;
+        await exportDetailedInOut(filteredMembers, dataAttendances, monthParam);
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Lỗi xuất dữ liệu: ' + e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const openEditModal = (userId: string, date: string, att?: AttendanceRecord) => {
@@ -140,11 +179,11 @@ export default function AttendancePage() {
             onChange={e => setCurrentMonth(e.target.value)}
             style={{ width: 150 }}
           />
-          <button onClick={handleExport} className="btn btn-primary" style={{ background: 'var(--success)' }}>
-            📥 Xuất Tổng Hợp
+          <button onClick={handleExportSummary} className="btn btn-primary" style={{ background: 'var(--success)' }}>
+            <span className="material-icons" style={{ fontSize: 18, marginRight: 4 }}>download</span> Tổng Hợp
           </button>
           <button onClick={handleExportDetailed} className="btn btn-primary" style={{ background: 'var(--accent)' }}>
-            📥 Xuất Chi Tiết IN-OUT
+            <span className="material-icons" style={{ fontSize: 18, marginRight: 4 }}>download</span> IN-OUT
           </button>
         </div>
       </div>
@@ -299,6 +338,14 @@ export default function AttendancePage() {
           </div>
         </div>
       )}
+      
+      <ExportModal 
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        members={activeMembers}
+        onExport={handleExportConfirm}
+        title={exportMode === 'summary' ? "Xuất Bảng Công Tổng Hợp" : "Xuất Bảng Công Chi Tiết (IN/OUT)"}
+      />
     </div>
   );
 }
