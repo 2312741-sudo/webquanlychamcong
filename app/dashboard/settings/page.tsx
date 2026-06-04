@@ -303,7 +303,7 @@ export default function SettingsPage() {
                 <div style={{ paddingTop: 20 }}>
                   <button 
                     onClick={() => removeWifi(i)}
-                    style={{ width: 36, height: 36, borderRadius: 18, border: 'none', background: 'var(--danger)', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    style={{ width: 36, height: 36, borderRadius: 18, border: 'none', background: 'var(--primary)', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                   >
                     ×
                   </button>
@@ -356,7 +356,7 @@ export default function SettingsPage() {
                 <div style={{ paddingTop: 20 }}>
                   <button 
                     onClick={() => removeDepartment(i)}
-                    style={{ width: 36, height: 36, borderRadius: 18, border: 'none', background: 'var(--danger)', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    style={{ width: 36, height: 36, borderRadius: 18, border: 'none', background: 'var(--primary)', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                   >
                     ×
                   </button>
@@ -438,7 +438,7 @@ export default function SettingsPage() {
                   <div style={{ paddingTop: 20 }}>
                     <button 
                       onClick={() => removeShift(i)}
-                      style={{ width: 36, height: 36, borderRadius: 18, border: 'none', background: 'var(--danger)', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      style={{ width: 36, height: 36, borderRadius: 18, border: 'none', background: 'var(--primary)', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     >
                       ×
                     </button>
@@ -476,7 +476,7 @@ export default function SettingsPage() {
               className="btn btn-secondary" 
               onClick={handleClearSchedules}
               disabled={saving}
-              style={{ color: 'white', background: 'var(--danger)', borderColor: 'var(--danger)', marginBottom: 12 }}
+              style={{ color: 'white', background: 'var(--primary)', borderColor: 'var(--primary)', marginBottom: 12 }}
             >
               🗑️ Xóa toàn bộ dữ liệu lịch làm
             </button>
@@ -485,7 +485,7 @@ export default function SettingsPage() {
               className="btn btn-secondary" 
               onClick={handleClearAttendances}
               disabled={saving}
-              style={{ color: 'white', background: 'var(--danger)', borderColor: 'var(--danger)' }}
+              style={{ color: 'white', background: 'var(--primary)', borderColor: 'var(--primary)' }}
             >
               🗑️ Xóa toàn bộ dữ liệu IN/OUT (Chấm công)
             </button>
