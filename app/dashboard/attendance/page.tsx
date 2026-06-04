@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../layout';
 import { getMonthAttendances, editAttendance, createManualAttendance, getSchedulesInRange } from '@/lib/firestore';
-import { exportMonthlyAttendance } from '@/lib/exportExcel';
+import { exportMonthlyAttendance, exportDetailedInOut } from '@/lib/exportExcel';
 import { AttendanceRecord, ScheduleModel } from '@/lib/types';
 
 export default function AttendancePage() {
@@ -60,6 +60,11 @@ export default function AttendancePage() {
   const handleExport = () => {
     if (!store) return;
     exportMonthlyAttendance(activeMembers, attendances, currentMonth, store, schedules);
+  };
+
+  const handleExportDetailed = () => {
+    if (!store) return;
+    exportDetailedInOut(activeMembers, attendances, currentMonth);
   };
 
   const openEditModal = (userId: string, date: string, att?: AttendanceRecord) => {
@@ -136,7 +141,10 @@ export default function AttendancePage() {
             style={{ width: 150 }}
           />
           <button onClick={handleExport} className="btn btn-primary" style={{ background: 'var(--success)' }}>
-            📥 Xuất Excel
+            📥 Xuất Tổng Hợp
+          </button>
+          <button onClick={handleExportDetailed} className="btn btn-primary" style={{ background: 'var(--accent)' }}>
+            📥 Xuất Chi Tiết IN-OUT
           </button>
         </div>
       </div>

@@ -99,27 +99,44 @@ export function exportMonthlyAttendance(
   });
 
   const wb = XLSX.utils.book_new();
-  const ws1 = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-  ws1['!cols'] = [{ wch: 22 }, { wch: 12 }, ...Array(daysInMonth).fill({ wch: 16 }), { wch: 10 }, { wch: 10 }, { wch: 14 }, { wch: 10 }, { wch: 14 }];
-  XLSX.utils.book_append_sheet(wb, ws1, 'Tổng Hợp');
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  ws['!cols'] = [{ wch: 22 }, { wch: 12 }, ...Array(daysInMonth).fill({ wch: 16 }), { wch: 10 }, { wch: 10 }, { wch: 14 }, { wch: 10 }, { wch: 14 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'Bảng Công');
+  XLSX.writeFile(wb, `BangCong_${month}.xlsx`);
+}
 
-  // Sheet 2: Chi Tiết IN-OUT
+export function exportDetailedInOut(
+  members: Member[],
+  attendances: AttendanceRecord[],
+  month: string,
+) {
   const detailHeaders = ['ngày', 'mã nv', 'tên nhân viên', 'giờ', 'in/out'];
   const detailRows: any[][] = [];
   
   const sortedAtts = [...attendances].sort((a, b) => {
     if (a.date !== b.date) return a.date.localeCompare(b.date);
+    const formatTime = (val: any) => {
+      if (!val) return null;
+      const d = val.toDate ? val.toDate() : (val.seconds ? new Date(val.seconds * 1000) : new Date(val));
+      return isNaN(d.getTime()) ? null : d;
+    };
     const timeA = formatTime(a.checkIn)?.getTime() || 0;
     const timeB = formatTime(b.checkIn)?.getTime() || 0;
     return timeA - timeB;
   });
 
+  const formatTimeHelper = (val: any) => {
+    if (!val) return null;
+    const d = val.toDate ? val.toDate() : (val.seconds ? new Date(val.seconds * 1000) : new Date(val));
+    return isNaN(d.getTime()) ? null : d;
+  };
+
   sortedAtts.forEach(att => {
     const member = members.find(m => m.userId === att.userId);
     if (!member) return;
     
-    const inD = formatTime(att.checkIn);
-    const outD = formatTime(att.checkOut);
+    const inD = formatTimeHelper(att.checkIn);
+    const outD = formatTimeHelper(att.checkOut);
     
     const formatStrDate = (d: Date) => `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
     const formatStrTime = (d: Date) => `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
@@ -145,11 +162,12 @@ export function exportMonthlyAttendance(
     }
   });
 
+  const wb = XLSX.utils.book_new();
   const ws2 = XLSX.utils.aoa_to_sheet([detailHeaders, ...detailRows]);
   ws2['!cols'] = [{ wch: 15 }, { wch: 12 }, { wch: 25 }, { wch: 10 }, { wch: 10 }];
   XLSX.utils.book_append_sheet(wb, ws2, 'Chi Tiết IN-OUT');
 
-  XLSX.writeFile(wb, `BangCong_${month}.xlsx`);
+  XLSX.writeFile(wb, `ChiTietInOut_${month}.xlsx`);
 }
 
 export function exportMonthlySalary(
