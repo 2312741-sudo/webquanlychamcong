@@ -563,7 +563,6 @@ export default function SettingsPage() {
             >
               🗑️ Xóa toàn bộ dữ liệu IN/OUT (Chấm công)
             </button>
-          </div>
         </div>
       </div>
 
