@@ -71,7 +71,8 @@ export interface ShiftDefinition {
   startMinute: number;
   endHour: number;
   endMinute: number;
-  isDelivery?: boolean;
+  isDelivery?: boolean; // Chở hàng
+  isGiaoHang?: boolean; // Giao hàng
 }
 
 export interface DaySchedule {

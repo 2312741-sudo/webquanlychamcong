@@ -54,10 +54,11 @@ export default function SalaryPage() {
     return () => unsubscribeAdvances();
   }, [storeId, currentMonth]);
 
-  const getDeliveryShiftsCount = (userId: string) => {
+  const getSpecialShiftsCounts = (userId: string) => {
     const DAY_KEYS: (keyof DaySchedule)[] = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
     
-    let count = 0;
+    let deliveryCount = 0;
+    let giaoHangCount = 0;
     const [yearStr, monthStr] = currentMonth.split('-');
     
     // We count deliveries only for dates that fall exactly in `currentMonth`
@@ -78,15 +79,16 @@ export default function SalaryPage() {
           const validIds = new Set((store?.customShifts || []).map(s => s.id));
           const hasValidNormalShift = arr.some(id => {
             const baseId = id.split('|')[0];
-            return baseId !== 'delivery' && validIds.has(baseId);
+            return baseId !== 'delivery' && baseId !== 'giaohang' && validIds.has(baseId);
           });
-          if (arr.includes('delivery') && hasValidNormalShift) {
-            count++;
+          if (hasValidNormalShift) {
+            if (arr.includes('delivery')) deliveryCount++;
+            if (arr.includes('giaohang')) giaoHangCount++;
           }
         }
       });
     });
-    return count;
+    return { deliveryCount, giaoHangCount };
   };
 
   const handleExportClick = () => {
@@ -130,6 +132,7 @@ export default function SalaryPage() {
   let totalPayout = 0;
   let totalHoursAll = 0;
   let totalDeliveries = 0;
+  let totalGiaoHang = 0;
 
   const rows = activeMembers.map(m => {
     const memberAtts = attendances.filter(a => a.userId === m.userId);
@@ -143,10 +146,13 @@ export default function SalaryPage() {
       calculatedSalary = totalHours * m.baseHourlyRate;
     }
     
-    const deliveryCount = getDeliveryShiftsCount(m.userId);
+    const { deliveryCount, giaoHangCount } = getSpecialShiftsCounts(m.userId);
     const deliveryPay = deliveryCount * (store?.deliveryAllowance || 0);
+    const giaoHangPay = giaoHangCount * (store?.giaoHangAllowance || 0);
+    
     totalDeliveries += deliveryCount;
-    calculatedSalary += deliveryPay;
+    totalGiaoHang += giaoHangCount;
+    calculatedSalary += deliveryPay + giaoHangPay;
     
     totalPayout += calculatedSalary;
 
@@ -162,6 +168,8 @@ export default function SalaryPage() {
       calculatedSalary,
       deliveryCount,
       deliveryPay,
+      giaoHangCount,
+      giaoHangPay,
       totalAdvance,
       netSalary,
       baseSalaryStr: m.employeeType === 'fulltime' ? m.baseMonthlySalary : m.baseHourlyRate
@@ -212,12 +220,12 @@ export default function SalaryPage() {
             </button>
           )}
           <button onClick={handleExportClick} className="btn btn-primary" style={{ background: 'var(--success)' }}>
-            <span className="material-icons" style={{ fontSize: 18, marginRight: 4 }}>download</span> Xuất Excel
+            <span className="material-icons" style={{ fontSize: 18 }}>download</span> Xuất Excel
           </button>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16 }}>
         <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{ width: 48, height: 48, borderRadius: 14, background: 'var(--info-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>👥</div>
           <div>
@@ -232,13 +240,22 @@ export default function SalaryPage() {
             <div style={{ fontSize: 22, fontWeight: 800 }}>{totalHoursAll.toFixed(1)}h</div>
           </div>
         </div>
-        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ width: 48, height: 48, borderRadius: 14, background: '#FFF3CD', color: '#856404', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>📦</div>
-          <div>
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>CHỞ HÀNG</div>
-            <div style={{ fontSize: 22, fontWeight: 800 }}>{totalDeliveries} ca</div>
+          <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{ width: 48, height: 48, borderRadius: 14, background: '#FFF3CD', color: '#856404', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>📦</div>
+            <div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>CHỞ HÀNG</div>
+              <div style={{ fontSize: 22, fontWeight: 800 }}>{totalDeliveries} ca</div>
+            </div>
           </div>
-        </div>
+          <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{ width: 48, height: 48, borderRadius: 14, background: '#fcf3cf', color: '#d4ac0d', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>
+              <span className="material-icons" style={{ fontSize: 22 }}>inventory_2</span>
+            </div>
+            <div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>GIAO HÀNG</div>
+              <div style={{ fontSize: 22, fontWeight: 800 }}>{totalGiaoHang} ca</div>
+            </div>
+          </div>
         <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{ width: 48, height: 48, borderRadius: 14, background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>💰</div>
           <div>
@@ -262,8 +279,9 @@ export default function SalaryPage() {
                   <th>Loại HĐ</th>
                   <th>Tổng giờ</th>
                   <th>Lương cơ bản</th>
-                  <th>Phụ cấp chở hàng</th>
-                  <th>Đã tạm ứng</th>
+                  <th style={{ minWidth: 100 }}>PHỤ CẤP CHỞ HÀNG</th>
+                  <th style={{ minWidth: 100 }}>PHỤ CẤP GIAO HÀNG</th>
+                  <th style={{ minWidth: 120 }}>ĐÃ TẠM ỨNG</th>
                   <th>Lương thực nhận</th>
                 </tr>
               </thead>
@@ -286,6 +304,9 @@ export default function SalaryPage() {
                     <td style={{ color: 'var(--text-secondary)' }}>{row.baseSalaryStr.toLocaleString('vi-VN')} vnđ</td>
                     <td style={{ color: 'var(--text-secondary)' }}>
                       {row.deliveryCount} ca = {row.deliveryPay.toLocaleString('vi-VN')} vnđ
+                    </td>
+                    <td style={{ color: 'var(--text-secondary)' }}>
+                      {row.giaoHangCount} ca = {row.giaoHangPay.toLocaleString('vi-VN')} vnđ
                     </td>
                     <td style={{ fontWeight: 600, color: 'var(--danger)' }}>
                       {row.totalAdvance > 0 ? `-${Math.round(row.totalAdvance).toLocaleString('vi-VN')} đ` : '0 đ'}
