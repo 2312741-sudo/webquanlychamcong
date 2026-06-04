@@ -18,6 +18,7 @@ export default function SettingsPage() {
   const [wifis, setWifis] = useState<{name: string; ip: string}[]>([]);
   const [shifts, setShifts] = useState<ShiftDefinition[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [deletePassword, setDeletePassword] = useState('123456');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -34,6 +35,7 @@ export default function SettingsPage() {
       setWifis(store.wifis || []);
       setShifts(store.customShifts || []);
       setDepartments(store.departments || []);
+      setDeletePassword((store as any).deletePassword || '123456');
     }
   }, [store]);
 
@@ -54,6 +56,7 @@ export default function SettingsPage() {
         wifis,
         customShifts: shifts,
         departments,
+        deletePassword,
       });
       alert('Đã lưu cài đặt');
     } catch (e) {
@@ -66,6 +69,13 @@ export default function SettingsPage() {
   const handleClearSchedules = async () => {
     if (!storeId) return;
     if (!confirm('BẠN CÓ CHẮC CHẮN MUỐN XÓA TOÀN BỘ LỊCH LÀM?\n\nThao tác này sẽ xóa sạch lịch làm của tất cả các tuần trong cửa hàng này và không thể hoàn tác!')) return;
+    
+    const pass = window.prompt('Vui lòng nhập mật khẩu bảo mật để xác nhận xóa toàn bộ lịch làm:');
+    if (pass !== deletePassword) {
+      alert('Mật khẩu không đúng. Đã hủy thao tác xóa.');
+      return;
+    }
+
     setSaving(true);
     try {
       await clearAllSchedules(storeId);
@@ -80,6 +90,13 @@ export default function SettingsPage() {
   const handleClearAttendances = async () => {
     if (!storeId) return;
     if (!confirm('BẠN CÓ CHẮC CHẮN MUỐN XÓA TOÀN BỘ DỮ LIỆU IN/OUT?\n\nThao tác này sẽ xóa sạch dữ liệu chấm công của tất cả nhân viên và không thể hoàn tác!')) return;
+    
+    const pass = window.prompt('Vui lòng nhập mật khẩu bảo mật để xác nhận xóa toàn bộ dữ liệu IN/OUT:');
+    if (pass !== deletePassword) {
+      alert('Mật khẩu không đúng. Đã hủy thao tác xóa.');
+      return;
+    }
+
     setSaving(true);
     try {
       await deleteAllAttendances(storeId);
@@ -469,6 +486,15 @@ export default function SettingsPage() {
         <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>Dữ liệu hệ thống</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
+            <label className="label">Mật khẩu bảo mật cho các thao tác xóa (Mặc định: 123456)</label>
+            <input 
+              type="text" 
+              className="input" 
+              value={deletePassword}
+              onChange={e => setDeletePassword(e.target.value)}
+              style={{ maxWidth: 300, marginBottom: 20 }}
+            />
+            
             <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 12 }}>
               Nếu hệ thống bị lỗi hiển thị số liệu ca cũ do thay đổi nhiều cài đặt, bạn có thể xóa toàn bộ lịch làm để xếp lại từ đầu.
             </p>
