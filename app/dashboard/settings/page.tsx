@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useApp } from '../layout';
-import { updateStore, clearAllSchedules } from '@/lib/firestore';
+import { updateStore, clearAllSchedules, deleteAllAttendances } from '@/lib/firestore';
 import { ShiftDefinition, Department } from '@/lib/types';
 
 export default function SettingsPage() {
@@ -72,6 +72,20 @@ export default function SettingsPage() {
       alert('Đã xóa toàn bộ lịch làm thành công!');
     } catch (e) {
       alert('Lỗi khi xóa lịch làm');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleClearAttendances = async () => {
+    if (!storeId) return;
+    if (!confirm('BẠN CÓ CHẮC CHẮN MUỐN XÓA TOÀN BỘ DỮ LIỆU IN/OUT?\n\nThao tác này sẽ xóa sạch dữ liệu chấm công của tất cả nhân viên và không thể hoàn tác!')) return;
+    setSaving(true);
+    try {
+      await deleteAllAttendances(storeId);
+      alert('Đã xóa toàn bộ dữ liệu IN/OUT thành công!');
+    } catch (e) {
+      alert('Lỗi khi xóa dữ liệu');
     } finally {
       setSaving(false);
     }
@@ -462,9 +476,18 @@ export default function SettingsPage() {
               className="btn btn-secondary" 
               onClick={handleClearSchedules}
               disabled={saving}
-              style={{ color: 'white', background: 'var(--danger)', borderColor: 'var(--danger)' }}
+              style={{ color: 'white', background: 'var(--danger)', borderColor: 'var(--danger)', marginBottom: 12 }}
             >
               🗑️ Xóa toàn bộ dữ liệu lịch làm
+            </button>
+            <br/>
+            <button 
+              className="btn btn-secondary" 
+              onClick={handleClearAttendances}
+              disabled={saving}
+              style={{ color: 'white', background: 'var(--danger)', borderColor: 'var(--danger)' }}
+            >
+              🗑️ Xóa toàn bộ dữ liệu IN/OUT (Chấm công)
             </button>
           </div>
         </div>

@@ -2,7 +2,7 @@ import { db } from './firebase';
 import {
   collection, doc, query, where, getDocs, getDoc,
   updateDoc, addDoc, orderBy, Timestamp, onSnapshot,
-  setDoc, limit, DocumentSnapshot
+  setDoc, limit, DocumentSnapshot, deleteDoc
 } from 'firebase/firestore';
 import { Member, AttendanceRecord, Store, ScheduleModel, DaySchedule } from './types';
 
@@ -186,5 +186,13 @@ export async function clearAllSchedules(storeId: string): Promise<void> {
   const snap = await getDocs(q);
   for (const d of snap.docs) {
     await updateDoc(d.ref, { shifts: {} });
+  }
+}
+
+export async function deleteAllAttendances(storeId: string): Promise<void> {
+  const q = query(collection(db, 'stores', storeId, 'attendances'));
+  const snap = await getDocs(q);
+  for (const d of snap.docs) {
+    await deleteDoc(d.ref);
   }
 }
