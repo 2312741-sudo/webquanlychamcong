@@ -19,6 +19,8 @@ export default function SettingsPage() {
   const [shifts, setShifts] = useState<ShiftDefinition[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [deletePassword, setDeletePassword] = useState('123456');
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -56,11 +58,35 @@ export default function SettingsPage() {
         wifis,
         customShifts: shifts,
         departments,
-        deletePassword,
       });
       alert('Đã lưu cài đặt');
     } catch (e) {
       alert('Lỗi khi lưu cài đặt');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!storeId) return;
+    if (!oldPassword || !newPassword) {
+      alert('Vui lòng nhập đủ mật khẩu cũ và mới');
+      return;
+    }
+    const currentPass = (store as any).deletePassword || '123456';
+    if (oldPassword !== currentPass) {
+      alert('Mật khẩu cũ không chính xác!');
+      return;
+    }
+    setSaving(true);
+    try {
+      await updateStore(storeId, { deletePassword: newPassword });
+      setDeletePassword(newPassword);
+      alert('Đổi mật khẩu thành công!');
+      setOldPassword('');
+      setNewPassword('');
+    } catch (e) {
+      alert('Lỗi khi đổi mật khẩu');
     } finally {
       setSaving(false);
     }
@@ -485,15 +511,37 @@ export default function SettingsPage() {
       <div className="card">
         <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>Dữ liệu hệ thống</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div>
-            <label className="label">Mật khẩu bảo mật cho các thao tác xóa (Mặc định: 123456)</label>
-            <input 
-              type="text" 
-              className="input" 
-              value={deletePassword}
-              onChange={e => setDeletePassword(e.target.value)}
-              style={{ maxWidth: 300, marginBottom: 20 }}
-            />
+          <div style={{ background: 'var(--surface)', padding: 16, borderRadius: 8, marginBottom: 20 }}>
+            <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>Đổi mật khẩu bảo mật (dùng khi xóa dữ liệu)</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 300 }}>
+              <div>
+                <label className="label">Mật khẩu cũ (Mặc định: 123456)</label>
+                <input 
+                  type="password" 
+                  className="input" 
+                  value={oldPassword}
+                  onChange={e => setOldPassword(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="label">Mật khẩu mới</label>
+                <input 
+                  type="password" 
+                  className="input" 
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                />
+              </div>
+              <button 
+                className="btn btn-secondary"
+                onClick={handleChangePassword}
+                disabled={saving || !oldPassword || !newPassword}
+                style={{ width: 'max-content', marginTop: 4 }}
+              >
+                Cập nhật mật khẩu
+              </button>
+            </div>
+          </div>
             
             <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 12 }}>
               Nếu hệ thống bị lỗi hiển thị số liệu ca cũ do thay đổi nhiều cài đặt, bạn có thể xóa toàn bộ lịch làm để xếp lại từ đầu.
