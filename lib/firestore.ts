@@ -179,11 +179,12 @@ export async function updateAdvanceRequestStatus(storeId: string, advanceId: str
 export function watchAdvances(storeId: string, month: string, cb: (advances: AdvanceRequest[]) => void) {
   const q = query(
     collection(db, 'stores', storeId, 'advances'),
-    where('month', '==', month),
-    orderBy('requestDate', 'desc')
+    where('month', '==', month)
   );
   return onSnapshot(q, snap => {
-    cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as AdvanceRequest)));
+    const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as AdvanceRequest));
+    list.sort((a, b) => new Date(b.requestDate).getTime() - new Date(a.requestDate).getTime());
+    cb(list);
   });
 }
 
