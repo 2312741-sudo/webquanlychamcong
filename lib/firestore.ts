@@ -4,7 +4,7 @@ import {
   updateDoc, addDoc, orderBy, Timestamp, onSnapshot,
   setDoc, limit, DocumentSnapshot, deleteDoc
 } from 'firebase/firestore';
-import { Member, AttendanceRecord, Store, ScheduleModel, DaySchedule } from './types';
+import { Member, AttendanceRecord, Store, ScheduleModel, DaySchedule, AdvanceRequest } from './types';
 
 export async function getUserStoreId(uid: string): Promise<string | null> {
   const snap = await getDoc(doc(db, 'users', uid));
@@ -159,6 +159,34 @@ export async function getSchedulesInRange(storeId: string, startDateStr: string,
   const snap = await getDocs(q);
   return snap.docs.map(d => ({ id: d.id, ...d.data() } as ScheduleModel));
 }
+
+// ---------------- Advances ----------------
+export async function createAdvanceRequest(storeId: string, data: Omit<AdvanceRequest, 'id'>): Promise<string> {
+  const collRef = collection(db, 'stores', storeId, 'advances');
+  const docRef = await addDoc(collRef, data);
+  return docRef.id;
+}
+
+export async function updateAdvanceRequestStatus(storeId: string, advanceId: string, status: 'approved' | 'rejected', approvedDate?: string) {
+  const docRef = doc(db, 'stores', storeId, 'advances', advanceId);
+  const updateData: any = { status };
+  if (approvedDate) {
+    updateData.approvedDate = approvedDate;
+  }
+  await updateDoc(docRef, updateData);
+}
+
+export function watchAdvances(storeId: string, month: string, cb: (advances: AdvanceRequest[]) => void) {
+  const q = query(
+    collection(db, 'stores', storeId, 'advances'),
+    where('month', '==', month),
+    orderBy('requestDate', 'desc')
+  );
+  return onSnapshot(q, snap => {
+    cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as AdvanceRequest)));
+  });
+}
+
 
 export async function saveWeekSchedule(
   storeId: string, weekStart: string, shifts: Record<string, DaySchedule>

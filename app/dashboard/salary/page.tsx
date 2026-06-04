@@ -1,9 +1,10 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useApp } from '../layout';
-import { getMonthAttendances, getSchedulesInRange } from '@/lib/firestore';
+import { getMonthAttendances, getSchedulesInRange, watchAdvances, createAdvanceRequest, updateAdvanceRequestStatus } from '@/lib/firestore';
 import { exportMonthlySalary } from '@/lib/exportExcel';
-import { AttendanceRecord, ScheduleModel, DaySchedule } from '@/lib/types';
+import { AttendanceRecord, ScheduleModel, DaySchedule, AdvanceRequest } from '@/lib/types';
+import { auth } from '@/lib/firebase';
 
 export default function SalaryPage() {
   const { storeId, store, members } = useApp();
@@ -13,7 +14,15 @@ export default function SalaryPage() {
   });
   const [attendances, setAttendances] = useState<AttendanceRecord[]>([]);
   const [schedules, setSchedules] = useState<ScheduleModel[]>([]);
+  const [advances, setAdvances] = useState<AdvanceRequest[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showAdvanceModal, setShowAdvanceModal] = useState(false);
+  const [advanceAmount, setAdvanceAmount] = useState('');
+  const [advanceNote, setAdvanceNote] = useState('');
+  const currentUser = auth.currentUser;
+  
+  const currentMember = currentUser ? members.find(m => m.userId === currentUser.uid) : null;
+  const isOwner = currentMember?.role === 'owner';
 
   const activeMembers = members.filter(m => m.status === 'active');
 
@@ -35,6 +44,12 @@ export default function SalaryPage() {
       setAttendances(atts);
       setSchedules(scheds);
     }).finally(() => setLoading(false));
+
+    const unsubscribeAdvances = watchAdvances(storeId, currentMonth, (advs) => {
+      setAdvances(advs);
+    });
+
+    return () => unsubscribeAdvances();
   }, [storeId, currentMonth]);
 
   const getDeliveryShiftsCount = (userId: string) => {
@@ -75,7 +90,7 @@ export default function SalaryPage() {
   const handleExport = () => {
     if (!store) return;
     // We pass schedules down to the export function so it can calculate delivery pay
-    exportMonthlySalary(activeMembers, attendances, currentMonth, store, schedules);
+    exportMonthlySalary(activeMembers, attendances, currentMonth, store, schedules, advances);
   };
 
   let totalPayout = 0;
@@ -101,15 +116,44 @@ export default function SalaryPage() {
     
     totalPayout += calculatedSalary;
 
+    let totalAdvance = advances
+      .filter(a => a.userId === m.userId && a.status === 'approved')
+      .reduce((sum, a) => sum + a.amount, 0);
+
+    const netSalary = calculatedSalary - totalAdvance;
+
     return {
       ...m,
       totalHours,
       calculatedSalary,
       deliveryCount,
       deliveryPay,
+      totalAdvance,
+      netSalary,
       baseSalaryStr: m.employeeType === 'fulltime' ? m.baseMonthlySalary : m.baseHourlyRate
     };
   });
+
+  const handleRequestAdvance = async () => {
+    if (!storeId || !currentUser || !advanceAmount) return;
+    const amountNum = parseInt(advanceAmount);
+    if (isNaN(amountNum) || amountNum <= 0) return;
+
+    await createAdvanceRequest(storeId, {
+      userId: currentUser.uid,
+      storeId: storeId,
+      month: currentMonth,
+      amount: amountNum,
+      status: 'pending',
+      requestDate: new Date().toISOString(),
+      note: advanceNote
+    });
+
+    setShowAdvanceModal(false);
+    setAdvanceAmount('');
+    setAdvanceNote('');
+    alert('Đã gửi yêu cầu ứng lương thành công!');
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -128,6 +172,11 @@ export default function SalaryPage() {
             onChange={e => setCurrentMonth(e.target.value)}
             style={{ width: 150 }}
           />
+          {!isOwner && (
+            <button onClick={() => setShowAdvanceModal(true)} className="btn btn-secondary">
+              💵 Xin ứng lương
+            </button>
+          )}
           <button onClick={handleExport} className="btn btn-primary" style={{ background: 'var(--success)' }}>
             📥 Xuất Excel
           </button>
@@ -180,6 +229,7 @@ export default function SalaryPage() {
                   <th>Tổng giờ</th>
                   <th>Lương cơ bản</th>
                   <th>Phụ cấp chở hàng</th>
+                  <th>Đã tạm ứng</th>
                   <th>Lương thực nhận</th>
                 </tr>
               </thead>
@@ -203,8 +253,11 @@ export default function SalaryPage() {
                     <td style={{ color: 'var(--text-secondary)' }}>
                       {row.deliveryCount} ca = {row.deliveryPay.toLocaleString('vi-VN')} vnđ
                     </td>
+                    <td style={{ fontWeight: 600, color: 'var(--danger)' }}>
+                      {row.totalAdvance > 0 ? `-${Math.round(row.totalAdvance).toLocaleString('vi-VN')} đ` : '0 đ'}
+                    </td>
                     <td style={{ fontWeight: 700, color: 'var(--primary)' }}>
-                      {Math.round(row.calculatedSalary).toLocaleString('vi-VN')} vnđ
+                      {Math.round(row.netSalary).toLocaleString('vi-VN')} vnđ
                     </td>
                   </tr>
                 ))}
@@ -220,6 +273,85 @@ export default function SalaryPage() {
           </div>
         )}
       </div>
+
+      {isOwner && advances.filter(a => a.status === 'pending').length > 0 && (
+        <div>
+          <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12 }}>Yêu cầu ứng lương cần duyệt</h2>
+          <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {advances.filter(a => a.status === 'pending').map(adv => {
+              const member = members.find(m => m.userId === adv.userId);
+              return (
+                <div key={adv.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 12, border: '1px solid var(--border)', borderRadius: 8 }}>
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{member?.name || 'Nhân viên'} xin ứng {adv.amount.toLocaleString('vi-VN')} đ</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                      Ngày xin: {new Date(adv.requestDate).toLocaleString('vi-VN')}
+                      {adv.note && ` - Ghi chú: ${adv.note}`}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button 
+                      className="btn btn-primary" 
+                      onClick={() => updateAdvanceRequestStatus(storeId, adv.id, 'approved', new Date().toISOString())}
+                      style={{ padding: '6px 12px', fontSize: 13 }}
+                    >
+                      Duyệt
+                    </button>
+                    <button 
+                      className="btn btn-secondary" 
+                      onClick={() => updateAdvanceRequestStatus(storeId, adv.id, 'rejected')}
+                      style={{ padding: '6px 12px', fontSize: 13, color: 'var(--danger)' }}
+                    >
+                      Từ chối
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {showAdvanceModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="card" style={{ width: 400, padding: 24 }}>
+            <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>Xin ứng lương</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <label className="label">Số tiền (VNĐ)</label>
+                <input 
+                  type="number" 
+                  className="input" 
+                  value={advanceAmount}
+                  onChange={e => setAdvanceAmount(e.target.value)}
+                  placeholder="VD: 500000"
+                />
+              </div>
+              <div>
+                <label className="label">Lý do (không bắt buộc)</label>
+                <input 
+                  type="text" 
+                  className="input" 
+                  value={advanceNote}
+                  onChange={e => setAdvanceNote(e.target.value)}
+                  placeholder="VD: Có việc gấp"
+                />
+              </div>
+              
+              {advances.filter(a => a.userId === currentUser?.uid && a.status === 'pending').length > 0 && (
+                <div style={{ color: 'var(--warning)', fontSize: 13, padding: 8, background: '#fff3cd', borderRadius: 4 }}>
+                  ⚠️ Bạn đang có 1 yêu cầu chờ duyệt, gửi thêm sẽ tạo yêu cầu mới.
+                </div>
+              )}
+              
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 8 }}>
+                <button className="btn btn-secondary" onClick={() => setShowAdvanceModal(false)}>Hủy</button>
+                <button className="btn btn-primary" onClick={handleRequestAdvance} disabled={!advanceAmount}>Gửi yêu cầu</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

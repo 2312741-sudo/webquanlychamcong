@@ -90,3 +90,15 @@ export interface ScheduleModel {
   weekStart: string;
   shifts: Record<string, DaySchedule>;
 }
+
+export interface AdvanceRequest {
+  id: string;
+  storeId: string;
+  userId: string;
+  month: string; // YYYY-MM
+  amount: number;
+  status: 'pending' | 'approved' | 'rejected';
+  requestDate: string; // ISO string
+  approvedDate?: string;
+  note?: string;
+}

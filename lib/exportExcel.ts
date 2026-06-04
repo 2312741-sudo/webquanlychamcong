@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx';
 import * as ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
-import { Member, AttendanceRecord, ScheduleModel, Store, ShiftDefinition, DaySchedule } from './types';
+import { Member, AttendanceRecord, ScheduleModel, Store, ShiftDefinition, DaySchedule, AdvanceRequest } from './types';
 
 const DAY_KEYS = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
 const DAY_LABELS = ['Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7','Chủ nhật'];
@@ -152,11 +152,12 @@ export async function exportMonthlySalary(
   attendances: AttendanceRecord[],
   month: string,
   store: Store,
-  schedules: ScheduleModel[]
+  schedules: ScheduleModel[],
+  advances: AdvanceRequest[] = []
 ) {
   const headers = [
     'TÊN NHÂN VIÊN', 'VAI TRÒ', 'LOẠI HĐ',
-    'TỔNG GIỜ', 'GIỜ CHUẨN', 'LƯƠNG CƠ BẢN', 'SỐ CA CHỞ HÀNG', 'PHỤ CẤP CHỞ', 'SỐ CA GIAO', 'PHỤ CẤP GIAO', 'LƯƠNG THỰC NHẬN',
+    'TỔNG GIỜ', 'GIỜ CHUẨN', 'LƯƠNG CƠ BẢN', 'SỐ CA CHỞ HÀNG', 'PHỤ CẤP CHỞ', 'SỐ CA GIAO', 'PHỤ CẤP GIAO', 'ĐÃ TẠM ỨNG', 'LƯƠNG THỰC NHẬN',
   ];
 
   const rows = members.map(member => {
@@ -198,6 +199,12 @@ export async function exportMonthlySalary(
     const giaoHangPay = giaoHangCount * (store.giaoHangAllowance || 0);
     calculatedSalary += deliveryPay + giaoHangPay;
 
+    let totalAdvance = advances
+      .filter(a => a.userId === member.userId && a.status === 'approved')
+      .reduce((sum, a) => sum + a.amount, 0);
+
+    const netSalary = calculatedSalary - totalAdvance;
+
     return [
       member.name,
       ROLE_LABELS[member.role] || member.role,
@@ -209,7 +216,8 @@ export async function exportMonthlySalary(
       `${deliveryPay.toLocaleString('vi-VN')} vnđ`,
       `${giaoHangCount} ca`,
       `${giaoHangPay.toLocaleString('vi-VN')} vnđ`,
-      `${Math.round(calculatedSalary).toLocaleString('vi-VN')} vnđ`,
+      `${totalAdvance.toLocaleString('vi-VN')} vnđ`,
+      `${Math.round(netSalary).toLocaleString('vi-VN')} vnđ`,
     ];
   });
 
@@ -223,7 +231,7 @@ export async function exportMonthlySalary(
 
   sheet.columns = [
     { width: 22 }, { width: 12 }, { width: 16 }, { width: 10 }, { width: 10 },
-    { width: 16 }, { width: 14 }, { width: 16 }, { width: 14 }, { width: 16 }, { width: 20 }
+    { width: 16 }, { width: 14 }, { width: 16 }, { width: 14 }, { width: 16 }, { width: 16 }, { width: 20 }
   ];
 
   const buffer = await workbook.xlsx.writeBuffer();
