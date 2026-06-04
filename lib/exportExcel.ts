@@ -123,7 +123,10 @@ export async function exportDetailedInOut(
   members: Member[],
   attendances: AttendanceRecord[],
   month: string,
+  store?: Store,
 ) {
+  const themeColor = (store?.themeColor || '#C8102E').replace('#', '');
+  const lightColorHex = getLightHex(themeColor);
   const detailHeaders = ['NGÀY', 'MÃ NV', 'TÊN NHÂN VIÊN', 'GIỜ', 'IN/OUT'];
   const detailRows: any[][] = [];
   
@@ -180,9 +183,29 @@ export async function exportDetailedInOut(
   const sheet = workbook.addWorksheet('Chi Tiết IN-OUT');
 
   const headerRow = sheet.addRow(detailHeaders);
-  headerRow.font = { bold: true };
+  headerRow.eachCell(cell => {
+    cell.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: `FF${themeColor}` }
+    };
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+  });
   
-  detailRows.forEach(r => sheet.addRow(r));
+  detailRows.forEach(r => {
+    const row = sheet.addRow(r);
+    row.eachCell((cell, colNumber) => {
+      if (colNumber > 3) {
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: lightColorHex }
+        };
+      }
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    });
+  });
 
   sheet.getColumn(1).width = 15;
   sheet.getColumn(2).width = 15;

@@ -96,7 +96,9 @@ export default function AttendancePage() {
         await exportMonthlyAttendance(filteredMembers, dataAttendances, monthParam, store, schedules, { startDate: startObj, endDate: endObj });
       } else {
         const monthParam = filters.type === 'month' ? filters.month! : currentMonth;
-        await exportDetailedInOut(filteredMembers, dataAttendances, monthParam);
+        if (store) {
+          await exportDetailedInOut(filteredMembers, dataAttendances, monthParam, store);
+        }
       }
     } catch (e) {
       console.error(e);
