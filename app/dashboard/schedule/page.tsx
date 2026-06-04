@@ -320,7 +320,7 @@ export default function SchedulePage() {
                       </div>
                     </label>
                     
-                    {isSelected && (currentUser?.role === 'owner' || store?.departmentSelectionEnabled !== false) && (
+                    {isSelected && (currentMember?.role === 'owner' || store?.departmentSelectionEnabled !== false) && (
                       <div style={{ padding: '8px 12px', background: 'white' }}>
                         <select 
                           className="input" 
