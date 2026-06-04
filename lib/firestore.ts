@@ -85,10 +85,11 @@ export function watchTodayAttendances(storeId: string, cb: (records: AttendanceR
 
 export async function editAttendance(
   storeId: string, attendanceId: string,
-  checkIn: Date, checkOut: Date, editNote: string, editedBy: string
+  date: string, checkIn: Date, checkOut: Date, editNote: string, editedBy: string
 ): Promise<void> {
   const totalHours = (checkOut.getTime() - checkIn.getTime()) / 3600000;
   await updateDoc(doc(db, 'stores', storeId, 'attendances', attendanceId), {
+    date,
     checkIn: Timestamp.fromDate(checkIn),
     checkOut: Timestamp.fromDate(checkOut),
     totalHours: parseFloat(totalHours.toFixed(2)),
@@ -132,6 +133,10 @@ export async function updateMemberSalary(
     ...(employeeType === 'fulltime' ? { baseMonthlySalary: salary } : { baseHourlyRate: salary }),
     standardHoursPerMonth: standardHours,
   });
+}
+
+export async function updateMemberInfo(storeId: string, userId: string, data: Record<string, any>) {
+  await updateDoc(doc(db, 'stores', storeId, 'members', userId), data);
 }
 
 export async function getWeekSchedule(storeId: string, weekStart: string): Promise<ScheduleModel | null> {

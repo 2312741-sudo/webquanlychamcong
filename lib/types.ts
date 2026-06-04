@@ -15,6 +15,7 @@ export interface Member {
   baseHourlyRate: number;
   standardHoursPerMonth: number;
   joinedAt: any;
+  employeeCode?: string;
 }
 
 export interface AttendanceRecord {
@@ -38,13 +39,23 @@ export interface Store {
   ownerId: string;
   address?: string;
   networkIP?: string;
+  wifis?: StoreWifi[];
   latitude?: number;
   longitude?: number;
   radiusMeters: number;
   customShifts?: ShiftDefinition[];
   themeColor?: string;
-  deliveryAllowance?: number;
+  deliveryAllowance?: number; // Chở hàng
+  giaoHangAllowance?: number; // Giao hàng
+  deliveryEnabled?: boolean;
+  giaoHangEnabled?: boolean;
+  departmentSelectionEnabled?: boolean;
   departments?: Department[];
+}
+
+export interface StoreWifi {
+  name: string;
+  ip: string;
 }
 
 export interface Department {

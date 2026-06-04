@@ -11,6 +11,11 @@ export default function SettingsPage() {
   const [radius, setRadius] = useState(100);
   const [themeColor, setThemeColor] = useState('#C8102E');
   const [deliveryAllowance, setDeliveryAllowance] = useState(0);
+  const [giaoHangAllowance, setGiaoHangAllowance] = useState(0);
+  const [deliveryEnabled, setDeliveryEnabled] = useState(true);
+  const [giaoHangEnabled, setGiaoHangEnabled] = useState(true);
+  const [departmentSelectionEnabled, setDepartmentSelectionEnabled] = useState(true);
+  const [wifis, setWifis] = useState<{name: string; ip: string}[]>([]);
   const [shifts, setShifts] = useState<ShiftDefinition[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [saving, setSaving] = useState(false);
@@ -22,6 +27,11 @@ export default function SettingsPage() {
       setRadius(store.radiusMeters || 100);
       setThemeColor(store.themeColor || '#C8102E');
       setDeliveryAllowance(store.deliveryAllowance || 0);
+      setGiaoHangAllowance(store.giaoHangAllowance || 0);
+      setDeliveryEnabled(store.deliveryEnabled ?? true);
+      setGiaoHangEnabled(store.giaoHangEnabled ?? true);
+      setDepartmentSelectionEnabled(store.departmentSelectionEnabled ?? true);
+      setWifis(store.wifis || []);
       setShifts(store.customShifts || []);
       setDepartments(store.departments || []);
     }
@@ -37,6 +47,11 @@ export default function SettingsPage() {
         radiusMeters: radius,
         themeColor,
         deliveryAllowance,
+        giaoHangAllowance,
+        deliveryEnabled,
+        giaoHangEnabled,
+        departmentSelectionEnabled,
+        wifis,
         customShifts: shifts,
         departments,
       });
@@ -60,6 +75,19 @@ export default function SettingsPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const addWifi = () => {
+    if (wifis.length >= 3) return;
+    setWifis([...wifis, { name: 'WiFi mới', ip: '' }]);
+  };
+  const updateWifi = (index: number, field: 'name' | 'ip', value: string) => {
+    const newWifis = [...wifis];
+    newWifis[index] = { ...newWifis[index], [field]: value };
+    setWifis(newWifis);
+  };
+  const removeWifi = (index: number) => {
+    setWifis(wifis.filter((_, i) => i !== index));
   };
 
   const addShift = () => {
@@ -186,7 +214,90 @@ export default function SettingsPage() {
               Số tiền này sẽ được cộng thêm vào lương khi nhân viên được xếp lịch làm "ca chở hàng".
             </p>
           </div>
+
+          <div>
+            <label className="label">Phụ cấp giao hàng (vnđ/ca)</label>
+            <input 
+              type="number" 
+              className="input" 
+              value={giaoHangAllowance}
+              onChange={e => setGiaoHangAllowance(Number(e.target.value))}
+            />
+          </div>
+
+          <div>
+            <label className="label" style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
+              <input type="checkbox" checked={deliveryEnabled} onChange={e => setDeliveryEnabled(e.target.checked)} />
+              Cho phép NV/QL đăng ký "Chở hàng" trên app/web
+            </label>
+          </div>
+
+          <div>
+            <label className="label" style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
+              <input type="checkbox" checked={giaoHangEnabled} onChange={e => setGiaoHangEnabled(e.target.checked)} />
+              Hiển thị tích "Giao hàng" trên lịch làm cho Chủ/QL
+            </label>
+          </div>
+
+          <div>
+            <label className="label" style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
+              <input type="checkbox" checked={departmentSelectionEnabled} onChange={e => setDepartmentSelectionEnabled(e.target.checked)} />
+              Cho phép NV/QL đăng ký bộ phận
+            </label>
+          </div>
         </div>
+      </div>
+
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 700 }}>Danh sách WiFi Chấm Công</h3>
+          <button className="btn btn-secondary" onClick={addWifi} disabled={wifis.length >= 3} style={{ fontSize: 13, padding: '6px 12px' }}>
+            + Thêm WiFi ({wifis.length}/3)
+          </button>
+        </div>
+        
+        {wifis.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-secondary)', background: 'var(--surface)', borderRadius: 8 }}>
+            Chưa có WiFi nào. Bấm "Thêm WiFi" để tạo (tối đa 3).
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {wifis.map((w, i) => (
+              <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'center', background: 'var(--surface)', padding: 12, borderRadius: 8 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>Tên WiFi</label>
+                  <input 
+                    type="text" 
+                    className="input" 
+                    value={w.name}
+                    onChange={e => updateWifi(i, 'name', e.target.value)}
+                    style={{ padding: '6px 10px', marginTop: 4 }}
+                    placeholder="VD: CuaHang_T1"
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>Địa chỉ IP</label>
+                  <input 
+                    type="text" 
+                    className="input" 
+                    value={w.ip}
+                    onChange={e => updateWifi(i, 'ip', e.target.value)}
+                    style={{ padding: '6px 10px', marginTop: 4 }}
+                    placeholder="VD: 113.113.113.113"
+                  />
+                </div>
+                <div style={{ paddingTop: 20 }}>
+                  <button 
+                    onClick={() => removeWifi(i)}
+                    style={{ width: 36, height: 36, borderRadius: 18, border: 'none', background: 'var(--danger)', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="card">

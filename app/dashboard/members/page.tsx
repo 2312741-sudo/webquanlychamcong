@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useApp } from '../layout';
-import { setMemberStatus, updateMemberRole, updateMemberSalary } from '@/lib/firestore';
+import { setMemberStatus, updateMemberRole, updateMemberSalary, updateMemberInfo } from '@/lib/firestore';
 import { Member } from '@/lib/types';
 
 export default function MembersPage() {
@@ -9,10 +9,12 @@ export default function MembersPage() {
   const [activeTab, setActiveTab] = useState<'active'|'pending'>('active');
   const [editingSalary, setEditingSalary] = useState<Member | null>(null);
 
-  // Edit salary state
+  // Edit salary/info state
   const [empType, setEmpType] = useState<'fulltime'|'parttime'>('fulltime');
   const [salaryAmt, setSalaryAmt] = useState(0);
   const [stdHours, setStdHours] = useState(208);
+  const [employeeCode, setEmployeeCode] = useState('');
+  const [joinedAt, setJoinedAt] = useState('');
   const [saving, setSaving] = useState(false);
 
   const activeMembers = members.filter(m => m.status === 'active');
@@ -42,6 +44,8 @@ export default function MembersPage() {
     setEmpType(m.employeeType);
     setSalaryAmt(m.employeeType === 'fulltime' ? m.baseMonthlySalary : m.baseHourlyRate);
     setStdHours(m.standardHoursPerMonth || 208);
+    setEmployeeCode(m.employeeCode || '');
+    setJoinedAt(m.joinedAt || '');
   };
 
   const saveSalary = async () => {
@@ -49,9 +53,10 @@ export default function MembersPage() {
     setSaving(true);
     try {
       await updateMemberSalary(storeId, editingSalary.userId, empType, salaryAmt, stdHours);
+      await updateMemberInfo(storeId, editingSalary.userId, { employeeCode, joinedAt });
       setEditingSalary(null);
     } catch (e) {
-      alert('Lỗi khi lưu lương');
+      alert('Lỗi khi lưu thông tin');
     } finally {
       setSaving(false);
     }
@@ -95,6 +100,7 @@ export default function MembersPage() {
             <thead>
               <tr>
                 <th>Nhân viên</th>
+                <th>Mã NV / Ngày vào</th>
                 <th>Vai trò</th>
                 <th>Loại hợp đồng</th>
                 <th>Lương cơ bản</th>
@@ -111,6 +117,12 @@ export default function MembersPage() {
                         <div style={{ fontWeight: 600 }}>{m.name}</div>
                         <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{m.phone || 'Chưa cập nhật SĐT'}</div>
                       </div>
+                    </div>
+                  </td>
+                  <td>
+                    <div style={{ fontWeight: 600, color: 'var(--neutral)' }}>{m.employeeCode || '-'}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                      {m.joinedAt ? new Date(m.joinedAt).toLocaleDateString('vi-VN') : 'Chưa cập nhật'}
                     </div>
                   </td>
                   <td>
@@ -136,14 +148,14 @@ export default function MembersPage() {
                   </td>
                   <td>
                     <div className="flex gap-2">
-                      <button className="btn btn-ghost btn-sm" onClick={() => openSalaryModal(m)}>Sửa lương</button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => openSalaryModal(m)}>Cài đặt</button>
                       <button className="btn btn-ghost btn-sm" style={{ color: 'var(--primary)', borderColor: 'var(--primary-light)' }} onClick={() => handleStatusChange(m.userId, 'kicked')}>Xóa</button>
                     </div>
                   </td>
                 </tr>
               ))}
               {activeMembers.length === 0 && (
-                <tr><td colSpan={5} style={{ textAlign: 'center', padding: 40, color: 'var(--text-secondary)' }}>Chưa có nhân viên nào</td></tr>
+                <tr><td colSpan={6} style={{ textAlign: 'center', padding: 40, color: 'var(--text-secondary)' }}>Chưa có nhân viên nào</td></tr>
               )}
             </tbody>
           </table>
@@ -181,11 +193,33 @@ export default function MembersPage() {
         <div className="modal-overlay" onClick={() => setEditingSalary(null)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <div className="modal-title">Cài đặt lương: {editingSalary.name}</div>
+              <div className="modal-title">Cài đặt nhân viên: {editingSalary.name}</div>
               <button className="modal-close" onClick={() => setEditingSalary(null)}>×</button>
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 24 }}>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <label className="label">Mã nhân viên</label>
+                  <input 
+                    type="text" 
+                    className="input" 
+                    placeholder="VD: NV001"
+                    value={employeeCode}
+                    onChange={e => setEmployeeCode(e.target.value)}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label className="label">Ngày vào làm</label>
+                  <input 
+                    type="date" 
+                    className="input" 
+                    value={joinedAt}
+                    onChange={e => setJoinedAt(e.target.value)}
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="label">Loại hợp đồng</label>
                 <select className="select" value={empType} onChange={e => setEmpType(e.target.value as any)}>

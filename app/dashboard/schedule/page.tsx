@@ -43,6 +43,7 @@ export default function SchedulePage() {
       const cleanShifts: Record<string, DaySchedule> = JSON.parse(JSON.stringify(loadedShifts));
       const validIds = new Set((store?.customShifts || []).map(s => s.id));
       validIds.add('delivery');
+      validIds.add('giaohang');
 
       for (const uid in cleanShifts) {
         for (const day of DAY_KEYS) {
@@ -53,9 +54,9 @@ export default function SchedulePage() {
             return validIds.has(shiftId);
           });
           
-          // Remove delivery if no normal shifts
-          if (!arr.some(id => id !== 'delivery')) {
-            arr = arr.filter(id => id !== 'delivery');
+          // Remove delivery/giaohang if no normal shifts
+          if (!arr.some(id => id !== 'delivery' && id !== 'giaohang')) {
+            arr = arr.filter(id => id !== 'delivery' && id !== 'giaohang');
           }
           
           cleanShifts[uid][day] = arr;
@@ -92,21 +93,21 @@ export default function SchedulePage() {
         currentArray = currentArray === 'off' ? [] : [currentArray as any];
       }
       
-      if (shiftId === 'delivery') {
-        const newArray = currentArray.includes('delivery') 
-          ? currentArray.filter(id => id !== 'delivery')
-          : [...currentArray, 'delivery'];
+      if (shiftId === 'delivery' || shiftId === 'giaohang') {
+        const newArray = currentArray.includes(shiftId as any) 
+          ? currentArray.filter(id => id !== shiftId)
+          : [...currentArray, shiftId as any];
         return { ...prev, [userId]: { ...userSchedule, [dayKey]: newArray } };
       }
 
       const existingEntry = currentArray.find(s => s === shiftId || s.startsWith(`${shiftId}|`));
       let newArray = existingEntry
         ? currentArray.filter(s => s !== existingEntry)
-        : [...currentArray, shiftId];
+        : [...currentArray, shiftId as any];
         
-      // If no normal shifts left, remove delivery too
-      if (!newArray.some(id => id !== 'delivery')) {
-        newArray = newArray.filter(id => id !== 'delivery');
+      // If no normal shifts left, remove delivery and giaohang too
+      if (!newArray.some(id => id !== 'delivery' && id !== 'giaohang')) {
+        newArray = newArray.filter(id => id !== 'delivery' && id !== 'giaohang');
       }
 
       return { ...prev, [userId]: { ...userSchedule, [dayKey]: newArray } };
@@ -141,8 +142,9 @@ export default function SchedulePage() {
     const arr = Array.isArray(shiftIds) ? shiftIds : (shiftIds === 'off' ? [] : [shiftIds]);
     if (arr.length === 0) return 'Nghỉ';
     
-    const actualShifts = arr.filter(id => id !== 'delivery');
+    const actualShifts = arr.filter(id => id !== 'delivery' && id !== 'giaohang');
     const hasDelivery = arr.includes('delivery');
+    const hasGiaoHang = arr.includes('giaohang');
     
     if (actualShifts.length === 0) return 'Nghỉ';
 
@@ -156,6 +158,7 @@ export default function SchedulePage() {
     });
     
     if (hasDelivery) names.push('📦 Chở hàng');
+    if (hasGiaoHang) names.push('🛵 Giao hàng');
     
     return names.join(' + ');
   };
@@ -317,7 +320,7 @@ export default function SchedulePage() {
                       </div>
                     </label>
                     
-                    {isSelected && currentMember?.role === 'owner' && (
+                    {isSelected && store?.departmentSelectionEnabled !== false && (
                       <div style={{ padding: '8px 12px', background: 'white' }}>
                         <select 
                           className="input" 
@@ -355,20 +358,40 @@ export default function SchedulePage() {
               )}
             </div>
 
-            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px dashed var(--border)' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, color: 'var(--primary)', fontWeight: 600 }}>
-                <input 
-                  type="checkbox" 
-                  disabled={!(shifts[editingCell.userId]?.[editingCell.dayKey as keyof DaySchedule] || []).some(id => id !== 'delivery')}
-                  checked={(shifts[editingCell.userId]?.[editingCell.dayKey as keyof DaySchedule] || []).includes('delivery')}
-                  onChange={() => toggleShiftForCell('delivery')}
-                  style={{ transform: 'scale(1.2)' }}
-                />
-                Có chở hàng (được nhận phụ cấp)
-              </label>
-              {!(shifts[editingCell.userId]?.[editingCell.dayKey as keyof DaySchedule] || []).some(id => id !== 'delivery') && (
+            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px dashed var(--border)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {store?.deliveryEnabled !== false && (
+                <div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, color: 'var(--primary)', fontWeight: 600 }}>
+                    <input 
+                      type="checkbox" 
+                      disabled={!(shifts[editingCell.userId]?.[editingCell.dayKey as keyof DaySchedule] || []).some(id => id !== 'delivery' && id !== 'giaohang')}
+                      checked={(shifts[editingCell.userId]?.[editingCell.dayKey as keyof DaySchedule] || []).includes('delivery')}
+                      onChange={() => toggleShiftForCell('delivery')}
+                      style={{ transform: 'scale(1.2)' }}
+                    />
+                    📦 Chở hàng (được nhận phụ cấp)
+                  </label>
+                </div>
+              )}
+              
+              {store?.giaoHangEnabled !== false && (
+                <div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, color: 'var(--primary)', fontWeight: 600 }}>
+                    <input 
+                      type="checkbox" 
+                      disabled={!(shifts[editingCell.userId]?.[editingCell.dayKey as keyof DaySchedule] || []).some(id => id !== 'delivery' && id !== 'giaohang')}
+                      checked={(shifts[editingCell.userId]?.[editingCell.dayKey as keyof DaySchedule] || []).includes('giaohang')}
+                      onChange={() => toggleShiftForCell('giaohang')}
+                      style={{ transform: 'scale(1.2)' }}
+                    />
+                    🛵 Giao hàng (được nhận phụ cấp)
+                  </label>
+                </div>
+              )}
+
+              {!(shifts[editingCell.userId]?.[editingCell.dayKey as keyof DaySchedule] || []).some(id => id !== 'delivery' && id !== 'giaohang') && (
                 <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
-                  * Cần chọn ít nhất 1 ca làm để có thể tích chở hàng
+                  * Cần chọn ít nhất 1 ca làm để có thể tích chở hàng / giao hàng
                 </div>
               )}
             </div>

@@ -22,7 +22,9 @@ export default function AttendancePage() {
   } | null>(null);
 
   const [editForm, setEditForm] = useState({
+    checkInDate: '',
     checkInTime: '',
+    checkOutDate: '',
     checkOutTime: '',
     note: ''
   });
@@ -62,16 +64,18 @@ export default function AttendancePage() {
 
   const openEditModal = (userId: string, date: string, att?: AttendanceRecord) => {
     setEditingCell({ userId, date, att });
-    if (att && att.checkOut) {
-      const ci = new Date(att.checkIn.seconds * 1000);
-      const co = new Date(att.checkOut.seconds * 1000);
+    if (att) {
+      const ci = att.checkIn ? new Date(att.checkIn.seconds ? att.checkIn.seconds * 1000 : att.checkIn) : null;
+      const co = att.checkOut ? new Date(att.checkOut.seconds ? att.checkOut.seconds * 1000 : att.checkOut) : null;
       setEditForm({
-        checkInTime: `${String(ci.getHours()).padStart(2,'0')}:${String(ci.getMinutes()).padStart(2,'0')}`,
-        checkOutTime: `${String(co.getHours()).padStart(2,'0')}:${String(co.getMinutes()).padStart(2,'0')}`,
+        checkInDate: ci ? `${ci.getFullYear()}-${String(ci.getMonth() + 1).padStart(2,'0')}-${String(ci.getDate()).padStart(2,'0')}` : date,
+        checkInTime: ci ? `${String(ci.getHours()).padStart(2,'0')}:${String(ci.getMinutes()).padStart(2,'0')}` : '',
+        checkOutDate: co ? `${co.getFullYear()}-${String(co.getMonth() + 1).padStart(2,'0')}-${String(co.getDate()).padStart(2,'0')}` : date,
+        checkOutTime: co ? `${String(co.getHours()).padStart(2,'0')}:${String(co.getMinutes()).padStart(2,'0')}` : '',
         note: att.editNote || ''
       });
     } else {
-      setEditForm({ checkInTime: '', checkOutTime: '', note: '' });
+      setEditForm({ checkInDate: date, checkInTime: '', checkOutDate: date, checkOutTime: '', note: '' });
     }
   };
 
@@ -85,19 +89,24 @@ export default function AttendancePage() {
     const { userId, date, att } = editingCell;
     const [inH, inM] = editForm.checkInTime.split(':').map(Number);
     const [outH, outM] = editForm.checkOutTime.split(':').map(Number);
+    const [inY, inMon, inD] = editForm.checkInDate.split('-').map(Number);
+    const [outY, outMon, outD] = editForm.checkOutDate.split('-').map(Number);
     
-    const [y, m, d] = date.split('-').map(Number);
-    const ciDate = new Date(y, m - 1, d, inH, inM);
-    const coDate = new Date(y, m - 1, d, outH, outM);
+    const ciDate = new Date(inY, inMon - 1, inD, inH, inM);
+    const coDate = new Date(outY, outMon - 1, outD, outH, outM);
+
     if (coDate < ciDate) {
-      coDate.setDate(coDate.getDate() + 1); // qua đêm
+      alert('Giờ ra không thể trước giờ vào');
+      return;
     }
+
+    const assignedDate = editForm.checkInDate;
 
     try {
       if (att) {
-        await editAttendance(storeId, att.id, ciDate, coDate, editForm.note, user?.displayName || 'Admin');
+        await editAttendance(storeId, att.id, assignedDate, ciDate, coDate, editForm.note, user?.displayName || 'Admin');
       } else {
-        await createManualAttendance(storeId, userId, date, ciDate, coDate, editForm.note, user?.displayName || 'Admin');
+        await createManualAttendance(storeId, userId, assignedDate, ciDate, coDate, editForm.note, user?.displayName || 'Admin');
       }
       alert('Đã lưu');
       setEditingCell(null);
@@ -219,10 +228,19 @@ export default function AttendancePage() {
           <div style={{ background: 'white', padding: 24, borderRadius: 16, width: 400 }}>
             <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>Chỉnh sửa chấm công</h3>
             <p style={{ marginBottom: 16, color: 'var(--text-secondary)' }}>
-              Ngày: {editingCell.date}
+              Ngày ban đầu: {editingCell.date}
             </p>
 
             <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+              <div style={{ flex: 1 }}>
+                <label className="label">Ngày vào</label>
+                <input 
+                  type="date" 
+                  className="input" 
+                  value={editForm.checkInDate}
+                  onChange={e => setEditForm({...editForm, checkInDate: e.target.value})}
+                />
+              </div>
               <div style={{ flex: 1 }}>
                 <label className="label">Giờ vào</label>
                 <input 
@@ -230,6 +248,18 @@ export default function AttendancePage() {
                   className="input" 
                   value={editForm.checkInTime}
                   onChange={e => setEditForm({...editForm, checkInTime: e.target.value})}
+                />
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+              <div style={{ flex: 1 }}>
+                <label className="label">Ngày ra</label>
+                <input 
+                  type="date" 
+                  className="input" 
+                  value={editForm.checkOutDate}
+                  onChange={e => setEditForm({...editForm, checkOutDate: e.target.value})}
                 />
               </div>
               <div style={{ flex: 1 }}>

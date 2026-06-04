@@ -25,10 +25,16 @@ export function exportMonthlyAttendance(
   const [year, mon] = month.split('-').map(Number);
   const daysInMonth = new Date(year, mon, 0).getDate();
 
+  const formatTime = (val: any) => {
+    if (!val) return null;
+    const d = val.toDate ? val.toDate() : (val.seconds ? new Date(val.seconds * 1000) : new Date(val));
+    return isNaN(d.getTime()) ? null : d;
+  };
+
   const headers = [
     'Tên nhân viên', 'Vai trò',
     ...Array.from({ length: daysInMonth }, (_, i) => `Ngày ${i + 1}`),
-    'Tổng giờ', 'Số ca chở hàng', 'Tiền chở hàng'
+    'Tổng giờ', 'Số ca chở', 'Tiền chở', 'Số ca giao', 'Tiền giao'
   ];
 
   const rows = members.map(member => {
@@ -40,10 +46,23 @@ export function exportMonthlyAttendance(
       const att = memberAtts.find(a => a.date === dateStr);
       const h = att?.totalHours ?? 0;
       totalHours += h;
-      return h > 0 ? `${h.toFixed(1)}h` : '0h';
+      if (att) {
+        const inD = formatTime(att.checkIn);
+        const outD = formatTime(att.checkOut);
+        let str = '';
+        if (inD) str += `${inD.getHours().toString().padStart(2, '0')}:${inD.getMinutes().toString().padStart(2, '0')}`;
+        str += '-';
+        if (outD) {
+          str += `${outD.getHours().toString().padStart(2, '0')}:${outD.getMinutes().toString().padStart(2, '0')}`;
+          if (inD && outD.getDate() !== inD.getDate()) str += '(+1)';
+        }
+        return `${str} (${h.toFixed(1)}h)`;
+      }
+      return '0h';
     });
     // Calculate delivery
     let deliveryCount = 0;
+    let giaoHangCount = 0;
     const [yearStr, monthStr] = month.split('-');
     schedules.forEach(sched => {
       const weekStart = new Date(sched.weekStart);
@@ -57,13 +76,15 @@ export function exportMonthlyAttendance(
           const validIds = new Set((store?.customShifts || []).map(s => s.id));
           const hasValidNormalShift = arr.some(id => {
             const baseId = id.split('|')[0];
-            return baseId !== 'delivery' && validIds.has(baseId);
+            return baseId !== 'delivery' && baseId !== 'giaohang' && validIds.has(baseId);
           });
           if (arr.includes('delivery') && hasValidNormalShift) deliveryCount++;
+          if (arr.includes('giaohang') && hasValidNormalShift) giaoHangCount++;
         }
       });
     });
     const deliveryPay = deliveryCount * (store.deliveryAllowance || 0);
+    const giaoHangPay = giaoHangCount * (store.giaoHangAllowance || 0);
 
     return [
       member.name, 
@@ -71,14 +92,63 @@ export function exportMonthlyAttendance(
       ...dayCells, 
       `${totalHours.toFixed(1)}h`,
       `${deliveryCount} ca`,
-      `${deliveryPay.toLocaleString('vi-VN')} vnđ`
+      `${deliveryPay.toLocaleString('vi-VN')} vnđ`,
+      `${giaoHangCount} ca`,
+      `${giaoHangPay.toLocaleString('vi-VN')} vnđ`
     ];
   });
 
   const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-  ws['!cols'] = [{ wch: 22 }, { wch: 12 }, ...Array(daysInMonth).fill({ wch: 8 }), { wch: 10 }, { wch: 14 }, { wch: 16 }];
-  XLSX.utils.book_append_sheet(wb, ws, 'Bảng Công');
+  const ws1 = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  ws1['!cols'] = [{ wch: 22 }, { wch: 12 }, ...Array(daysInMonth).fill({ wch: 16 }), { wch: 10 }, { wch: 10 }, { wch: 14 }, { wch: 10 }, { wch: 14 }];
+  XLSX.utils.book_append_sheet(wb, ws1, 'Tổng Hợp');
+
+  // Sheet 2: Chi Tiết IN-OUT
+  const detailHeaders = ['ngày', 'mã nv', 'tên nhân viên', 'giờ', 'in/out'];
+  const detailRows: any[][] = [];
+  
+  const sortedAtts = [...attendances].sort((a, b) => {
+    if (a.date !== b.date) return a.date.localeCompare(b.date);
+    const timeA = formatTime(a.checkIn)?.getTime() || 0;
+    const timeB = formatTime(b.checkIn)?.getTime() || 0;
+    return timeA - timeB;
+  });
+
+  sortedAtts.forEach(att => {
+    const member = members.find(m => m.userId === att.userId);
+    if (!member) return;
+    
+    const inD = formatTime(att.checkIn);
+    const outD = formatTime(att.checkOut);
+    
+    const formatStrDate = (d: Date) => `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
+    const formatStrTime = (d: Date) => `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+    
+    if (inD) {
+      detailRows.push([
+        formatStrDate(inD),
+        member.employeeCode || '',
+        member.name,
+        formatStrTime(inD),
+        'IN'
+      ]);
+    }
+    
+    if (outD) {
+      detailRows.push([
+        formatStrDate(outD),
+        member.employeeCode || '',
+        member.name,
+        formatStrTime(outD),
+        'OUT'
+      ]);
+    }
+  });
+
+  const ws2 = XLSX.utils.aoa_to_sheet([detailHeaders, ...detailRows]);
+  ws2['!cols'] = [{ wch: 15 }, { wch: 12 }, { wch: 25 }, { wch: 10 }, { wch: 10 }];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Chi Tiết IN-OUT');
+
   XLSX.writeFile(wb, `BangCong_${month}.xlsx`);
 }
 
@@ -91,7 +161,7 @@ export function exportMonthlySalary(
 ) {
   const headers = [
     'Tên nhân viên', 'Vai trò', 'Loại HĐ',
-    'Tổng giờ', 'Giờ chuẩn', 'Lương cơ bản', 'Số ca chở hàng', 'Phụ cấp chở hàng', 'Lương thực nhận',
+    'Tổng giờ', 'Giờ chuẩn', 'Lương cơ bản', 'Số ca chở hàng', 'Phụ cấp chở', 'Số ca giao', 'Phụ cấp giao', 'Lương thực nhận',
   ];
 
   const rows = members.map(member => {
@@ -108,6 +178,7 @@ export function exportMonthlySalary(
 
     // Calculate delivery
     let deliveryCount = 0;
+    let giaoHangCount = 0;
     const [yearStr, monthStr] = month.split('-');
     schedules.forEach(sched => {
       const weekStart = new Date(sched.weekStart);
@@ -121,14 +192,16 @@ export function exportMonthlySalary(
           const validIds = new Set((store?.customShifts || []).map(s => s.id));
           const hasValidNormalShift = arr.some(id => {
             const baseId = id.split('|')[0];
-            return baseId !== 'delivery' && validIds.has(baseId);
+            return baseId !== 'delivery' && baseId !== 'giaohang' && validIds.has(baseId);
           });
           if (arr.includes('delivery') && hasValidNormalShift) deliveryCount++;
+          if (arr.includes('giaohang') && hasValidNormalShift) giaoHangCount++;
         }
       });
     });
     const deliveryPay = deliveryCount * (store.deliveryAllowance || 0);
-    calculatedSalary += deliveryPay;
+    const giaoHangPay = giaoHangCount * (store.giaoHangAllowance || 0);
+    calculatedSalary += deliveryPay + giaoHangPay;
 
     return [
       member.name,
@@ -139,13 +212,15 @@ export function exportMonthlySalary(
       `${baseSalary.toLocaleString('vi-VN')} vnđ`,
       `${deliveryCount} ca`,
       `${deliveryPay.toLocaleString('vi-VN')} vnđ`,
+      `${giaoHangCount} ca`,
+      `${giaoHangPay.toLocaleString('vi-VN')} vnđ`,
       `${Math.round(calculatedSalary).toLocaleString('vi-VN')} vnđ`,
     ];
   });
 
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-  ws['!cols'] = [{ wch: 22 }, { wch: 12 }, { wch: 16 }, { wch: 10 }, { wch: 10 }, { wch: 16 }, { wch: 14 }, { wch: 16 }, { wch: 20 }];
+  ws['!cols'] = [{ wch: 22 }, { wch: 12 }, { wch: 16 }, { wch: 10 }, { wch: 10 }, { wch: 16 }, { wch: 14 }, { wch: 16 }, { wch: 14 }, { wch: 16 }, { wch: 20 }];
   XLSX.utils.book_append_sheet(wb, ws, 'Lương Tháng');
   XLSX.writeFile(wb, `BaoCaoLuong_${month}.xlsx`);
 }
@@ -235,7 +310,7 @@ export async function exportWeeklySchedule(
     DAY_KEYS.forEach(key => {
       const shiftsForDay = daySchedule[key as keyof DaySchedule] || [];
       const arr = Array.isArray(shiftsForDay) ? shiftsForDay : (shiftsForDay === 'off' ? [] : [shiftsForDay]);
-      const actualArr = arr.filter(id => id !== 'delivery');
+      const actualArr = arr.filter(id => id !== 'delivery' && id !== 'giaohang');
       if (actualArr.length > maxShifts) maxShifts = actualArr.length;
     });
 
@@ -260,7 +335,7 @@ export async function exportWeeklySchedule(
         const shiftsForDay = daySchedule[dayKey as keyof DaySchedule] || [];
         const arr = Array.isArray(shiftsForDay) ? shiftsForDay : (shiftsForDay === 'off' ? [] : [shiftsForDay]);
         
-        const actualShifts = arr.filter(id => id !== 'delivery');
+        const actualShifts = arr.filter(id => id !== 'delivery' && id !== 'giaohang');
 
         const startCol = 2 + i * 4;
         
