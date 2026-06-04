@@ -292,14 +292,14 @@ export default function SalaryPage() {
                   <div className="flex gap-2">
                     <button 
                       className="btn btn-primary" 
-                      onClick={() => updateAdvanceRequestStatus(storeId, adv.id, 'approved', new Date().toISOString())}
+                      onClick={() => { if (storeId) updateAdvanceRequestStatus(storeId, adv.id, 'approved', new Date().toISOString()) }}
                       style={{ padding: '6px 12px', fontSize: 13 }}
                     >
                       Duyệt
                     </button>
                     <button 
                       className="btn btn-secondary" 
-                      onClick={() => updateAdvanceRequestStatus(storeId, adv.id, 'rejected')}
+                      onClick={() => { if (storeId) updateAdvanceRequestStatus(storeId, adv.id, 'rejected') }}
                       style={{ padding: '6px 12px', fontSize: 13, color: 'var(--danger)' }}
                     >
                       Từ chối
