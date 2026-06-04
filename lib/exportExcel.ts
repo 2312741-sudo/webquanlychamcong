@@ -15,7 +15,7 @@ const ROLE_LABELS: Record<string, string> = {
   owner: 'Chủ', manager: 'Quản lý', employee: 'Nhân viên',
 };
 
-export function exportMonthlyAttendance(
+export async function exportMonthlyAttendance(
   members: Member[],
   attendances: AttendanceRecord[],
   month: string,
@@ -25,15 +25,9 @@ export function exportMonthlyAttendance(
   const [year, mon] = month.split('-').map(Number);
   const daysInMonth = new Date(year, mon, 0).getDate();
 
-  const formatTime = (val: any) => {
-    if (!val) return null;
-    const d = val.toDate ? val.toDate() : (val.seconds ? new Date(val.seconds * 1000) : new Date(val));
-    return isNaN(d.getTime()) ? null : d;
-  };
-
   const headers = [
-    'Nhân viên', 'Vai trò', 'Tổng giờ',
-    ...Array.from({ length: daysInMonth }, (_, i) => `Ngày ${i + 1}`)
+    'NHÂN VIÊN', 'VAI TRÒ', 'TỔNG GIỜ',
+    ...Array.from({ length: daysInMonth }, (_, i) => `NGÀY ${i + 1}`)
   ];
 
   const rows = members.map(member => {
@@ -59,19 +53,31 @@ export function exportMonthlyAttendance(
     ];
   });
 
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-  ws['!cols'] = [{ wch: 22 }, { wch: 12 }, { wch: 10 }, ...Array(daysInMonth).fill({ wch: 10 })];
-  XLSX.utils.book_append_sheet(wb, ws, 'Bảng Công');
-  XLSX.writeFile(wb, `BangCong_${month}.xlsx`);
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Bảng Công');
+
+  const headerRow = sheet.addRow(headers);
+  headerRow.font = { bold: true };
+  
+  rows.forEach(r => sheet.addRow(r));
+
+  sheet.getColumn(1).width = 22;
+  sheet.getColumn(2).width = 12;
+  sheet.getColumn(3).width = 10;
+  for (let i = 4; i <= daysInMonth + 3; i++) {
+    sheet.getColumn(i).width = 10;
+  }
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  saveAs(new Blob([buffer]), `BangCong_${month}.xlsx`);
 }
 
-export function exportDetailedInOut(
+export async function exportDetailedInOut(
   members: Member[],
   attendances: AttendanceRecord[],
   month: string,
 ) {
-  const detailHeaders = ['ngày', 'mã nv', 'tên nhân viên', 'giờ', 'in/out'];
+  const detailHeaders = ['NGÀY', 'MÃ NV', 'TÊN NHÂN VIÊN', 'GIỜ', 'IN/OUT'];
   const detailRows: any[][] = [];
   
   const sortedAtts = [...attendances].sort((a, b) => {
@@ -123,15 +129,25 @@ export function exportDetailedInOut(
     }
   });
 
-  const wb = XLSX.utils.book_new();
-  const ws2 = XLSX.utils.aoa_to_sheet([detailHeaders, ...detailRows]);
-  ws2['!cols'] = [{ wch: 15 }, { wch: 12 }, { wch: 25 }, { wch: 10 }, { wch: 10 }];
-  XLSX.utils.book_append_sheet(wb, ws2, 'Chi Tiết IN-OUT');
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Chi Tiết IN-OUT');
 
-  XLSX.writeFile(wb, `ChiTietInOut_${month}.xlsx`);
+  const headerRow = sheet.addRow(detailHeaders);
+  headerRow.font = { bold: true };
+  
+  detailRows.forEach(r => sheet.addRow(r));
+
+  sheet.getColumn(1).width = 15;
+  sheet.getColumn(2).width = 15;
+  sheet.getColumn(3).width = 25;
+  sheet.getColumn(4).width = 12;
+  sheet.getColumn(5).width = 12;
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  saveAs(new Blob([buffer]), `ChiTietInOut_${month}.xlsx`);
 }
 
-export function exportMonthlySalary(
+export async function exportMonthlySalary(
   members: Member[],
   attendances: AttendanceRecord[],
   month: string,
@@ -139,8 +155,8 @@ export function exportMonthlySalary(
   schedules: ScheduleModel[]
 ) {
   const headers = [
-    'Tên nhân viên', 'Vai trò', 'Loại HĐ',
-    'Tổng giờ', 'Giờ chuẩn', 'Lương cơ bản', 'Số ca chở hàng', 'Phụ cấp chở', 'Số ca giao', 'Phụ cấp giao', 'Lương thực nhận',
+    'TÊN NHÂN VIÊN', 'VAI TRÒ', 'LOẠI HĐ',
+    'TỔNG GIỜ', 'GIỜ CHUẨN', 'LƯƠNG CƠ BẢN', 'SỐ CA CHỞ HÀNG', 'PHỤ CẤP CHỞ', 'SỐ CA GIAO', 'PHỤ CẤP GIAO', 'LƯƠNG THỰC NHẬN',
   ];
 
   const rows = members.map(member => {
@@ -197,11 +213,21 @@ export function exportMonthlySalary(
     ];
   });
 
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-  ws['!cols'] = [{ wch: 22 }, { wch: 12 }, { wch: 16 }, { wch: 10 }, { wch: 10 }, { wch: 16 }, { wch: 14 }, { wch: 16 }, { wch: 14 }, { wch: 16 }, { wch: 20 }];
-  XLSX.utils.book_append_sheet(wb, ws, 'Lương Tháng');
-  XLSX.writeFile(wb, `BaoCaoLuong_${month}.xlsx`);
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Lương Tháng');
+
+  const headerRow = sheet.addRow(headers);
+  headerRow.font = { bold: true };
+  
+  rows.forEach(r => sheet.addRow(r));
+
+  sheet.columns = [
+    { width: 22 }, { width: 12 }, { width: 16 }, { width: 10 }, { width: 10 },
+    { width: 16 }, { width: 14 }, { width: 16 }, { width: 14 }, { width: 16 }, { width: 20 }
+  ];
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  saveAs(new Blob([buffer]), `BaoCaoLuong_${month}.xlsx`);
 }
 
 export async function exportWeeklySchedule(
