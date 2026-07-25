@@ -22,6 +22,7 @@ const NAV = [
   { href: '/dashboard/salary', icon: '💰', label: 'Báo cáo lương' },
   { href: '/dashboard/members', icon: '👥', label: 'Nhân viên' },
   { href: '/dashboard/schedule', icon: '🗓️', label: 'Lịch làm' },
+  { href: '/dashboard/production', icon: '🏭', label: 'Sản xuất' },
   { href: '/dashboard/settings', icon: '⚙️', label: 'Cài đặt' },
 ];
 

@@ -4,7 +4,7 @@ import {
   updateDoc, addDoc, orderBy, Timestamp, onSnapshot,
   setDoc, limit, DocumentSnapshot, deleteDoc
 } from 'firebase/firestore';
-import { Member, AttendanceRecord, Store, ScheduleModel, DaySchedule, AdvanceRequest } from './types';
+import { Member, AttendanceRecord, Store, ScheduleModel, DaySchedule, AdvanceRequest, ProductionTask, ProductionReport, ProductionTaskEntry } from './types';
 
 export async function getUserStoreId(uid: string): Promise<string | null> {
   const snap = await getDoc(doc(db, 'users', uid));
@@ -263,4 +263,86 @@ export async function deleteAllAttendances(storeId: string): Promise<void> {
   for (const d of snap.docs) {
     await deleteDoc(d.ref);
   }
+}
+
+// ─── Production Tasks ────────────────────────────────────────────────────────
+
+export function watchProductionTasks(
+  storeId: string,
+  cb: (tasks: ProductionTask[]) => void
+) {
+  const q = query(
+    collection(db, 'stores', storeId, 'production_tasks'),
+    orderBy('order', 'asc')
+  );
+  return onSnapshot(q, snap => {
+    cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as ProductionTask)));
+  });
+}
+
+export async function addProductionTask(
+  storeId: string,
+  task: Omit<ProductionTask, 'id'>
+): Promise<void> {
+  await addDoc(collection(db, 'stores', storeId, 'production_tasks'), {
+    ...task,
+    createdAt: Timestamp.now(),
+  });
+}
+
+export async function updateProductionTask(
+  storeId: string,
+  taskId: string,
+  data: Partial<ProductionTask>
+): Promise<void> {
+  await updateDoc(doc(db, 'stores', storeId, 'production_tasks', taskId), data);
+}
+
+export async function deleteProductionTask(
+  storeId: string,
+  taskId: string
+): Promise<void> {
+  await deleteDoc(doc(db, 'stores', storeId, 'production_tasks', taskId));
+}
+
+// ─── Production Reports ──────────────────────────────────────────────────────
+
+export async function getProductionReports(
+  storeId: string,
+  month: string // YYYY-MM
+): Promise<ProductionReport[]> {
+  const q = query(
+    collection(db, 'stores', storeId, 'production_reports'),
+    where('date', '>=', `${month}-01`),
+    where('date', '<=', `${month}-31`),
+    orderBy('date', 'asc')
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as ProductionReport));
+}
+
+export async function addProductionReport(
+  storeId: string,
+  report: Omit<ProductionReport, 'id'>
+): Promise<string> {
+  const ref = await addDoc(
+    collection(db, 'stores', storeId, 'production_reports'),
+    { ...report, createdAt: Timestamp.now() }
+  );
+  return ref.id;
+}
+
+export async function updateProductionReport(
+  storeId: string,
+  reportId: string,
+  data: Partial<ProductionReport>
+): Promise<void> {
+  await updateDoc(doc(db, 'stores', storeId, 'production_reports', reportId), data);
+}
+
+export async function deleteProductionReport(
+  storeId: string,
+  reportId: string
+): Promise<void> {
+  await deleteDoc(doc(db, 'stores', storeId, 'production_reports', reportId));
 }

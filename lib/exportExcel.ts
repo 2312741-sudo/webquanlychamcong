@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx';
 import * as ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
-import { Member, AttendanceRecord, ScheduleModel, Store, ShiftDefinition, DaySchedule, AdvanceRequest } from './types';
+import { Member, AttendanceRecord, ScheduleModel, Store, ShiftDefinition, DaySchedule, AdvanceRequest, ProductionReport, ProductionTask } from './types';
 
 const DAY_KEYS = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
 const DAY_LABELS = ['Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7','Chủ nhật'];
@@ -543,4 +543,164 @@ export async function exportWeeklySchedule(
   const monthStr = month.toString().padStart(2, '0');
   const cleanStoreName = store.name.replace(/[^a-zA-Z0-9\s]/g, '').trim();
   saveAs(new Blob([buffer]), `LichLam-${monthStr},${year}-${cleanStoreName}.xlsx`);
+}
+
+// ─── Export Báo cáo Sản xuất ────────────────────────────────────────────────
+
+export async function exportProductionReport(
+  reports: ProductionReport[],
+  tasks: ProductionTask[],
+  members: Member[],
+  storeName: string,
+  month: string // YYYY-MM
+) {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Báo cáo sản xuất');
+
+  // — Style helpers —
+  const headerFill: ExcelJS.Fill = {
+    type: 'pattern', pattern: 'solid',
+    fgColor: { argb: 'FFC8102E' },
+  };
+  const headerFont: Partial<ExcelJS.Font> = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+  const subHeaderFill: ExcelJS.Fill = {
+    type: 'pattern', pattern: 'solid',
+    fgColor: { argb: 'FFFFF3CD' },
+  };
+  const borderStyle: Partial<ExcelJS.Borders> = {
+    top: { style: 'thin' }, bottom: { style: 'thin' },
+    left: { style: 'thin' }, right: { style: 'thin' },
+  };
+
+  const activeTasks = tasks.filter(t => t.active);
+
+  // — Title row —
+  sheet.mergeCells(1, 1, 1, 5 + activeTasks.length);
+  const titleCell = sheet.getCell(1, 1);
+  titleCell.value = `BÁO CÁO HIỆU QUẢ SẢN XUẤT - ${storeName} - Tháng ${month}`;
+  titleCell.font = { bold: true, size: 14, color: { argb: 'FFC8102E' } };
+  titleCell.alignment = { horizontal: 'center' };
+  sheet.getRow(1).height = 28;
+
+  // — Headers —
+  const headers = [
+    'Ngày', 'Tên nhân viên', 'Ca làm',
+    ...activeTasks.map(t => `${t.name} (${t.unitLabel})`),
+    'Giờ out ca', 'Ghi chú',
+  ];
+
+  const headerRow = sheet.getRow(2);
+  headers.forEach((h, i) => {
+    const cell = headerRow.getCell(i + 1);
+    cell.value = h;
+    cell.fill = headerFill;
+    cell.font = headerFont;
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.border = borderStyle;
+  });
+  headerRow.height = 36;
+
+  // — Data rows —
+  const memberMap = new Map(members.map(m => [m.userId, m.name]));
+
+  reports.forEach((report, idx) => {
+    const row = sheet.getRow(3 + idx);
+
+    // Format checkout time
+    let checkoutStr = '';
+    if (report.checkoutTime) {
+      try {
+        const ts = report.checkoutTime.toDate ? report.checkoutTime.toDate() : new Date(report.checkoutTime);
+        checkoutStr = ts.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' });
+      } catch { checkoutStr = ''; }
+    }
+
+    const taskValues = activeTasks.map(task => {
+      const entry = report.tasks?.find(t => t.taskId === task.id);
+      return entry ? entry.value : '';
+    });
+
+    const rowData = [
+      report.date,
+      memberMap.get(report.userId) || report.memberName,
+      report.shiftName,
+      ...taskValues,
+      checkoutStr,
+      report.note || '',
+    ];
+
+    rowData.forEach((val, i) => {
+      const cell = row.getCell(i + 1);
+      cell.value = val as any;
+      cell.border = borderStyle;
+      cell.alignment = { vertical: 'middle', horizontal: i === 0 || i >= 3 + activeTasks.length ? 'center' : 'left' };
+      if (idx % 2 === 1) {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } };
+      }
+    });
+    row.height = 22;
+  });
+
+  // — Summary rows —
+  const summaryStartRow = 3 + reports.length + 1;
+  const summaryTitle = sheet.getRow(summaryStartRow);
+  sheet.mergeCells(summaryStartRow, 1, summaryStartRow, 5 + activeTasks.length);
+  summaryTitle.getCell(1).value = 'TỔNG HỢP THEO NHÂN VIÊN';
+  summaryTitle.getCell(1).font = { bold: true, size: 12, color: { argb: 'FF1A6B5A' } };
+  summaryTitle.getCell(1).fill = subHeaderFill;
+  summaryTitle.height = 24;
+
+  const summaryHeaderRow = sheet.getRow(summaryStartRow + 1);
+  ['Tên nhân viên', 'Số ca báo cáo', ...activeTasks.map(t => `Tổng ${t.name} (${t.unitLabel})`)].forEach((h, i) => {
+    const cell = summaryHeaderRow.getCell(i + 1);
+    cell.value = h;
+    cell.fill = subHeaderFill;
+    cell.font = { bold: true, size: 10 };
+    cell.border = borderStyle;
+    cell.alignment = { horizontal: 'center' };
+  });
+
+  // Group by member
+  const memberSummary = new Map<string, { name: string; count: number; taskTotals: number[] }>();
+  reports.forEach(report => {
+    if (!memberSummary.has(report.userId)) {
+      memberSummary.set(report.userId, {
+        name: memberMap.get(report.userId) || report.memberName,
+        count: 0,
+        taskTotals: activeTasks.map(() => 0),
+      });
+    }
+    const entry = memberSummary.get(report.userId)!;
+    entry.count++;
+    activeTasks.forEach((task, ti) => {
+      const taskEntry = report.tasks?.find(t => t.taskId === task.id);
+      if (taskEntry && typeof taskEntry.value === 'number') {
+        entry.taskTotals[ti] += taskEntry.value;
+      }
+    });
+  });
+
+  let rowIdx = summaryStartRow + 2;
+  memberSummary.forEach(({ name, count, taskTotals }) => {
+    const row = sheet.getRow(rowIdx);
+    [name, count, ...taskTotals].forEach((val, i) => {
+      const cell = row.getCell(i + 1);
+      cell.value = val as any;
+      cell.border = borderStyle;
+      cell.alignment = { vertical: 'middle', horizontal: i === 0 ? 'left' : 'center' };
+    });
+    row.height = 20;
+    rowIdx++;
+  });
+
+  // — Column widths —
+  sheet.getColumn(1).width = 14; // Ngày
+  sheet.getColumn(2).width = 22; // Tên NV
+  sheet.getColumn(3).width = 16; // Ca làm
+  activeTasks.forEach((_, i) => { sheet.getColumn(4 + i).width = 18; });
+  sheet.getColumn(4 + activeTasks.length).width = 12; // Giờ out
+  sheet.getColumn(5 + activeTasks.length).width = 24; // Ghi chú
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  saveAs(new Blob([buffer]), `BaoCaoSanXuat-${month}-${storeName}.xlsx`);
 }

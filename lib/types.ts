@@ -103,3 +103,38 @@ export interface AdvanceRequest {
   approvedDate?: string;
   note?: string;
 }
+
+// ─── Production / Efficiency Measurement ────────────────────────────────────
+
+export type ProductionUnitType = 'time' | 'kg' | 'shift' | 'qty';
+
+export interface ProductionTask {
+  id: string;
+  name: string;
+  unit: ProductionUnitType;    // loại đơn vị đo lường
+  unitLabel: string;           // nhãn hiển thị: "Phút", "Kg", "Ca", "Sản phẩm"
+  active: boolean;             // bật/tắt
+  order: number;               // thứ tự hiển thị
+  createdAt?: any;
+}
+
+export interface ProductionTaskEntry {
+  taskId: string;
+  taskName: string;
+  unit: ProductionUnitType;
+  unitLabel: string;
+  value: number;               // giá trị đo lường NV nhập
+}
+
+export interface ProductionReport {
+  id: string;
+  userId: string;
+  memberName: string;
+  date: string;                // YYYY-MM-DD
+  shiftId: string;
+  shiftName: string;
+  checkoutTime: any;           // Firestore Timestamp
+  note: string;
+  tasks: ProductionTaskEntry[];
+  createdAt?: any;
+}
