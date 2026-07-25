@@ -2,7 +2,7 @@ import { db } from './firebase';
 import {
   collection, doc, query, where, getDocs, getDoc,
   updateDoc, addDoc, orderBy, Timestamp, onSnapshot,
-  setDoc, limit, DocumentSnapshot, deleteDoc
+  setDoc, limit, DocumentSnapshot, deleteDoc, collectionGroup
 } from 'firebase/firestore';
 import { Member, AttendanceRecord, Store, ScheduleModel, DaySchedule, AdvanceRequest, ProductionTask, ProductionReport, ProductionTaskEntry } from './types';
 
@@ -26,35 +26,62 @@ export async function getUserStoreId(uid: string): Promise<string | null> {
 
 export async function getUserStores(uid: string): Promise<Store[]> {
   try {
-    const stores: Store[] = [];
     const storeMap = new Map<string, Store>();
+    const foundStoreIds = new Set<string>();
 
-    // 1. Get from users/{uid}.storeIds
-    const snap = await getDoc(doc(db, 'users', uid));
-    const storeIds: string[] = snap.data()?.storeIds || [];
-
-    for (const id of storeIds) {
-      if (!id) continue;
-      const sDoc = await getDoc(doc(db, 'stores', id));
-      if (sDoc.exists()) {
-        storeMap.set(sDoc.id, { id: sDoc.id, ...sDoc.data() } as Store);
+    // 1. Get storeIds & currentStoreId from users/{uid} document
+    try {
+      const uSnap = await getDoc(doc(db, 'users', uid));
+      if (uSnap.exists()) {
+        const uData = uSnap.data();
+        const ids: string[] = uData?.storeIds || [];
+        ids.forEach(id => { if (id) foundStoreIds.add(id); });
+        if (uData?.currentStoreId) foundStoreIds.add(uData.currentStoreId);
       }
+    } catch (e) {
+      console.error('Error reading user document:', e);
     }
 
-    // 2. Query stores where ownerId == uid (Fallback)
+    // 2. Query collectionGroup('members') where userId == uid to find all joined stores
     try {
-      const qOwner = query(collection(db, 'stores'), where('ownerId', '==', uid));
-      const ownerSnap = await getDocs(qOwner);
-      for (const d of ownerSnap.docs) {
-        if (!storeMap.has(d.id)) {
-          storeMap.set(d.id, { id: d.id, ...d.data() } as Store);
+      const qMembers = query(collectionGroup(db, 'members'), where('userId', '==', uid));
+      const mSnap = await getDocs(qMembers);
+      for (const mDoc of mSnap.docs) {
+        // mDoc.ref.path is stores/{storeId}/members/{userId}
+        const storeRef = mDoc.ref.parent.parent;
+        if (storeRef) {
+          foundStoreIds.add(storeRef.id);
         }
       }
     } catch (e) {
-      // Fallback query might fail if index or rule limits, ignore
+      console.error('Error querying members collection group:', e);
     }
 
-    return Array.from(storeMap.values());
+    // 3. Fetch each store document (User has read permission because they are a member)
+    const allIds = Array.from(foundStoreIds);
+    for (const storeId of allIds) {
+      try {
+        const sDoc = await getDoc(doc(db, 'stores', storeId));
+        if (sDoc.exists()) {
+          storeMap.set(sDoc.id, { id: sDoc.id, ...sDoc.data() } as Store);
+        }
+      } catch (e) {
+        console.error(`Error fetching store ${storeId}:`, e);
+      }
+    }
+
+    const result = Array.from(storeMap.values());
+
+    // 4. Self-heal: Update user's storeIds array if new stores were discovered via collectionGroup
+    if (result.length > 0) {
+      const resultIds = result.map(s => s.id);
+      updateDoc(doc(db, 'users', uid), {
+        storeIds: resultIds,
+        ...(resultIds.length > 0 ? {} : {})
+      }).catch(() => {});
+    }
+
+    return result;
   } catch (err) {
     console.error('Error in getUserStores:', err);
     return [];
