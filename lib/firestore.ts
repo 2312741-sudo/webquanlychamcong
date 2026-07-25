@@ -7,23 +7,58 @@ import {
 import { Member, AttendanceRecord, Store, ScheduleModel, DaySchedule, AdvanceRequest, ProductionTask, ProductionReport, ProductionTaskEntry } from './types';
 
 export async function getUserStoreId(uid: string): Promise<string | null> {
-  const snap = await getDoc(doc(db, 'users', uid));
-  return snap.data()?.currentStoreId ?? null;
+  try {
+    const snap = await getDoc(doc(db, 'users', uid));
+    let sid = snap.data()?.currentStoreId ?? null;
+    if (!sid) {
+      const stores = await getUserStores(uid);
+      if (stores.length > 0) {
+        sid = stores[0].id;
+        await updateDoc(doc(db, 'users', uid), { currentStoreId: sid }).catch(() => {});
+      }
+    }
+    return sid;
+  } catch (err) {
+    console.error('Error in getUserStoreId:', err);
+    return null;
+  }
 }
 
 export async function getUserStores(uid: string): Promise<Store[]> {
-  const snap = await getDoc(doc(db, 'users', uid));
-  const storeIds = snap.data()?.storeIds || [];
-  if (storeIds.length === 0) return [];
-  
-  const stores: Store[] = [];
-  for (const id of storeIds) {
-    const sDoc = await getDoc(doc(db, 'stores', id));
-    if (sDoc.exists()) {
-      stores.push({ id: sDoc.id, ...sDoc.data() } as Store);
+  try {
+    const stores: Store[] = [];
+    const storeMap = new Map<string, Store>();
+
+    // 1. Get from users/{uid}.storeIds
+    const snap = await getDoc(doc(db, 'users', uid));
+    const storeIds: string[] = snap.data()?.storeIds || [];
+
+    for (const id of storeIds) {
+      if (!id) continue;
+      const sDoc = await getDoc(doc(db, 'stores', id));
+      if (sDoc.exists()) {
+        storeMap.set(sDoc.id, { id: sDoc.id, ...sDoc.data() } as Store);
+      }
     }
+
+    // 2. Query stores where ownerId == uid (Fallback)
+    try {
+      const qOwner = query(collection(db, 'stores'), where('ownerId', '==', uid));
+      const ownerSnap = await getDocs(qOwner);
+      for (const d of ownerSnap.docs) {
+        if (!storeMap.has(d.id)) {
+          storeMap.set(d.id, { id: d.id, ...d.data() } as Store);
+        }
+      }
+    } catch (e) {
+      // Fallback query might fail if index or rule limits, ignore
+    }
+
+    return Array.from(storeMap.values());
+  } catch (err) {
+    console.error('Error in getUserStores:', err);
+    return [];
   }
-  return stores;
 }
 
 export async function getAdvancesInRange(storeId: string, startDate: string, endDate: string): Promise<AdvanceRequest[]> {

@@ -43,10 +43,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       if (!u) { router.replace('/login'); return; }
       setUser(u);
       try {
-        const sid = await getUserCurrentStoreId(u.uid);
-        setStoreId(sid);
         const stores = await getUserStores(u.uid);
         setUserStores(stores);
+
+        let sid = await getUserCurrentStoreId(u.uid);
+        if (!sid && stores.length > 0) {
+          sid = stores[0].id;
+        }
+        setStoreId(sid);
       } catch (err) {
         console.error('Lỗi khi tải dữ liệu người dùng:', err);
       } finally {
