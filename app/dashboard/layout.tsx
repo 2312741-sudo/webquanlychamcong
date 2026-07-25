@@ -88,6 +88,32 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     </div>
   );
 
+  if (!storeId && !loading) {
+    return (
+      <div style={{ display:'flex', flexDirection: 'column', alignItems:'center', justifyContent:'center', minHeight:'100vh', background:'var(--surface)' }}>
+        <img src="/empty-store.png" alt="No store" style={{ width:120, height:120, opacity:0.5, marginBottom:16 }} onError={e => (e.currentTarget.style.display = 'none')} />
+        <h2 style={{ fontSize:18, fontWeight:700, color:'var(--neutral)', marginBottom:8 }}>Bạn chưa tham gia cửa hàng nào</h2>
+        <p style={{ color:'var(--text-secondary)', fontSize:14, marginBottom:24 }}>Vui lòng mở app điện thoại để tạo hoặc tham gia cửa hàng</p>
+        
+        <div style={{ background: '#f8d7da', color: '#721c24', padding: '12px 16px', borderRadius: '8px', fontSize: '12px', border: '1px solid #f5c6cb', maxWidth: '400px', textAlign: 'left' }}>
+          <strong>Thông tin Debug:</strong><br/>
+          - <b>Email:</b> {user?.email}<br/>
+          - <b>UID:</b> {user?.uid}<br/>
+          - <b>Stores Found:</b> {userStores.length}<br/>
+          <br/>
+          <i>Ghi chú: Đảm bảo bạn đang đăng nhập đúng tài khoản email đã tạo cửa hàng trên App. Nếu tài khoản đúng nhưng vẫn lỗi, có thể do cấu hình Firebase Security Rules chưa đồng bộ.</i>
+        </div>
+
+        <button 
+          onClick={() => signOut().then(() => router.replace('/login'))}
+          style={{ marginTop: '20px', padding: '10px 20px', border: 'none', background: 'var(--primary)', color: 'white', borderRadius: '8px', cursor: 'pointer' }}
+        >
+          Đăng xuất
+        </button>
+      </div>
+    );
+  }
+
   const initials = user?.displayName
     ? user.displayName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
     : (user?.email?.[0] ?? 'U').toUpperCase();
