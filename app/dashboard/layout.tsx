@@ -42,11 +42,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const unsub = onAuthChanged(async (u) => {
       if (!u) { router.replace('/login'); return; }
       setUser(u);
-      const sid = await getUserCurrentStoreId(u.uid);
-      setStoreId(sid);
-      const stores = await getUserStores(u.uid);
-      setUserStores(stores);
-      setLoading(false);
+      try {
+        const sid = await getUserCurrentStoreId(u.uid);
+        setStoreId(sid);
+        const stores = await getUserStores(u.uid);
+        setUserStores(stores);
+      } catch (err) {
+        console.error('Lỗi khi tải dữ liệu người dùng:', err);
+      } finally {
+        setLoading(false);
+      }
     });
     return unsub;
   }, [router]);
