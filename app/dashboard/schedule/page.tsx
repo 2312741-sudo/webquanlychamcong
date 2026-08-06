@@ -358,43 +358,49 @@ export default function SchedulePage() {
               )}
             </div>
 
-            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px dashed var(--border)', display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {store?.deliveryEnabled !== false && (
-                <div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, color: 'var(--primary)', fontWeight: 600 }}>
-                    <input 
-                      type="checkbox" 
-                      disabled={!(shifts[editingCell.userId]?.[editingCell.dayKey as keyof DaySchedule] || []).some(id => id !== 'delivery' && id !== 'giaohang')}
-                      checked={(shifts[editingCell.userId]?.[editingCell.dayKey as keyof DaySchedule] || []).includes('delivery')}
-                      onChange={() => toggleShiftForCell('delivery')}
-                      style={{ transform: 'scale(1.2)' }}
-                    />
-                    📦 Chở hàng (được nhận phụ cấp)
-                  </label>
-                </div>
-              )}
-              
-              {store?.giaoHangEnabled !== false && (
-                <div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, color: 'var(--primary)', fontWeight: 600 }}>
-                    <input 
-                      type="checkbox" 
-                      disabled={!(shifts[editingCell.userId]?.[editingCell.dayKey as keyof DaySchedule] || []).some(id => id !== 'delivery' && id !== 'giaohang')}
-                      checked={(shifts[editingCell.userId]?.[editingCell.dayKey as keyof DaySchedule] || []).includes('giaohang')}
-                      onChange={() => toggleShiftForCell('giaohang')}
-                      style={{ transform: 'scale(1.2)' }}
-                    />
-                    🛵 Giao hàng (được nhận phụ cấp)
-                  </label>
-                </div>
-              )}
+            {(() => {
+              const currentVal = shifts[editingCell.userId]?.[editingCell.dayKey];
+              const cellShifts = Array.isArray(currentVal) ? currentVal : (currentVal === 'off' || !currentVal ? [] : [currentVal as string]);
+              const hasNormalShift = cellShifts.some(id => id !== 'delivery' && id !== 'giaohang');
+              const isDeliveryChecked = cellShifts.includes('delivery');
+              const isGiaoHangChecked = cellShifts.includes('giaohang');
 
-              {!(shifts[editingCell.userId]?.[editingCell.dayKey as keyof DaySchedule] || []).some(id => id !== 'delivery' && id !== 'giaohang') && (
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
-                  * Cần chọn ít nhất 1 ca làm để có thể tích chở hàng / giao hàng
+              return (
+                <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px dashed var(--border)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, color: 'var(--primary)', fontWeight: 600 }}>
+                      <input 
+                        type="checkbox" 
+                        disabled={!hasNormalShift}
+                        checked={isDeliveryChecked}
+                        onChange={() => toggleShiftForCell('delivery')}
+                        style={{ transform: 'scale(1.2)' }}
+                      />
+                      📦 Chở hàng (được nhận phụ cấp)
+                    </label>
+                  </div>
+                  
+                  <div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, color: 'var(--primary)', fontWeight: 600 }}>
+                      <input 
+                        type="checkbox" 
+                        disabled={!hasNormalShift}
+                        checked={isGiaoHangChecked}
+                        onChange={() => toggleShiftForCell('giaohang')}
+                        style={{ transform: 'scale(1.2)' }}
+                      />
+                      🛵 Giao hàng (được nhận phụ cấp)
+                    </label>
+                  </div>
+
+                  {!hasNormalShift && (
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+                      * Cần chọn ít nhất 1 ca làm để có thể tích chở hàng / giao hàng
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              );
+            })()}
 
             <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end' }}>
               <button className="btn btn-primary" onClick={() => setModalOpen(false)}>
