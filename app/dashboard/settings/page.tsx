@@ -285,14 +285,14 @@ export default function SettingsPage() {
           <div>
             <label className="label" style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
               <input type="checkbox" checked={deliveryEnabled} onChange={e => setDeliveryEnabled(e.target.checked)} />
-              Cho phép NV/QL đăng ký "Chở hàng" trên app/web
+              Cho phép NV đăng ký "Chở hàng" khi đăng ký lịch làm
             </label>
           </div>
 
           <div>
             <label className="label" style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
               <input type="checkbox" checked={giaoHangEnabled} onChange={e => setGiaoHangEnabled(e.target.checked)} />
-              Hiển thị tích "Giao hàng" trên lịch làm cho Chủ/QL
+              Cho phép NV đăng ký "Giao hàng" khi đăng ký lịch làm
             </label>
           </div>
 
