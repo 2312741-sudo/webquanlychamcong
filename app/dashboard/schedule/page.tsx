@@ -6,12 +6,21 @@ import { exportWeeklySchedule } from '@/lib/exportExcel';
 import { ScheduleModel, DaySchedule, ShiftDefinition } from '@/lib/types';
 
 function getMondayOfWeek(date: Date): string {
-  const d = new Date(date);
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   const day = d.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
+  const diff = day === 0 ? -6 : 1 - day; // adjust when day is sunday
   d.setDate(d.getDate() + diff);
-  return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dayStr = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dayStr}`;
 }
+
+const DEFAULT_SHIFTS: ShiftDefinition[] = [
+  { id: 'morning', name: 'Ca sáng', startHour: 6, startMinute: 0, endHour: 14, endMinute: 0 },
+  { id: 'afternoon', name: 'Ca chiều', startHour: 14, startMinute: 0, endHour: 22, endMinute: 0 },
+  { id: 'evening', name: 'Ca tối', startHour: 22, startMinute: 0, endHour: 6, endMinute: 0 },
+];
 
 const DAY_KEYS: (keyof DaySchedule)[] = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
 const DAY_LABELS = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN'];
@@ -30,7 +39,9 @@ export default function SchedulePage() {
   const [editingCell, setEditingCell] = useState<{userId: string; dayKey: keyof DaySchedule; memberName: string; dateLabel: string} | null>(null);
 
   const activeMembers = members.filter(m => m.status === 'active');
-  const customShifts = store?.customShifts || [];
+  const customShifts = (store?.customShifts && store.customShifts.length > 0)
+    ? store.customShifts
+    : DEFAULT_SHIFTS;
 
   useEffect(() => {
     if (!storeId || !currentWeek) return;
@@ -38,17 +49,17 @@ export default function SchedulePage() {
     getWeekSchedule(storeId, currentWeek).then(data => {
       setScheduleData(data);
       
-      // Auto-cleanup deleted shifts
       const loadedShifts = data?.shifts || {};
       const cleanShifts: Record<string, DaySchedule> = JSON.parse(JSON.stringify(loadedShifts));
-      const validIds = new Set((store?.customShifts || []).map(s => s.id));
+      const validIds = new Set(customShifts.map(s => s.id));
       validIds.add('delivery');
       validIds.add('giaohang');
 
       for (const uid in cleanShifts) {
+        if (!cleanShifts[uid]) continue;
         for (const day of DAY_KEYS) {
           const val = cleanShifts[uid][day];
-          let arr = Array.isArray(val) ? val : (val === 'off' ? [] : [val as string]);
+          let arr = Array.isArray(val) ? val : (val === 'off' || !val ? [] : [val as string]);
           arr = arr.filter(s => {
             const shiftId = s.split('|')[0];
             return validIds.has(shiftId);
@@ -64,18 +75,31 @@ export default function SchedulePage() {
       }
       
       setShifts(cleanShifts);
+    }).catch(err => {
+      console.error('Error fetching schedule:', err);
     }).finally(() => setLoading(false));
   }, [storeId, currentWeek, store?.customShifts]);
 
   const changeWeek = (offset: number) => {
-    const d = new Date(currentWeek);
-    d.setDate(d.getDate() + offset * 7);
-    setCurrentWeek(getMondayOfWeek(d));
+    const [y, m, d] = currentWeek.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    dateObj.setDate(dateObj.getDate() + offset * 7);
+    setCurrentWeek(getMondayOfWeek(dateObj));
+  };
+
+  const goToCurrentWeek = () => {
+    setCurrentWeek(getMondayOfWeek(new Date()));
   };
 
   const handleExport = () => {
     if (!store) return;
-    exportWeeklySchedule(activeMembers, scheduleData, currentWeek, store);
+    const currentSchedule: ScheduleModel = {
+      id: scheduleData?.id || '',
+      storeId: storeId || '',
+      weekStart: currentWeek,
+      shifts: shifts
+    };
+    exportWeeklySchedule(activeMembers, currentSchedule, currentWeek, store);
   };
 
   const openModal = (userId: string, dayKey: keyof DaySchedule, memberName: string, dateLabel: string) => {
@@ -90,27 +114,33 @@ export default function SchedulePage() {
       const userSchedule = prev[userId] || { monday:[], tuesday:[], wednesday:[], thursday:[], friday:[], saturday:[], sunday:[] };
       let currentArray = userSchedule[dayKey] || [];
       if (!Array.isArray(currentArray)) {
-        currentArray = currentArray === 'off' ? [] : [currentArray as any];
+        currentArray = currentArray === 'off' || !currentArray ? [] : [currentArray as any];
       }
       
+      let newArray: string[] = [];
       if (shiftId === 'delivery' || shiftId === 'giaohang') {
-        const newArray = currentArray.includes(shiftId as any) 
+        newArray = currentArray.includes(shiftId) 
           ? currentArray.filter(id => id !== shiftId)
-          : [...currentArray, shiftId as any];
-        return { ...prev, [userId]: { ...userSchedule, [dayKey]: newArray } };
+          : [...currentArray, shiftId];
+      } else {
+        const existingEntry = currentArray.find(s => s === shiftId || s.startsWith(`${shiftId}|`));
+        newArray = existingEntry
+          ? currentArray.filter(s => s !== existingEntry)
+          : [...currentArray, shiftId];
+          
+        // If no normal shifts left, remove delivery and giaohang too
+        if (!newArray.some(id => id !== 'delivery' && id !== 'giaohang')) {
+          newArray = newArray.filter(id => id !== 'delivery' && id !== 'giaohang');
+        }
       }
 
-      const existingEntry = currentArray.find(s => s === shiftId || s.startsWith(`${shiftId}|`));
-      let newArray = existingEntry
-        ? currentArray.filter(s => s !== existingEntry)
-        : [...currentArray, shiftId as any];
-        
-      // If no normal shifts left, remove delivery and giaohang too
-      if (!newArray.some(id => id !== 'delivery' && id !== 'giaohang')) {
-        newArray = newArray.filter(id => id !== 'delivery' && id !== 'giaohang');
-      }
-
-      return { ...prev, [userId]: { ...userSchedule, [dayKey]: newArray } };
+      return {
+        ...prev,
+        [userId]: {
+          ...userSchedule,
+          [dayKey]: newArray
+        }
+      };
     });
   };
 
@@ -118,19 +148,36 @@ export default function SchedulePage() {
     if (!storeId) return;
     setSaving(true);
     try {
-      await saveWeekSchedule(storeId, currentWeek, shifts);
+      // Clean up shifts before saving to Firestore to avoid undefined fields
+      const sanitizedShifts: Record<string, DaySchedule> = {};
+      for (const uid in shifts) {
+        if (!shifts[uid]) continue;
+        sanitizedShifts[uid] = {
+          monday: shifts[uid].monday || [],
+          tuesday: shifts[uid].tuesday || [],
+          wednesday: shifts[uid].wednesday || [],
+          thursday: shifts[uid].thursday || [],
+          friday: shifts[uid].friday || [],
+          saturday: shifts[uid].saturday || [],
+          sunday: shifts[uid].sunday || [],
+        };
+      }
+
+      await saveWeekSchedule(storeId, currentWeek, sanitizedShifts);
       const data = await getWeekSchedule(storeId, currentWeek);
       setScheduleData(data);
       setShifts(data?.shifts || {});
-      alert('Đã lưu lịch làm');
+      alert('Đã lưu lịch làm việc thành công!');
     } catch (e) {
-      alert('Lỗi khi lưu lịch');
+      console.error('Error saving schedule:', e);
+      alert('Lỗi khi lưu lịch làm: ' + e);
     } finally {
       setSaving(false);
     }
   };
 
-  const mondayDate = new Date(currentWeek);
+  const [monYear, monMonth, monDay] = currentWeek.split('-').map(Number);
+  const mondayDate = new Date(monYear, monMonth - 1, monDay);
   const datesInWeek = Array.from({length: 7}, (_, i) => {
     const d = new Date(mondayDate);
     d.setDate(mondayDate.getDate() + i);
@@ -139,32 +186,37 @@ export default function SchedulePage() {
 
   const getShiftLabel = (shiftIds: string[] | string) => {
     if (!shiftIds) return 'Nghỉ';
-    const arr = Array.isArray(shiftIds) ? shiftIds : (shiftIds === 'off' ? [] : [shiftIds]);
+    const arr = Array.isArray(shiftIds) ? shiftIds : (shiftIds === 'off' || !shiftIds ? [] : [shiftIds]);
     if (arr.length === 0) return 'Nghỉ';
     
     const actualShifts = arr.filter(id => id !== 'delivery' && id !== 'giaohang');
     const hasDelivery = arr.includes('delivery');
     const hasGiaoHang = arr.includes('giaohang');
     
-    if (actualShifts.length === 0) return 'Nghỉ';
+    if (actualShifts.length === 0) {
+      if (hasDelivery && hasGiaoHang) return '📦 Chở + 🛵 Giao';
+      if (hasDelivery) return '📦 Chở hàng';
+      if (hasGiaoHang) return '🛵 Giao hàng';
+      return 'Nghỉ';
+    }
 
     const names = actualShifts.map(entry => {
       const [shiftId, deptId] = entry.split('|');
       const found = customShifts.find(s => s.id === shiftId);
       const dept = store?.departments?.find(d => d.id === deptId);
       
-      const shiftName = found ? found.name : 'Ca cũ';
+      const shiftName = found ? found.name : 'Ca làm';
       return dept ? `[${dept.shortName}] ${shiftName}` : shiftName;
     });
     
-    if (hasDelivery) names.push('📦 Chở hàng');
-    if (hasGiaoHang) names.push('🛵 Giao hàng');
+    if (hasDelivery) names.push('📦 Chở');
+    if (hasGiaoHang) names.push('🛵 Giao');
     
     return names.join(' + ');
   };
 
   const getCellColor = (shiftIds: string[] | string) => {
-    const arr = Array.isArray(shiftIds) ? shiftIds : (shiftIds === 'off' ? [] : [shiftIds]);
+    const arr = Array.isArray(shiftIds) ? shiftIds : (shiftIds === 'off' || !shiftIds ? [] : [shiftIds]);
     if (arr.length === 0) return 'transparent';
     return store?.themeColor || 'var(--primary)';
   };
@@ -175,10 +227,13 @@ export default function SchedulePage() {
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--neutral)' }}>Lịch làm tuần</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 4 }}>
-            Quản lý và phân ca cho nhân viên
+            Quản lý và phân ca làm việc cho nhân viên
           </p>
         </div>
         <div className="flex gap-3">
+          <button onClick={goToCurrentWeek} className="btn btn-secondary">
+            📅 Tuần này
+          </button>
           <button onClick={handleExport} className="btn btn-primary" style={{ background: 'var(--success)' }}>
             📥 Xuất Excel
           </button>
@@ -188,17 +243,11 @@ export default function SchedulePage() {
         </div>
       </div>
 
-      {customShifts.length === 0 && (
-        <div style={{ padding: 16, background: '#FFF3CD', color: '#856404', borderRadius: 8, fontSize: 14 }}>
-          <strong>Lưu ý:</strong> Bạn chưa tạo ca làm việc nào. Hãy vào trang <strong>Cài đặt</strong> để thêm danh sách ca trước khi xếp lịch.
-        </div>
-      )}
-
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: 16, borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <button className="btn btn-ghost" onClick={() => changeWeek(-1)}>← Tuần trước</button>
-          <div style={{ fontWeight: 700, fontSize: 16 }}>
-            Tuần: {datesInWeek[0]} - {datesInWeek[6]}
+          <div style={{ fontWeight: 700, fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>Tuần: {datesInWeek[0]} - {datesInWeek[6]} ({currentWeek})</span>
           </div>
           <button className="btn btn-ghost" onClick={() => changeWeek(1)}>Tuần sau →</button>
         </div>
@@ -228,7 +277,7 @@ export default function SchedulePage() {
                     </td>
                     {DAY_KEYS.map((dayKey, i) => {
                       const currentVal = shifts[m.userId]?.[dayKey] || [];
-                      const isOff = Array.isArray(currentVal) ? currentVal.length === 0 : currentVal === 'off';
+                      const isOff = Array.isArray(currentVal) ? currentVal.length === 0 : (currentVal === 'off' || !currentVal);
                       const bgColor = getCellColor(currentVal);
                       const textColor = isOff ? 'var(--text-primary)' : 'white';
                       const label = getShiftLabel(currentVal);
@@ -239,10 +288,12 @@ export default function SchedulePage() {
                             onClick={() => openModal(m.userId, dayKey, m.name, `${DAY_LABELS[i]} ${datesInWeek[i]}`)}
                             style={{
                               width: '100%',
-                              height: 48,
+                              minHeight: 48,
+                              padding: '6px 8px',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
+                              textAlign: 'center',
                               borderRadius: 8,
                               border: isOff ? '1px dashed var(--border)' : 'none',
                               background: isOff ? 'var(--surface)' : bgColor,
@@ -251,6 +302,7 @@ export default function SchedulePage() {
                               fontWeight: 600,
                               cursor: 'pointer',
                               transition: 'all 0.2s',
+                              wordBreak: 'break-word'
                             }}
                           >
                             {label}
@@ -261,7 +313,7 @@ export default function SchedulePage() {
                   </tr>
                 ))}
                 {activeMembers.length === 0 && (
-                  <tr><td colSpan={8} style={{ textAlign: 'center', padding: 40, color: 'var(--text-secondary)' }}>Chưa có nhân viên</td></tr>
+                  <tr><td colSpan={8} style={{ textAlign: 'center', padding: 40, color: 'var(--text-secondary)' }}>Chưa có nhân viên hoạt động</td></tr>
                 )}
               </tbody>
             </table>
@@ -269,7 +321,7 @@ export default function SchedulePage() {
         )}
       </div>
 
-      {/* MODAL */}
+      {/* MODAL PHÂN CA */}
       {modalOpen && editingCell && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -277,7 +329,7 @@ export default function SchedulePage() {
           display: 'flex', alignItems: 'center', justifyContent: 'center'
         }}>
           <div style={{
-            background: 'white', borderRadius: 16, padding: 24, width: '100%', maxWidth: 400,
+            background: 'white', borderRadius: 16, padding: 24, width: '100%', maxWidth: 420,
             boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
           }}>
             <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Chọn ca làm</h3>
@@ -285,10 +337,10 @@ export default function SchedulePage() {
               {editingCell.memberName} • {editingCell.dateLabel}
             </p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 300, overflowY: 'auto' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 320, overflowY: 'auto' }}>
               {customShifts.map(shift => {
                 const currentArr = shifts[editingCell.userId]?.[editingCell.dayKey] || [];
-                const arr = Array.isArray(currentArr) ? currentArr : (currentArr === 'off' ? [] : [currentArr]);
+                const arr = Array.isArray(currentArr) ? currentArr : (currentArr === 'off' || !currentArr ? [] : [currentArr]);
                 const shiftEntry = arr.find(s => s === shift.id || s.startsWith(`${shift.id}|`));
                 const isSelected = !!shiftEntry;
                 const selectedDeptId = shiftEntry?.split('|')[1] || '';
@@ -330,7 +382,7 @@ export default function SchedulePage() {
                             setShifts(prev => {
                               const userSchedule = prev[editingCell.userId] || { monday:[], tuesday:[], wednesday:[], thursday:[], friday:[], saturday:[], sunday:[] };
                               let cArr = userSchedule[editingCell.dayKey] || [];
-                              if (!Array.isArray(cArr)) cArr = cArr === 'off' ? [] : [cArr as any];
+                              if (!Array.isArray(cArr)) cArr = cArr === 'off' || !cArr ? [] : [cArr as any];
                               let nArr = [...cArr];
                               const idx = nArr.findIndex(s => s === shiftEntry);
                               if (idx !== -1) {
@@ -351,11 +403,6 @@ export default function SchedulePage() {
                   </div>
                 );
               })}
-              {customShifts.length === 0 && (
-                <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-secondary)' }}>
-                  Vui lòng thêm ca làm trong trang Cài đặt.
-                </div>
-              )}
             </div>
 
             {(() => {
