@@ -140,25 +140,37 @@ export function watchStore(storeId: string, cb: (store: Store | null) => void) {
 }
 
 export async function getMonthAttendances(storeId: string, month: string): Promise<AttendanceRecord[]> {
-  const q = query(
-    collection(db, 'stores', storeId, 'attendances'),
-    where('date', '>=', `${month}-01`),
-    where('date', '<=', `${month}-31`),
-    orderBy('date')
-  );
-  const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() } as AttendanceRecord));
+  try {
+    const q = query(
+      collection(db, 'stores', storeId, 'attendances'),
+      where('date', '>=', `${month}-01`),
+      where('date', '<=', `${month}-31`)
+    );
+    const snap = await getDocs(q);
+    const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as AttendanceRecord));
+    list.sort((a, b) => a.date.localeCompare(b.date));
+    return list;
+  } catch (err) {
+    console.error('Error in getMonthAttendances:', err);
+    return [];
+  }
 }
 
 export async function getAttendancesInRange(storeId: string, startDate: string, endDate: string): Promise<AttendanceRecord[]> {
-  const q = query(
-    collection(db, 'stores', storeId, 'attendances'),
-    where('date', '>=', startDate),
-    where('date', '<=', endDate),
-    orderBy('date')
-  );
-  const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() } as AttendanceRecord));
+  try {
+    const q = query(
+      collection(db, 'stores', storeId, 'attendances'),
+      where('date', '>=', startDate),
+      where('date', '<=', endDate)
+    );
+    const snap = await getDocs(q);
+    const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as AttendanceRecord));
+    list.sort((a, b) => a.date.localeCompare(b.date));
+    return list;
+  } catch (err) {
+    console.error('Error in getAttendancesInRange:', err);
+    return [];
+  }
 }
 
 export async function getMemberMonthAttendances(storeId: string, userId: string, month: string): Promise<AttendanceRecord[]> {
@@ -373,14 +385,20 @@ export async function getProductionReports(
   storeId: string,
   month: string // YYYY-MM
 ): Promise<ProductionReport[]> {
-  const q = query(
-    collection(db, 'stores', storeId, 'production_reports'),
-    where('date', '>=', `${month}-01`),
-    where('date', '<=', `${month}-31`),
-    orderBy('date', 'asc')
-  );
-  const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() } as ProductionReport));
+  try {
+    const q = query(
+      collection(db, 'stores', storeId, 'production_reports'),
+      where('date', '>=', `${month}-01`),
+      where('date', '<=', `${month}-31`)
+    );
+    const snap = await getDocs(q);
+    const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as ProductionReport));
+    list.sort((a, b) => a.date.localeCompare(b.date));
+    return list;
+  } catch (err) {
+    console.error('Error in getProductionReports:', err);
+    return [];
+  }
 }
 
 export async function addProductionReport(

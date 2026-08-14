@@ -263,7 +263,8 @@ export async function exportMonthlySalary(
           : (date.getFullYear() === Number(yearStr) && date.getMonth() + 1 === Number(monthStr));
           
         if (inRange) {
-          const arr = (userShifts[dayKey as keyof typeof userShifts] || []) as string[];
+          const shiftVal = userShifts[dayKey as keyof typeof userShifts] || [];
+          const arr = Array.isArray(shiftVal) ? shiftVal : (shiftVal === 'off' ? [] : [shiftVal as string]);
           const validIds = new Set((store?.customShifts || []).map(s => s.id));
           const hasValidNormalShift = arr.some(id => {
             const baseId = id.split('|')[0];
