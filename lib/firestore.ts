@@ -57,18 +57,20 @@ export async function getUserStores(uid: string): Promise<Store[]> {
       console.error('Error querying members collection group:', e);
     }
 
-    // 3. Fetch each store document (User has read permission because they are a member)
+    // 3. Fetch store documents in parallel
     const allIds = Array.from(foundStoreIds);
-    for (const storeId of allIds) {
-      try {
-        const sDoc = await getDoc(doc(db, 'stores', storeId));
-        if (sDoc.exists()) {
-          storeMap.set(sDoc.id, { id: sDoc.id, ...sDoc.data() } as Store);
+    await Promise.all(
+      allIds.map(async (storeId) => {
+        try {
+          const sDoc = await getDoc(doc(db, 'stores', storeId));
+          if (sDoc.exists()) {
+            storeMap.set(sDoc.id, { id: sDoc.id, ...sDoc.data() } as Store);
+          }
+        } catch (e) {
+          console.error(`Error fetching store ${storeId}:`, e);
         }
-      } catch (e) {
-        console.error(`Error fetching store ${storeId}:`, e);
-      }
-    }
+      })
+    );
 
     const result = Array.from(storeMap.values());
 
