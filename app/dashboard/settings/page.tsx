@@ -135,8 +135,8 @@ export default function SettingsPage() {
   };
 
   const addWifi = () => {
-    if (wifis.length >= 3) return;
-    setWifis([...wifis, { name: 'WiFi mới', ip: '' }]);
+    if (wifis.length >= 10) return;
+    setWifis([...wifis, { name: `WiFi ${wifis.length + 1}`, ip: '' }]);
   };
   const updateWifi = (index: number, field: 'name' | 'ip', value: string) => {
     const newWifis = [...wifis];
@@ -307,15 +307,20 @@ export default function SettingsPage() {
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700 }}>Danh sách WiFi Chấm Công</h3>
-          <button className="btn btn-secondary" onClick={addWifi} disabled={wifis.length >= 3} style={{ fontSize: 13, padding: '6px 12px' }}>
-            + Thêm WiFi ({wifis.length}/3)
+          <div>
+            <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Danh sách WiFi Chấm Công</h3>
+            <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+              Cấu hình tối đa 10 địa chỉ WiFi/IP để nhân viên chấm công
+            </p>
+          </div>
+          <button className="btn btn-secondary" onClick={addWifi} disabled={wifis.length >= 10} style={{ fontSize: 13, padding: '6px 12px' }}>
+            + Thêm WiFi ({wifis.length}/10)
           </button>
         </div>
         
         {wifis.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-secondary)', background: 'var(--surface)', borderRadius: 8 }}>
-            Chưa có WiFi nào. Bấm "Thêm WiFi" để tạo (tối đa 3).
+            Chưa có WiFi nào. Bấm "Thêm WiFi" để tạo (tối đa 10 điểm).
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
