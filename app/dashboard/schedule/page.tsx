@@ -44,9 +44,15 @@ export default function SchedulePage() {
     : DEFAULT_SHIFTS;
 
   useEffect(() => {
-    if (!storeId || !currentWeek) return;
+    if (!storeId || !currentWeek) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
+    let isCancelled = false;
+
     getWeekSchedule(storeId, currentWeek).then(data => {
+      if (isCancelled) return;
       setScheduleData(data);
       
       const loadedShifts = data?.shifts || {};
@@ -76,9 +82,16 @@ export default function SchedulePage() {
       
       setShifts(cleanShifts);
     }).catch(err => {
+      if (isCancelled) return;
       console.error('Error fetching schedule:', err);
-    }).finally(() => setLoading(false));
-  }, [storeId, currentWeek, store?.customShifts]);
+    }).finally(() => {
+      if (!isCancelled) setLoading(false);
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [storeId, currentWeek]);
 
   const changeWeek = (offset: number) => {
     const [y, m, d] = currentWeek.split('-').map(Number);

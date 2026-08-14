@@ -255,24 +255,34 @@ export async function updateMemberInfo(storeId: string, userId: string, data: Re
 }
 
 export async function getWeekSchedule(storeId: string, weekStart: string): Promise<ScheduleModel | null> {
-  const q = query(
-    collection(db, 'stores', storeId, 'schedules'),
-    where('weekStart', '==', weekStart),
-    limit(1)
-  );
-  const snap = await getDocs(q);
-  if (snap.empty) return null;
-  return { id: snap.docs[0].id, ...snap.docs[0].data() } as ScheduleModel;
+  try {
+    const q = query(
+      collection(db, 'stores', storeId, 'schedules'),
+      where('weekStart', '==', weekStart),
+      limit(1)
+    );
+    const snap = await getDocs(q);
+    if (snap.empty) return null;
+    return { id: snap.docs[0].id, ...snap.docs[0].data() } as ScheduleModel;
+  } catch (err) {
+    console.error('Error in getWeekSchedule:', err);
+    return null;
+  }
 }
 
 export async function getSchedulesInRange(storeId: string, startDateStr: string, endDateStr: string): Promise<ScheduleModel[]> {
-  const q = query(
-    collection(db, 'stores', storeId, 'schedules'),
-    where('weekStart', '>=', startDateStr),
-    where('weekStart', '<=', endDateStr)
-  );
-  const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() } as ScheduleModel));
+  try {
+    const q = query(
+      collection(db, 'stores', storeId, 'schedules'),
+      where('weekStart', '>=', startDateStr),
+      where('weekStart', '<=', endDateStr)
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as ScheduleModel));
+  } catch (err) {
+    console.error('Error in getSchedulesInRange:', err);
+    return [];
+  }
 }
 
 // ---------------- Advances ----------------
