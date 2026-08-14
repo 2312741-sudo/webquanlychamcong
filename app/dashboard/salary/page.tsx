@@ -119,8 +119,13 @@ export default function SalaryPage() {
         endObj = new Date(filters.endDate);
       }
       
+      const selectedMemberName = filters.memberId ? filteredMembers[0]?.name : undefined;
       const monthParam = filters.type === 'month' ? filters.month! : currentMonth;
-      await exportMonthlySalary(filteredMembers, dataAttendances, monthParam, store, schedules, dataAdvances, { startDate: startObj, endDate: endObj });
+      await exportMonthlySalary(filteredMembers, dataAttendances, monthParam, store, schedules, dataAdvances, { 
+        startDate: startObj, 
+        endDate: endObj,
+        memberName: selectedMemberName
+      });
     } catch (e) {
       console.error(e);
       alert('Lỗi xuất dữ liệu: ' + e);

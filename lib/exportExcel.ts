@@ -1,19 +1,67 @@
-import * as XLSX from 'xlsx';
 import * as ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { Member, AttendanceRecord, ScheduleModel, Store, ShiftDefinition, DaySchedule, AdvanceRequest, ProductionReport, ProductionTask } from './types';
 
 const DAY_KEYS = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
-const DAY_LABELS = ['Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7','Chủ nhật'];
-const SHIFT_LABELS: Record<string, string> = {
-  morning: 'Ca sáng (06:00-14:00)',
-  afternoon: 'Ca chiều (14:00-22:00)',
-  evening: 'Ca tối (22:00-06:00)',
-  off: 'Nghỉ',
-};
 const ROLE_LABELS: Record<string, string> = {
   owner: 'Chủ', manager: 'Quản lý', employee: 'Nhân viên',
 };
+
+/**
+ * Sanitize tên file: bỏ dấu tiếng Việt, thay khoảng trắng bằng _, bỏ ký tự đặc biệt
+ */
+export function sanitize(input: string): string {
+  if (!input) return '';
+  const vietMap: Record<string, string> = {
+    'à': 'a', 'á': 'a', 'ả': 'a', 'ã': 'a', 'ạ': 'a',
+    'ă': 'a', 'ằ': 'a', 'ắ': 'a', 'ẳ': 'a', 'ẵ': 'a', 'ặ': 'a',
+    'â': 'a', 'ầ': 'a', 'ấ': 'a', 'ẩ': 'a', 'ẫ': 'a', 'ậ': 'a',
+    'è': 'e', 'é': 'e', 'ẻ': 'e', 'ẽ': 'e', 'ẹ': 'e',
+    'ê': 'e', 'ề': 'e', 'ế': 'e', 'ể': 'e', 'ễ': 'e', 'ệ': 'e',
+    'ì': 'i', 'í': 'i', 'ỉ': 'i', 'ĩ': 'i', 'ị': 'i',
+    'ò': 'o', 'ó': 'o', 'ỏ': 'o', 'õ': 'o', 'ọ': 'o',
+    'ô': 'o', 'ồ': 'o', 'ố': 'o', 'ổ': 'o', 'ỗ': 'o', 'ộ': 'o',
+    'ơ': 'o', 'ờ': 'o', 'ớ': 'o', 'ở': 'o', 'ỡ': 'o', 'ợ': 'o',
+    'ù': 'u', 'ú': 'u', 'ủ': 'u', 'ũ': 'u', 'ụ': 'u',
+    'ư': 'u', 'ừ': 'u', 'ứ': 'u', 'ử': 'u', 'ữ': 'u', 'ự': 'u',
+    'ỳ': 'y', 'ý': 'y', 'ỷ': 'y', 'ỹ': 'y', 'ỵ': 'y',
+    'đ': 'd',
+    'À': 'A', 'Á': 'A', 'Ả': 'A', 'Ã': 'A', 'Ạ': 'A',
+    'Ă': 'A', 'Ằ': 'A', 'Ắ': 'A', 'Ẳ': 'A', 'Ẵ': 'A', 'Ặ': 'A',
+    'Â': 'A', 'Ầ': 'A', 'Ấ': 'A', 'Ẩ': 'A', 'Ẫ': 'A', 'Ậ': 'A',
+    'È': 'E', 'É': 'E', 'Ẻ': 'E', 'Ẽ': 'E', 'Ẹ': 'E',
+    'Ê': 'E', 'Ề': 'E', 'Ế': 'E', 'Ể': 'E', 'Ễ': 'E', 'Ệ': 'E',
+    'Ì': 'I', 'Í': 'I', 'Ỉ': 'I', 'Ĩ': 'I', 'Ị': 'I',
+    'Ò': 'O', 'Ó': 'O', 'Ỏ': 'O', 'Õ': 'O', 'Ọ': 'O',
+    'Ô': 'O', 'Ồ': 'O', 'Ố': 'O', 'Ổ': 'O', 'Ỗ': 'O', 'Ộ': 'O',
+    'Ơ': 'O', 'Ờ': 'O', 'Ớ': 'O', 'Ở': 'O', 'Ỡ': 'O', 'Ợ': 'O',
+    'Ù': 'U', 'Ú': 'U', 'Ủ': 'U', 'Ũ': 'U', 'Ụ': 'U',
+    'Ư': 'U', 'Ừ': 'U', 'Ứ': 'U', 'Ử': 'U', 'Ữ': 'U', 'Ự': 'U',
+    'Ỳ': 'Y', 'Ý': 'Y', 'Ỷ': 'Y', 'Ỹ': 'Y', 'Ỵ': 'Y',
+    'Đ': 'D',
+  };
+  let result = '';
+  for (let i = 0; i < input.length; i++) {
+    const char = input[i];
+    result += vietMap[char] ?? char;
+  }
+  return result
+    .replace(/[^a-zA-Z0-9\s_\-]/g, '')
+    .replace(/\s+/g, '_');
+}
+
+function getLightHex(hex: string): string {
+  const c = hex.replace('#', '');
+  const r = parseInt(c.substring(0, 2), 16);
+  const g = parseInt(c.substring(2, 4), 16);
+  const b = parseInt(c.substring(4, 6), 16);
+  const lr = Math.min(255, Math.round(r + (255 - r) * 0.85)).toString(16).padStart(2, '0');
+  const lg = Math.min(255, Math.round(g + (255 - g) * 0.85)).toString(16).padStart(2, '0');
+  const lb = Math.min(255, Math.round(b + (255 - b) * 0.85)).toString(16).padStart(2, '0');
+  return `FF${lr}${lg}${lb}`.toUpperCase();
+}
+
+// ─── 1. Xuất Bảng Công ────────────────────────────────────────────────────────
 
 export async function exportMonthlyAttendance(
   members: Member[],
@@ -21,7 +69,7 @@ export async function exportMonthlyAttendance(
   month: string,
   store: Store,
   schedules: ScheduleModel[],
-  options?: { startDate?: Date; endDate?: Date }
+  options?: { startDate?: Date; endDate?: Date; memberName?: string }
 ) {
   const [year, mon] = month.split('-').map(Number);
   
@@ -54,27 +102,6 @@ export async function exportMonthlyAttendance(
     ...daysArray.map(d => d.label)
   ];
 
-  const rows = members.map(member => {
-    const memberAtts = attendances.filter(a => a.userId === member.userId);
-    let totalHours = 0;
-    const dayCells = daysArray.map(d => {
-      const att = memberAtts.find(a => a.date === d.dateStr);
-      const h = att?.totalHours ?? 0;
-      totalHours += h;
-      if (att) {
-        return `${h.toFixed(1)}h`;
-      }
-      return '-';
-    });
-
-    return [
-      member.name, 
-      ROLE_LABELS[member.role] || member.role, 
-      `${totalHours.toFixed(1)}h`,
-      ...dayCells
-    ];
-  });
-
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Bảng Công');
 
@@ -84,46 +111,81 @@ export async function exportMonthlyAttendance(
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${themeColor}` } };
     cell.alignment = { horizontal: 'center', vertical: 'middle' };
   });
-  
-  rows.forEach(r => {
-    const row = sheet.addRow(r);
-    row.eachCell((cell, colNumber) => {
-      if (colNumber > 3) {
-        cell.alignment = { horizontal: 'center' };
-        if (cell.value && cell.value !== '-') {
-          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightColorHex } };
-        }
+
+  members.forEach(member => {
+    const memberAtts = attendances.filter(a => a.userId === member.userId);
+    let totalHours = 0;
+    
+    const dayValues: number[] = [];
+    daysArray.forEach(d => {
+      const att = memberAtts.find(a => a.date === d.dateStr);
+      const h = att?.totalHours ?? 0;
+      totalHours += h;
+      dayValues.push(h);
+    });
+
+    const rowData: (string | number)[] = [
+      member.name, 
+      ROLE_LABELS[member.role] || member.role, 
+      totalHours,
+      ...dayValues
+    ];
+
+    const row = sheet.addRow(rowData);
+
+    // Styling
+    row.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
+    row.getCell(2).alignment = { horizontal: 'center', vertical: 'middle' };
+    
+    // Total hours numeric formatting
+    const totalCell = row.getCell(3);
+    totalCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    totalCell.numFmt = '0.0';
+
+    // Day cells
+    dayValues.forEach((hours, idx) => {
+      const cell = row.getCell(idx + 4);
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.numFmt = '0.0';
+      if (hours > 0) {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightColorHex } };
       }
     });
   });
 
-  sheet.getColumn(1).width = 22;
-  sheet.getColumn(2).width = 12;
-  sheet.getColumn(3).width = 10;
+  sheet.getColumn(1).width = 25;
+  sheet.getColumn(2).width = 14;
+  sheet.getColumn(3).width = 12;
   for (let i = 4; i <= daysArray.length + 3; i++) {
     sheet.getColumn(i).width = 10;
   }
 
+  // Filename formatting
+  const storePart = sanitize(store.name);
+  let timePart = '';
+  if (options?.startDate && options?.endDate) {
+    const startStr = `${String(options.startDate.getDate()).padStart(2, '0')}.${String(options.startDate.getMonth() + 1).padStart(2, '0')}`;
+    const endStr = `${String(options.endDate.getDate()).padStart(2, '0')}.${String(options.endDate.getMonth() + 1).padStart(2, '0')}.${options.endDate.getFullYear()}`;
+    timePart = `${startStr}-${endStr}`;
+  } else {
+    const [y, m] = month.split('-');
+    timePart = `T${m}-${y}`;
+  }
+  const memberPart = options?.memberName ? `_${sanitize(options.memberName)}` : '';
+  const fileName = `BangCong_${storePart}_${timePart}${memberPart}.xlsx`;
+
   const buffer = await workbook.xlsx.writeBuffer();
-  saveAs(new Blob([buffer]), `BangCong_${options?.startDate ? 'Filter' : month}.xlsx`);
+  saveAs(new Blob([buffer]), fileName);
 }
 
-function getLightHex(hex: string): string {
-  const c = hex.replace('#', '');
-  const r = parseInt(c.substring(0, 2), 16);
-  const g = parseInt(c.substring(2, 4), 16);
-  const b = parseInt(c.substring(4, 6), 16);
-  const lr = Math.min(255, Math.round(r + (255 - r) * 0.85)).toString(16).padStart(2, '0');
-  const lg = Math.min(255, Math.round(g + (255 - g) * 0.85)).toString(16).padStart(2, '0');
-  const lb = Math.min(255, Math.round(b + (255 - b) * 0.85)).toString(16).padStart(2, '0');
-  return `FF${lr}${lg}${lb}`.toUpperCase();
-}
+// ─── 2. Xuất Chi Tiết IN/OUT ──────────────────────────────────────────────────
 
 export async function exportDetailedInOut(
   members: Member[],
   attendances: AttendanceRecord[],
   month: string,
   store?: Store,
+  options?: { startDate?: Date; endDate?: Date; memberName?: string }
 ) {
   const themeColor = (store?.themeColor || '#C8102E').replace('#', '');
   const lightColorHex = getLightHex(themeColor);
@@ -213,9 +275,25 @@ export async function exportDetailedInOut(
   sheet.getColumn(4).width = 12;
   sheet.getColumn(5).width = 12;
 
+  // Filename formatting
+  const storePart = sanitize(store?.name || '');
+  let timePart = '';
+  if (options?.startDate && options?.endDate) {
+    const startStr = `${String(options.startDate.getDate()).padStart(2, '0')}.${String(options.startDate.getMonth() + 1).padStart(2, '0')}`;
+    const endStr = `${String(options.endDate.getDate()).padStart(2, '0')}.${String(options.endDate.getMonth() + 1).padStart(2, '0')}.${options.endDate.getFullYear()}`;
+    timePart = `${startStr}-${endStr}`;
+  } else {
+    const [y, m] = month.split('-');
+    timePart = `T${m}-${y}`;
+  }
+  const memberPart = options?.memberName ? `_${sanitize(options.memberName)}` : '';
+  const fileName = `ChiTietInOut_${storePart}_${timePart}${memberPart}.xlsx`;
+
   const buffer = await workbook.xlsx.writeBuffer();
-  saveAs(new Blob([buffer]), `ChiTietInOut_${month}.xlsx`);
+  saveAs(new Blob([buffer]), fileName);
 }
+
+// ─── 3. Xuất Báo Cáo Lương ────────────────────────────────────────────────────
 
 export async function exportMonthlySalary(
   members: Member[],
@@ -224,7 +302,7 @@ export async function exportMonthlySalary(
   store: Store,
   schedules: ScheduleModel[],
   advances: AdvanceRequest[] = [],
-  options?: { startDate?: Date; endDate?: Date }
+  options?: { startDate?: Date; endDate?: Date; memberName?: string }
 ) {
   const themeColor = (store.themeColor || '#C8102E').replace('#', '');
   const lightColorHex = getLightHex(themeColor);
@@ -234,19 +312,31 @@ export async function exportMonthlySalary(
     'TỔNG GIỜ', 'GIỜ CHUẨN', 'LƯƠNG CƠ BẢN', 'SỐ CA CHỞ HÀNG', 'PHỤ CẤP CHỞ', 'SỐ CA GIAO', 'PHỤ CẤP GIAO', 'ĐÃ TẠM ỨNG', 'LƯƠNG THỰC NHẬN',
   ];
 
-  const rows = members.map(member => {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Lương Tháng');
+
+  const headerRow = sheet.addRow(headers);
+  headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  headerRow.eachCell(cell => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${themeColor}` } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+  });
+
+  members.forEach(member => {
     const memberAtts = attendances.filter(a => a.userId === member.userId);
     const totalHours = memberAtts.reduce((sum, a) => sum + (a.totalHours || 0), 0);
     const typeLabel = member.employeeType === 'fulltime' ? 'Toàn thời gian' : 'Bán thời gian';
+    const standardHours = member.standardHoursPerMonth || 208;
+    
     let calculatedSalary = 0;
     if (member.employeeType === 'fulltime') {
-      calculatedSalary = member.baseMonthlySalary * (totalHours / (member.standardHoursPerMonth || 208));
+      calculatedSalary = member.baseMonthlySalary * (totalHours / standardHours);
     } else {
       calculatedSalary = totalHours * member.baseHourlyRate;
     }
     const baseSalary = member.employeeType === 'fulltime' ? member.baseMonthlySalary : member.baseHourlyRate;
 
-    // Calculate delivery
+    // Calculate delivery counts
     let deliveryCount = 0;
     let giaoHangCount = 0;
     const [yearStr, monthStr] = month.split('-');
@@ -279,56 +369,80 @@ export async function exportMonthlySalary(
     const giaoHangPay = giaoHangCount * (store.giaoHangAllowance || 0);
     calculatedSalary += deliveryPay + giaoHangPay;
 
-    let totalAdvance = advances
+    const totalAdvance = advances
       .filter(a => a.userId === member.userId && a.status === 'approved')
       .reduce((sum, a) => sum + a.amount, 0);
 
     const netSalary = calculatedSalary - totalAdvance;
 
-    return [
+    // Numeric row data
+    const rowData: (string | number)[] = [
       member.name,
       ROLE_LABELS[member.role] || member.role,
       typeLabel,
-      `${totalHours.toFixed(1)}h`,
-      `${member.standardHoursPerMonth}h`,
-      `${baseSalary.toLocaleString('vi-VN')} vnđ`,
-      `${deliveryCount} ca`,
-      `${deliveryPay.toLocaleString('vi-VN')} vnđ`,
-      `${giaoHangCount} ca`,
-      `${giaoHangPay.toLocaleString('vi-VN')} vnđ`,
-      `${totalAdvance.toLocaleString('vi-VN')} vnđ`,
-      `${Math.round(netSalary).toLocaleString('vi-VN')} vnđ`,
+      totalHours,
+      standardHours,
+      baseSalary,
+      deliveryCount,
+      deliveryPay,
+      giaoHangCount,
+      giaoHangPay,
+      totalAdvance,
+      Math.round(netSalary),
     ];
-  });
 
-  const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet('Lương Tháng');
+    const row = sheet.addRow(rowData);
 
-  const headerRow = sheet.addRow(headers);
-  headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  headerRow.eachCell(cell => {
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${themeColor}` } };
-    cell.alignment = { horizontal: 'center', vertical: 'middle' };
-  });
-  
-  rows.forEach(r => {
-    const row = sheet.addRow(r);
-    row.eachCell((cell, colNumber) => {
-      if (colNumber > 3) {
-        cell.alignment = { horizontal: 'center' };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightColorHex } };
-      }
-    });
+    // Styling & Number Formatting
+    row.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
+    row.getCell(2).alignment = { horizontal: 'center', vertical: 'middle' };
+    row.getCell(3).alignment = { horizontal: 'center', vertical: 'middle' };
+
+    // Format numbers
+    const numFormats = [
+      '0.0',       // Col 4: TỔNG GIỜ
+      '0',         // Col 5: GIỜ CHUẨN
+      '#,##0',     // Col 6: LƯƠNG CƠ BẢN
+      '0',         // Col 7: SỐ CA CHỞ
+      '#,##0',     // Col 8: PHỤ CẤP CHỞ
+      '0',         // Col 9: SỐ CA GIAO
+      '#,##0',     // Col 10: PHỤ CẤP GIAO
+      '#,##0',     // Col 11: ĐÃ TẠM ỨNG
+      '#,##0',     // Col 12: LƯƠNG THỰC NHẬN
+    ];
+
+    for (let c = 0; c < numFormats.length; c++) {
+      const cell = row.getCell(c + 4);
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.numFmt = numFormats[c];
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightColorHex } };
+    }
   });
 
   sheet.columns = [
-    { width: 22 }, { width: 12 }, { width: 16 }, { width: 10 }, { width: 10 },
-    { width: 16 }, { width: 14 }, { width: 16 }, { width: 14 }, { width: 16 }, { width: 16 }, { width: 20 }
+    { width: 25 }, { width: 14 }, { width: 18 }, { width: 12 }, { width: 12 },
+    { width: 18 }, { width: 16 }, { width: 18 }, { width: 16 }, { width: 18 }, { width: 18 }, { width: 22 }
   ];
 
+  // Filename formatting
+  const storePart = sanitize(store.name);
+  let timePart = '';
+  if (options?.startDate && options?.endDate) {
+    const startStr = `${String(options.startDate.getDate()).padStart(2, '0')}.${String(options.startDate.getMonth() + 1).padStart(2, '0')}`;
+    const endStr = `${String(options.endDate.getDate()).padStart(2, '0')}.${String(options.endDate.getMonth() + 1).padStart(2, '0')}.${options.endDate.getFullYear()}`;
+    timePart = `${startStr}-${endStr}`;
+  } else {
+    const [y, m] = month.split('-');
+    timePart = `T${m}-${y}`;
+  }
+  const memberPart = options?.memberName ? `_${sanitize(options.memberName)}` : '';
+  const fileName = `BaoCaoLuong_${storePart}_${timePart}${memberPart}.xlsx`;
+
   const buffer = await workbook.xlsx.writeBuffer();
-  saveAs(new Blob([buffer]), `BaoCaoLuong_${options?.startDate ? 'Filter' : month}.xlsx`);
+  saveAs(new Blob([buffer]), fileName);
 }
+
+// ─── 4. Xuất Lịch Làm Tuần ─────────────────────────────────────────────────────
 
 export async function exportWeeklySchedule(
   members: Member[],
@@ -346,14 +460,14 @@ export async function exportWeeklySchedule(
   });
 
   const customShifts = store.customShifts || [];
-  const themeColor = (store.themeColor || '#C8102E').replace('#', ''); // e.g. 'C8102E'
+  const themeColor = (store.themeColor || '#C8102E').replace('#', '');
 
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Lịch Làm');
 
   // Title Row
   const titleText = `CÔNG VIỆC THÁNG ${month} NĂM ${year} ${store.name.toUpperCase()}`;
-  sheet.mergeCells('A1:AD1'); // Columns A to AD (1 + 7*4 + 1 = 30 columns)
+  sheet.mergeCells('A1:AD1');
   const titleCell = sheet.getCell('A1');
   titleCell.value = titleText;
   titleCell.font = { name: 'Times New Roman', size: 16, bold: true, color: { argb: themeColor } };
@@ -370,7 +484,7 @@ export async function exportWeeklySchedule(
   const dayNamesEn = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   
   for (let i = 0; i < 7; i++) {
-    const startCol = 2 + i * 4; // B is 2
+    const startCol = 2 + i * 4;
     
     // Row 2: Day name
     sheet.mergeCells(2, startCol, 2, startCol + 3);
@@ -401,16 +515,11 @@ export async function exportWeeklySchedule(
   sheet.getCell(2, 30).font = { bold: true };
   sheet.getCell(2, 30).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEAEAEA' } };
 
-  // Column Headers under Days (not explicitly in sample, but implied)
-  // The sample image shows data directly under the date headers, but it has sub-columns.
-  // We'll skip adding a sub-header row to match the image, and just dump data in row 4+
-  
   let currentRow = 4;
 
   members.forEach(member => {
     const daySchedule = (schedule?.shifts[member.userId] || {}) as Partial<DaySchedule>;
     
-    // Find max shifts per day for this employee to determine how many sub-rows they need
     let maxShifts = 1;
     DAY_KEYS.forEach(key => {
       const shiftsForDay = daySchedule[key as keyof DaySchedule] || [];
@@ -422,7 +531,6 @@ export async function exportWeeklySchedule(
     const startRow = currentRow;
     const endRow = currentRow + maxShifts - 1;
 
-    // Merge employee name cell vertically
     if (maxShifts > 1) {
       sheet.mergeCells(`A${startRow}:A${endRow}`);
     }
@@ -433,13 +541,11 @@ export async function exportWeeklySchedule(
 
     let totalHoursInWeek = 0;
 
-    // Fill the shift data
     for (let r = 0; r < maxShifts; r++) {
       for (let i = 0; i < 7; i++) {
         const dayKey = DAY_KEYS[i];
         const shiftsForDay = daySchedule[dayKey as keyof DaySchedule] || [];
         const arr = Array.isArray(shiftsForDay) ? shiftsForDay : (shiftsForDay === 'off' ? [] : [shiftsForDay]);
-        
         const actualShifts = arr.filter(id => id !== 'delivery' && id !== 'giaohang');
 
         const startCol = 2 + i * 4;
@@ -466,52 +572,50 @@ export async function exportWeeklySchedule(
           
           if (shiftName) {
             totalHoursInWeek += durationH;
-          }
-
-          if (shiftName) {
-            sheet.getCell(startRow + r, startCol).value = startH === '-' ? '-' : `${startH}:${startM}`;
-            sheet.getCell(startRow + r, startCol + 1).value = endH === '-' ? '-' : `${endH}:${endM}`;
-            const nameCell = sheet.getCell(startRow + r, startCol + 2);
-            nameCell.value = shiftName;
+            sheet.getCell(startRow + r, startCol).value = `${startH}:${startM}`;
+            sheet.getCell(startRow + r, startCol + 1).value = `${endH}:${endM}`;
+            const sNameCell = sheet.getCell(startRow + r, startCol + 2);
+            sNameCell.value = shiftName;
             
-            sheet.getCell(startRow + r, startCol + 3).value = durationH;
+            const durCell = sheet.getCell(startRow + r, startCol + 3);
+            durCell.value = durationH;
+            durCell.numFmt = '0.0';
             
-            // Background color for shift cells
-            for(let c=0; c<4; c++) {
+            for(let c = 0; c < 4; c++) {
               const currentCell = sheet.getCell(startRow + r, startCol + c);
-              currentCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } }; // Light blue
-              currentCell.alignment = { horizontal: 'center' };
+              currentCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
+              currentCell.alignment = { horizontal: 'center', vertical: 'middle' };
             }
             
-            // Bold department name
             if (dept) {
-              nameCell.font = { bold: true };
+              sNameCell.font = { bold: true };
             }
           }
         } else {
-          // empty shift cell
           sheet.getCell(startRow + r, startCol).value = '-';
           sheet.getCell(startRow + r, startCol + 1).value = '-';
           sheet.getCell(startRow + r, startCol + 2).value = '-';
-          sheet.getCell(startRow + r, startCol + 3).value = '0,00';
-          for(let c=0; c<4; c++) {
-            sheet.getCell(startRow + r, startCol + c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
-            sheet.getCell(startRow + r, startCol + c).alignment = { horizontal: 'center' };
+          const emptyDurCell = sheet.getCell(startRow + r, startCol + 3);
+          emptyDurCell.value = 0;
+          emptyDurCell.numFmt = '0.0';
+          for(let c = 0; c < 4; c++) {
+            const currentCell = sheet.getCell(startRow + r, startCol + c);
+            currentCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
+            currentCell.alignment = { horizontal: 'center', vertical: 'middle' };
           }
         }
       }
     }
     
-    // Add total shifts cell
     if (maxShifts > 1) {
       sheet.mergeCells(startRow, 30, endRow, 30);
     }
     const totalCell = sheet.getCell(startRow, 30);
-    totalCell.value = `${totalHoursInWeek.toFixed(1)}h`;
+    totalCell.value = totalHoursInWeek;
+    totalCell.numFmt = '0.0';
     totalCell.alignment = { horizontal: 'center', vertical: 'middle' };
     totalCell.font = { bold: true };
 
-    // Add borders to the employee block
     for (let r = startRow; r <= endRow; r++) {
       for (let c = 1; c <= 30; c++) {
         sheet.getCell(r, c).border = {
@@ -523,14 +627,12 @@ export async function exportWeeklySchedule(
     currentRow += maxShifts;
   });
 
-  // Borders for Header
   for (let c = 1; c <= 30; c++) {
     sheet.getCell(2, c).border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
     sheet.getCell(3, c).border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
   }
 
-  // Adjust column widths
-  sheet.getColumn(1).width = 25; // Employee name
+  sheet.getColumn(1).width = 25;
   for (let i = 0; i < 7; i++) {
     const startCol = 2 + i * 4;
     sheet.getColumn(startCol).width = 7;
@@ -538,15 +640,21 @@ export async function exportWeeklySchedule(
     sheet.getColumn(startCol + 2).width = 6;
     sheet.getColumn(startCol + 3).width = 6;
   }
-  sheet.getColumn(30).width = 15; // Tổng số giờ
+  sheet.getColumn(30).width = 15;
+
+  // Filename formatting
+  const storePart = sanitize(store.name);
+  const storePrefix = storePart ? `${storePart}_` : '';
+  const mondayStr = `${String(monday.getDate()).padStart(2, '0')}.${String(monday.getMonth() + 1).padStart(2, '0')}`;
+  const sunday = days[6];
+  const sundayStr = `${String(sunday.getDate()).padStart(2, '0')}.${String(sunday.getMonth() + 1).padStart(2, '0')}.${sunday.getFullYear()}`;
+  const fileName = `LichLam_${storePrefix}Tuan_${mondayStr}-${sundayStr}.xlsx`;
 
   const buffer = await workbook.xlsx.writeBuffer();
-  const monthStr = month.toString().padStart(2, '0');
-  const cleanStoreName = store.name.replace(/[^a-zA-Z0-9\s]/g, '').trim();
-  saveAs(new Blob([buffer]), `LichLam-${monthStr},${year}-${cleanStoreName}.xlsx`);
+  saveAs(new Blob([buffer]), fileName);
 }
 
-// ─── Export Báo cáo Sản xuất ────────────────────────────────────────────────
+// ─── 5. Xuất Báo Cáo Sản Xuất ────────────────────────────────────────────────
 
 export async function exportProductionReport(
   reports: ProductionReport[],
@@ -558,7 +666,6 @@ export async function exportProductionReport(
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Báo cáo sản xuất');
 
-  // — Style helpers —
   const headerFill: ExcelJS.Fill = {
     type: 'pattern', pattern: 'solid',
     fgColor: { argb: 'FFC8102E' },
@@ -575,15 +682,15 @@ export async function exportProductionReport(
 
   const activeTasks = tasks.filter(t => t.active);
 
-  // — Title row —
+  // Title row
   sheet.mergeCells(1, 1, 1, 5 + activeTasks.length);
   const titleCell = sheet.getCell(1, 1);
   titleCell.value = `BÁO CÁO HIỆU QUẢ SẢN XUẤT - ${storeName} - Tháng ${month}`;
   titleCell.font = { bold: true, size: 14, color: { argb: 'FFC8102E' } };
-  titleCell.alignment = { horizontal: 'center' };
+  titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
   sheet.getRow(1).height = 28;
 
-  // — Headers —
+  // Headers
   const headers = [
     'Ngày', 'Tên nhân viên', 'Ca làm',
     ...activeTasks.map(t => `${t.name} (${t.unitLabel})`),
@@ -601,13 +708,12 @@ export async function exportProductionReport(
   });
   headerRow.height = 36;
 
-  // — Data rows —
+  // Data rows
   const memberMap = new Map(members.map(m => [m.userId, m.name]));
 
   reports.forEach((report, idx) => {
     const row = sheet.getRow(3 + idx);
 
-    // Format checkout time
     let checkoutStr = '';
     if (report.checkoutTime) {
       try {
@@ -618,10 +724,10 @@ export async function exportProductionReport(
 
     const taskValues = activeTasks.map(task => {
       const entry = report.tasks?.find(t => t.taskId === task.id);
-      return entry ? entry.value : '';
+      return entry ? (typeof entry.value === 'number' ? entry.value : 0) : 0;
     });
 
-    const rowData = [
+    const rowData: (string | number)[] = [
       report.date,
       memberMap.get(report.userId) || report.memberName,
       report.shiftName,
@@ -635,6 +741,13 @@ export async function exportProductionReport(
       cell.value = val as any;
       cell.border = borderStyle;
       cell.alignment = { vertical: 'middle', horizontal: i === 0 || i >= 3 + activeTasks.length ? 'center' : 'left' };
+      
+      // If task value column, set number format
+      if (i >= 3 && i < 3 + activeTasks.length) {
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        cell.numFmt = '#,##0.0';
+      }
+
       if (idx % 2 === 1) {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } };
       }
@@ -642,7 +755,7 @@ export async function exportProductionReport(
     row.height = 22;
   });
 
-  // — Summary rows —
+  // Summary rows
   const summaryStartRow = 3 + reports.length + 1;
   const summaryTitle = sheet.getRow(summaryStartRow);
   sheet.mergeCells(summaryStartRow, 1, summaryStartRow, 5 + activeTasks.length);
@@ -658,7 +771,7 @@ export async function exportProductionReport(
     cell.fill = subHeaderFill;
     cell.font = { bold: true, size: 10 };
     cell.border = borderStyle;
-    cell.alignment = { horizontal: 'center' };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
   });
 
   // Group by member
@@ -684,24 +797,33 @@ export async function exportProductionReport(
   let rowIdx = summaryStartRow + 2;
   memberSummary.forEach(({ name, count, taskTotals }) => {
     const row = sheet.getRow(rowIdx);
-    [name, count, ...taskTotals].forEach((val, i) => {
+    const summaryData: (string | number)[] = [name, count, ...taskTotals];
+    summaryData.forEach((val, i) => {
       const cell = row.getCell(i + 1);
       cell.value = val as any;
       cell.border = borderStyle;
       cell.alignment = { vertical: 'middle', horizontal: i === 0 ? 'left' : 'center' };
+      if (i >= 1) {
+        cell.numFmt = '#,##0.0';
+      }
     });
     row.height = 20;
     rowIdx++;
   });
 
-  // — Column widths —
-  sheet.getColumn(1).width = 14; // Ngày
-  sheet.getColumn(2).width = 22; // Tên NV
-  sheet.getColumn(3).width = 16; // Ca làm
+  sheet.getColumn(1).width = 14;
+  sheet.getColumn(2).width = 22;
+  sheet.getColumn(3).width = 16;
   activeTasks.forEach((_, i) => { sheet.getColumn(4 + i).width = 18; });
-  sheet.getColumn(4 + activeTasks.length).width = 12; // Giờ out
-  sheet.getColumn(5 + activeTasks.length).width = 24; // Ghi chú
+  sheet.getColumn(4 + activeTasks.length).width = 12;
+  sheet.getColumn(5 + activeTasks.length).width = 24;
+
+  // Filename formatting
+  const storePart = sanitize(storeName);
+  const [y, m] = month.split('-');
+  const timePart = `T${m}-${y}`;
+  const fileName = `BaoCaoSanXuat_${storePart}_${timePart}.xlsx`;
 
   const buffer = await workbook.xlsx.writeBuffer();
-  saveAs(new Blob([buffer]), `BaoCaoSanXuat-${month}-${storeName}.xlsx`);
+  saveAs(new Blob([buffer]), fileName);
 }

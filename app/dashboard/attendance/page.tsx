@@ -91,13 +91,22 @@ export default function AttendancePage() {
         endObj = new Date(filters.endDate);
       }
       
+      const selectedMemberName = filters.memberId ? filteredMembers[0]?.name : undefined;
+      const monthParam = filters.type === 'month' ? filters.month! : currentMonth;
+
       if (exportMode === 'summary') {
-        const monthParam = filters.type === 'month' ? filters.month! : currentMonth;
-        await exportMonthlyAttendance(filteredMembers, dataAttendances, monthParam, store, schedules, { startDate: startObj, endDate: endObj });
+        await exportMonthlyAttendance(filteredMembers, dataAttendances, monthParam, store, schedules, { 
+          startDate: startObj, 
+          endDate: endObj,
+          memberName: selectedMemberName
+        });
       } else {
-        const monthParam = filters.type === 'month' ? filters.month! : currentMonth;
         if (store) {
-          await exportDetailedInOut(filteredMembers, dataAttendances, monthParam, store);
+          await exportDetailedInOut(filteredMembers, dataAttendances, monthParam, store, {
+            startDate: startObj,
+            endDate: endObj,
+            memberName: selectedMemberName
+          });
         }
       }
     } catch (e) {
