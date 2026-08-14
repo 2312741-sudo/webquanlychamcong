@@ -6,18 +6,11 @@ import {
   deleteProductionTask, getProductionReports, deleteProductionReport,
 } from '@/lib/firestore';
 import { exportProductionReport } from '@/lib/exportExcel';
-import { ProductionTask, ProductionReport, ProductionUnitType } from '@/lib/types';
+import { ProductionTask, ProductionReport } from '@/lib/types';
 
-const UNIT_OPTIONS: { value: ProductionUnitType; label: string }[] = [
-  { value: 'time', label: 'Thời gian (Phút)' },
-  { value: 'kg', label: 'Khối lượng (Kg)' },
-  { value: 'qty', label: 'Số lượng (Sản phẩm)' },
-  { value: 'shift', label: 'Số ca' },
+const COMMON_UNIT_PRESETS = [
+  'Kg', 'Phút', 'Sản phẩm', 'Ca', 'Gói', 'Thùng', 'Ly', 'Hộp', 'Bao', 'Cái', 'Đơn'
 ];
-
-const UNIT_LABEL_MAP: Record<ProductionUnitType, string> = {
-  time: 'Phút', kg: 'Kg', qty: 'Sản phẩm', shift: 'Ca',
-};
 
 export default function ProductionPage() {
   const { storeId, store, members } = useApp();
@@ -27,7 +20,11 @@ export default function ProductionPage() {
   const [tasks, setTasks] = useState<ProductionTask[]>([]);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [editingTask, setEditingTask] = useState<ProductionTask | null>(null);
-  const [taskForm, setTaskForm] = useState({ name: '', unit: 'kg' as ProductionUnitType });
+  const [taskForm, setTaskForm] = useState({
+    name: '',
+    hasUnit: true,
+    unitLabel: 'Kg'
+  });
   const [taskSaving, setTaskSaving] = useState(false);
 
   // — Report state —
@@ -39,9 +36,6 @@ export default function ProductionPage() {
   const [reportLoading, setReportLoading] = useState(false);
   const [filterUserId, setFilterUserId] = useState('');
   const [exporting, setExporting] = useState(false);
-
-  // — Editing report inline —
-  const [editingReportId, setEditingReportId] = useState<string | null>(null);
 
   // Subscribe to tasks
   useEffect(() => {
@@ -69,31 +63,41 @@ export default function ProductionPage() {
   // — Task handlers —
   const openAddTask = () => {
     setEditingTask(null);
-    setTaskForm({ name: '', unit: 'kg' });
+    setTaskForm({ name: '', hasUnit: true, unitLabel: 'Kg' });
     setShowTaskModal(true);
   };
 
   const openEditTask = (task: ProductionTask) => {
     setEditingTask(task);
-    setTaskForm({ name: task.name, unit: task.unit });
+    const hasUnit = task.unitLabel ? task.unitLabel.trim().length > 0 : (task.unit !== 'none' && task.hasUnit !== false);
+    setTaskForm({
+      name: task.name,
+      hasUnit: hasUnit,
+      unitLabel: task.unitLabel || 'Kg'
+    });
     setShowTaskModal(true);
   };
 
   const saveTask = async () => {
     if (!storeId || !taskForm.name.trim()) return;
     setTaskSaving(true);
+    const finalUnitLabel = taskForm.hasUnit ? (taskForm.unitLabel.trim() || 'Sản phẩm') : '';
+    const finalUnitType = taskForm.hasUnit ? 'custom' : 'none';
+
     try {
       if (editingTask) {
         await updateProductionTask(storeId, editingTask.id, {
           name: taskForm.name.trim(),
-          unit: taskForm.unit,
-          unitLabel: UNIT_LABEL_MAP[taskForm.unit],
+          unit: finalUnitType,
+          unitLabel: finalUnitLabel,
+          hasUnit: taskForm.hasUnit,
         });
       } else {
         await addProductionTask(storeId, {
           name: taskForm.name.trim(),
-          unit: taskForm.unit,
-          unitLabel: UNIT_LABEL_MAP[taskForm.unit],
+          unit: finalUnitType,
+          unitLabel: finalUnitLabel,
+          hasUnit: taskForm.hasUnit,
           active: true,
           order: tasks.length + 1,
         });
@@ -150,17 +154,17 @@ export default function ProductionPage() {
       {/* Header */}
       <div style={{ marginBottom: '24px' }}>
         <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#1a1a1a', margin: 0 }}>
-          🏭 Công cụ Đo lường Hiệu quả Sản xuất
+          🏭 Công cụ Đo lường Hiệu quả Sản xuất & Checklist
         </h1>
         <p style={{ color: '#666', marginTop: '6px', fontSize: '14px' }}>
-          Quản lý danh sách công việc và xem báo cáo hiệu suất nhân viên
+          Quản lý danh sách công việc/checklist và theo dõi báo cáo hiệu suất nhân viên khi out ca
         </p>
       </div>
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', borderBottom: '2px solid #eee', paddingBottom: '0' }}>
         {[
-          { key: 'tasks', label: '📋 Quản lý công việc' },
+          { key: 'tasks', label: '📋 Quản lý công việc & Checklist' },
           { key: 'reports', label: '📊 Báo cáo sản xuất' },
         ].map(tab => (
           <button
@@ -186,7 +190,7 @@ export default function ProductionPage() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <div>
               <span style={{ fontSize: '14px', color: '#666' }}>
-                {tasks.filter(t => t.active).length} công việc đang hoạt động / {tasks.length} tổng
+                {tasks.filter(t => t.active).length} công việc đang bật / {tasks.length} tổng
               </span>
             </div>
             <button
@@ -208,14 +212,14 @@ export default function ProductionPage() {
             }}>
               <div style={{ fontSize: '48px', marginBottom: '16px' }}>📋</div>
               <h3 style={{ color: '#999', fontWeight: 500 }}>Chưa có công việc nào</h3>
-              <p style={{ color: '#bbb', fontSize: '14px' }}>Bấm "Thêm công việc" để bắt đầu tạo danh sách</p>
+              <p style={{ color: '#bbb', fontSize: '14px' }}>Bấm "Thêm công việc" để tạo danh sách checklist cho nhân viên</p>
             </div>
           ) : (
             <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #eee', overflow: 'hidden' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#f8f8f8' }}>
-                    {['STT', 'Tên công việc', 'Đơn vị đo', 'Trạng thái', 'Thao tác'].map(h => (
+                    {['STT', 'Tên công việc', 'Đơn vị đo lường', 'Trạng thái', 'Thao tác'].map(h => (
                       <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#555', borderBottom: '1px solid #eee' }}>
                         {h}
                       </th>
@@ -223,50 +227,62 @@ export default function ProductionPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {tasks.map((task, idx) => (
-                    <tr key={task.id} style={{ borderBottom: '1px solid #f5f5f5' }}>
-                      <td style={{ padding: '12px 16px', color: '#999', fontSize: '13px' }}>{idx + 1}</td>
-                      <td style={{ padding: '12px 16px', fontWeight: 600, color: '#1a1a1a' }}>{task.name}</td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <span style={{
-                          background: '#f0f4ff', color: '#3b5bdb',
-                          padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
-                        }}>
-                          {task.unitLabel}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <button
-                          onClick={() => toggleTask(task)}
-                          style={{
-                            background: task.active ? '#e8f5e9' : '#fafafa',
-                            color: task.active ? '#1A6B5A' : '#999',
-                            border: `1px solid ${task.active ? '#1A6B5A' : '#ddd'}`,
-                            padding: '4px 12px', borderRadius: '20px', cursor: 'pointer',
-                            fontSize: '12px', fontWeight: 600,
-                          }}
-                        >
-                          {task.active ? '✓ Đang bật' : '○ Đang tắt'}
-                        </button>
-                      </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <div style={{ display: 'flex', gap: '8px' }}>
+                  {tasks.map((task, idx) => {
+                    const hasUnit = task.unitLabel && task.unitLabel.trim().length > 0;
+                    return (
+                      <tr key={task.id} style={{ borderBottom: '1px solid #f5f5f5' }}>
+                        <td style={{ padding: '12px 16px', color: '#999', fontSize: '13px' }}>{idx + 1}</td>
+                        <td style={{ padding: '12px 16px', fontWeight: 600, color: '#1a1a1a' }}>{task.name}</td>
+                        <td style={{ padding: '12px 16px' }}>
+                          {hasUnit ? (
+                            <span style={{
+                              background: '#f0f4ff', color: '#3b5bdb',
+                              padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
+                            }}>
+                              🏷️ {task.unitLabel}
+                            </span>
+                          ) : (
+                            <span style={{
+                              background: '#f1f3f5', color: '#868e96',
+                              padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 500,
+                            }}>
+                              ✓ Checklist (Không bắt buộc đơn vị)
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
                           <button
-                            onClick={() => openEditTask(task)}
-                            style={{ background: '#f0f4ff', color: '#3b5bdb', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}
+                            onClick={() => toggleTask(task)}
+                            style={{
+                              background: task.active ? '#e8f5e9' : '#fafafa',
+                              color: task.active ? '#1A6B5A' : '#999',
+                              border: `1px solid ${task.active ? '#1A6B5A' : '#ddd'}`,
+                              padding: '4px 12px', borderRadius: '20px', cursor: 'pointer',
+                              fontSize: '12px', fontWeight: 600,
+                            }}
                           >
-                            ✏️ Sửa
+                            {task.active ? '✓ Đang bật' : '○ Đang tắt'}
                           </button>
-                          <button
-                            onClick={() => deleteTask(task)}
-                            style={{ background: '#fff5f5', color: '#C8102E', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}
-                          >
-                            🗑️ Xóa
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              onClick={() => openEditTask(task)}
+                              style={{ background: '#f0f4ff', color: '#3b5bdb', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}
+                            >
+                              ✏️ Sửa
+                            </button>
+                            <button
+                              onClick={() => deleteTask(task)}
+                              style={{ background: '#fff5f5', color: '#C8102E', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}
+                            >
+                              🗑️ Xóa
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -274,12 +290,11 @@ export default function ProductionPage() {
 
           {/* Hướng dẫn */}
           <div style={{ marginTop: '24px', background: '#fffbf0', border: '1px solid #f5c842', borderRadius: '10px', padding: '16px' }}>
-            <h4 style={{ margin: '0 0 8px', color: '#856404', fontSize: '14px' }}>💡 Hướng dẫn sử dụng</h4>
+            <h4 style={{ margin: '0 0 8px', color: '#856404', fontSize: '14px' }}>💡 Hướng dẫn cài đặt Checklist & Đơn vị đo lường</h4>
             <ul style={{ margin: 0, paddingLeft: '20px', color: '#856404', fontSize: '13px', lineHeight: '1.8' }}>
-              <li>Thêm các công việc sản xuất mà nhân viên cần thực hiện trong ca</li>
-              <li>Chọn đơn vị đo phù hợp: <b>Kg</b> (khối lượng), <b>Phút</b> (thời gian), <b>Sản phẩm</b> (số lượng), <b>Ca</b> (số ca)</li>
-              <li>Nhân viên sẽ phải điền checklist công việc trước khi out ca (tính năng sắp có trên app)</li>
-              <li>Bật/tắt công việc để kiểm soát checklist hiển thị với nhân viên</li>
+              <li><b>Đơn vị đo lường là tùy chọn:</b> Bạn có thể bật hoặc tắt đơn vị đo lường cho từng công việc.</li>
+              <li><b>Tùy chỉnh đơn vị tự do:</b> Bạn có thể chọn nhanh các đơn vị có sẵn (Kg, Phút, Sản phẩm, Ca, Gói, Thùng, Ly, Hộp...) hoặc tự gõ bất kỳ đơn vị nào theo nhu cầu thực tế.</li>
+              <li><b>Khi tắt đơn vị đo:</b> Nhân viên chỉ cần tích chọn hoàn thành công việc trước khi out ca mà không cần nhập số liệu.</li>
             </ul>
           </div>
         </div>
@@ -340,15 +355,15 @@ export default function ProductionPage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '20px' }}>
               <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: '10px', padding: '16px', textAlign: 'center' }}>
                 <div style={{ fontSize: '28px', fontWeight: 700, color: '#C8102E' }}>{filteredReports.length}</div>
-                <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>Tổng báo cáo</div>
+                <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>Tổng lượt báo cáo</div>
               </div>
               <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: '10px', padding: '16px', textAlign: 'center' }}>
                 <div style={{ fontSize: '28px', fontWeight: 700, color: '#1A6B5A' }}>
                   {new Set(filteredReports.map(r => r.userId)).size}
                 </div>
-                <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>Nhân viên báo cáo</div>
+                <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>Nhân viên đã báo cáo</div>
               </div>
-              {activeTasks.slice(0, 2).map(task => {
+              {activeTasks.filter(t => t.unitLabel && t.unitLabel.trim().length > 0).slice(0, 2).map(task => {
                 const total = filteredReports.reduce((sum, r) => {
                   const entry = r.tasks?.find(t => t.taskId === task.id);
                   return sum + (entry?.value || 0);
@@ -375,7 +390,7 @@ export default function ProductionPage() {
               <h3 style={{ color: '#999', fontWeight: 500 }}>Chưa có báo cáo nào</h3>
               <p style={{ color: '#bbb', fontSize: '14px' }}>Nhân viên chưa gửi báo cáo công việc cho tháng này</p>
               <p style={{ color: '#bbb', fontSize: '13px', marginTop: '8px' }}>
-                (Báo cáo sẽ được tạo tự động khi NV out ca sau khi hoàn thành checklist trên app)
+                (Báo cáo được tự động ghi nhận khi nhân viên hoàn thành checklist và out ca trên app)
               </p>
             </div>
           ) : (
@@ -383,7 +398,7 @@ export default function ProductionPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: `${400 + activeTasks.length * 140}px` }}>
                 <thead>
                   <tr style={{ background: '#C8102E' }}>
-                    {['Ngày', 'Tên NV', 'Ca làm', ...activeTasks.map(t => `${t.name} (${t.unitLabel})`), 'Giờ out ca', 'Ghi chú', ''].map(h => (
+                    {['Ngày', 'Tên NV', 'Ca làm', ...activeTasks.map(t => `${t.name}${t.unitLabel ? ` (${t.unitLabel})` : ''}`), 'Giờ out ca', 'Ghi chú', ''].map(h => (
                       <th key={h} style={{ padding: '12px 14px', textAlign: 'left', fontSize: '12px', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap' }}>
                         {h}
                       </th>
@@ -400,13 +415,21 @@ export default function ProductionPage() {
                       <td style={{ padding: '11px 14px', fontSize: '13px', color: '#555' }}>{report.shiftName}</td>
                       {activeTasks.map(task => {
                         const entry = report.tasks?.find(t => t.taskId === task.id);
+                        if (!entry) {
+                          return <td key={task.id} style={{ padding: '11px 14px', fontSize: '13px', textAlign: 'center', color: '#ccc' }}>—</td>;
+                        }
+                        const hasUnit = entry.unitLabel && entry.unitLabel.trim().length > 0;
                         return (
                           <td key={task.id} style={{ padding: '11px 14px', fontSize: '13px', textAlign: 'center' }}>
-                            {entry ? (
+                            {hasUnit ? (
                               <span style={{ fontWeight: 600, color: '#1C4E6B' }}>
                                 {entry.value} <span style={{ fontSize: '11px', color: '#999' }}>{entry.unitLabel}</span>
                               </span>
-                            ) : <span style={{ color: '#ccc' }}>—</span>}
+                            ) : (
+                              <span style={{ fontWeight: 600, color: '#1A6B5A', background: '#e8f5e9', padding: '2px 8px', borderRadius: '12px', fontSize: '11px' }}>
+                                ✓ Hoàn thành
+                              </span>
+                            )}
                           </td>
                         );
                       })}
@@ -431,17 +454,6 @@ export default function ProductionPage() {
               </table>
             </div>
           )}
-
-          {/* Phần hướng dẫn cho owner */}
-          <div style={{ marginTop: '20px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '10px', padding: '16px' }}>
-            <h4 style={{ margin: '0 0 8px', color: '#0369a1', fontSize: '14px' }}>ℹ️ Cách hoạt động</h4>
-            <ul style={{ margin: 0, paddingLeft: '20px', color: '#0369a1', fontSize: '13px', lineHeight: '1.8' }}>
-              <li>Báo cáo được tự động tạo khi nhân viên out ca sản xuất qua app mobile</li>
-              <li>Nhân viên phải hoàn thành checklist công việc trước khi được phép out ca</li>
-              <li>Chủ/Quản lý có thể xem và xuất báo cáo tổng hợp theo tháng</li>
-              <li>Xuất Excel để có bảng báo cáo đầy đủ: Ngày | Tên NV | Công việc đã làm | Giờ out | Ghi chú</li>
-            </ul>
-          </div>
         </div>
       )}
 
@@ -453,20 +465,20 @@ export default function ProductionPage() {
         }}>
           <div style={{
             background: '#fff', borderRadius: '16px', padding: '28px',
-            width: '440px', maxWidth: '90vw', boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+            width: '480px', maxWidth: '90vw', boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
           }}>
             <h2 style={{ margin: '0 0 20px', fontSize: '18px', fontWeight: 700 }}>
-              {editingTask ? '✏️ Sửa công việc' : '+ Thêm công việc mới'}
+              {editingTask ? '✏️ Sửa công việc / Checklist' : '+ Thêm công việc / Checklist mới'}
             </h2>
 
-            <div style={{ marginBottom: '16px' }}>
+            <div style={{ marginBottom: '18px' }}>
               <label style={{ fontSize: '13px', fontWeight: 600, color: '#555', display: 'block', marginBottom: '6px' }}>
-                Tên công việc *
+                Tên công việc / Đầu mục checklist *
               </label>
               <input
                 value={taskForm.name}
                 onChange={e => setTaskForm(f => ({ ...f, name: e.target.value }))}
-                placeholder="VD: Đóng gói sản phẩm, Kiểm tra chất lượng..."
+                placeholder="VD: Đóng gói sản phẩm, Lau dọn máy móc, Kiểm tra nguyên liệu..."
                 style={{
                   width: '100%', padding: '10px 14px', border: '1.5px solid #ddd',
                   borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box',
@@ -478,30 +490,79 @@ export default function ProductionPage() {
               />
             </div>
 
-            <div style={{ marginBottom: '24px' }}>
-              <label style={{ fontSize: '13px', fontWeight: 600, color: '#555', display: 'block', marginBottom: '8px' }}>
-                Đơn vị đo lường *
+            {/* Toggle sử dụng đơn vị đo */}
+            <div style={{
+              background: '#f8f9fa', padding: '14px 16px', borderRadius: '10px',
+              border: '1px solid #e9ecef', marginBottom: '18px'
+            }}>
+              <label style={{
+                display: 'flex', alignItems: 'center', gap: '10px',
+                cursor: 'pointer', userSelect: 'none', fontSize: '14px', fontWeight: 600, color: '#333'
+              }}>
+                <input
+                  type="checkbox"
+                  checked={taskForm.hasUnit}
+                  onChange={e => setTaskForm(f => ({ ...f, hasUnit: e.target.checked }))}
+                  style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#C8102E' }}
+                />
+                Yêu cầu nhập số lượng / Khối lượng / Thời gian khi out ca
               </label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                {UNIT_OPTIONS.map(opt => (
-                  <button
-                    key={opt.value}
-                    onClick={() => setTaskForm(f => ({ ...f, unit: opt.value }))}
-                    style={{
-                      padding: '12px', border: `2px solid ${taskForm.unit === opt.value ? '#C8102E' : '#eee'}`,
-                      borderRadius: '8px', cursor: 'pointer', textAlign: 'left',
-                      background: taskForm.unit === opt.value ? '#fff5f5' : '#fafafa',
-                      color: taskForm.unit === opt.value ? '#C8102E' : '#555',
-                      fontWeight: taskForm.unit === opt.value ? 700 : 400,
-                      fontSize: '13px', transition: 'all 0.15s',
-                    }}
-                  >
-                    {opt.value === 'time' ? '⏱️' : opt.value === 'kg' ? '⚖️' : opt.value === 'qty' ? '📦' : '🔄'}{' '}
-                    {opt.label}
-                  </button>
-                ))}
+              <div style={{ fontSize: '12px', color: '#666', marginTop: '4px', marginLeft: '28px' }}>
+                {taskForm.hasUnit
+                  ? 'Nhân viên sẽ phải nhập số liệu cụ thể kèm đơn vị đo trước khi ra ca.'
+                  : 'Không cần đơn vị đo: Nhân viên chỉ cần tích dấu hoàn thành công việc.'}
               </div>
             </div>
+
+            {/* Nếu có đơn vị đo lường: chọn mẫu hoặc tự gõ tùy ý */}
+            {taskForm.hasUnit && (
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{ fontSize: '13px', fontWeight: 600, color: '#555', display: 'block', marginBottom: '8px' }}>
+                  Đơn vị đo lường (Tự do chỉnh sửa theo ý thích) *
+                </label>
+                
+                {/* Input tùy chỉnh trực tiếp */}
+                <div style={{ marginBottom: '10px' }}>
+                  <input
+                    value={taskForm.unitLabel}
+                    onChange={e => setTaskForm(f => ({ ...f, unitLabel: e.target.value }))}
+                    placeholder="Nhập đơn vị đo (VD: Kg, Gói, Thùng, Ly, Hộp, Mét, Bao...)"
+                    style={{
+                      width: '100%', padding: '10px 14px', border: '1.5px solid #C8102E',
+                      borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box',
+                      outline: 'none', fontWeight: 600, color: '#C8102E', background: '#fff9f9'
+                    }}
+                  />
+                </div>
+
+                {/* Các nút chọn nhanh */}
+                <div>
+                  <div style={{ fontSize: '12px', color: '#888', marginBottom: '6px' }}>Hoặc chọn nhanh từ danh sách:</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {COMMON_UNIT_PRESETS.map(u => (
+                      <button
+                        key={u}
+                        type="button"
+                        onClick={() => setTaskForm(f => ({ ...f, unitLabel: u }))}
+                        style={{
+                          padding: '5px 12px',
+                          border: `1px solid ${taskForm.unitLabel === u ? '#C8102E' : '#ddd'}`,
+                          borderRadius: '16px',
+                          background: taskForm.unitLabel === u ? '#C8102E' : '#fff',
+                          color: taskForm.unitLabel === u ? '#fff' : '#444',
+                          fontSize: '12px',
+                          fontWeight: taskForm.unitLabel === u ? 700 : 500,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s'
+                        }}
+                      >
+                        {u}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button
@@ -512,15 +573,15 @@ export default function ProductionPage() {
               </button>
               <button
                 onClick={saveTask}
-                disabled={taskSaving || !taskForm.name.trim()}
+                disabled={taskSaving || !taskForm.name.trim() || (taskForm.hasUnit && !taskForm.unitLabel.trim())}
                 style={{
                   padding: '10px 24px', background: '#C8102E', color: '#fff',
                   border: 'none', borderRadius: '8px', cursor: 'pointer',
                   fontWeight: 600, fontSize: '14px',
-                  opacity: (taskSaving || !taskForm.name.trim()) ? 0.6 : 1,
+                  opacity: (taskSaving || !taskForm.name.trim() || (taskForm.hasUnit && !taskForm.unitLabel.trim())) ? 0.6 : 1,
                 }}
               >
-                {taskSaving ? 'Đang lưu...' : editingTask ? 'Cập nhật' : 'Thêm công việc'}
+                {taskSaving ? 'Đang lưu...' : editingTask ? 'Lưu thay đổi' : 'Thêm công việc'}
               </button>
             </div>
           </div>

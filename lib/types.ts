@@ -106,13 +106,14 @@ export interface AdvanceRequest {
 
 // ─── Production / Efficiency Measurement ────────────────────────────────────
 
-export type ProductionUnitType = 'time' | 'kg' | 'shift' | 'qty';
+export type ProductionUnitType = 'time' | 'kg' | 'shift' | 'qty' | 'custom' | 'none' | string;
 
 export interface ProductionTask {
   id: string;
   name: string;
-  unit: ProductionUnitType;    // loại đơn vị đo lường
-  unitLabel: string;           // nhãn hiển thị: "Phút", "Kg", "Ca", "Sản phẩm"
+  unit?: ProductionUnitType;    // loại đơn vị đo lường
+  unitLabel?: string;          // nhãn hiển thị: "Phút", "Kg", "Gói", "Thùng", ... hoặc rỗng
+  hasUnit?: boolean;           // có sử dụng đơn vị đo lường không
   active: boolean;             // bật/tắt
   order: number;               // thứ tự hiển thị
   createdAt?: any;
@@ -121,9 +122,9 @@ export interface ProductionTask {
 export interface ProductionTaskEntry {
   taskId: string;
   taskName: string;
-  unit: ProductionUnitType;
-  unitLabel: string;
-  value: number;               // giá trị đo lường NV nhập
+  unit?: ProductionUnitType;
+  unitLabel?: string;
+  value: number;               // giá trị đo lường NV nhập (hoặc 1 nếu là tích checklist)
 }
 
 export interface ProductionReport {

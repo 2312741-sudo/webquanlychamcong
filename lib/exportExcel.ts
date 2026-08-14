@@ -693,7 +693,7 @@ export async function exportProductionReport(
   // Headers
   const headers = [
     'Ngày', 'Tên nhân viên', 'Ca làm',
-    ...activeTasks.map(t => `${t.name} (${t.unitLabel})`),
+    ...activeTasks.map(t => `${t.name}${t.unitLabel ? ` (${t.unitLabel})` : ''}`),
     'Giờ out ca', 'Ghi chú',
   ];
 
@@ -765,7 +765,7 @@ export async function exportProductionReport(
   summaryTitle.height = 24;
 
   const summaryHeaderRow = sheet.getRow(summaryStartRow + 1);
-  ['Tên nhân viên', 'Số ca báo cáo', ...activeTasks.map(t => `Tổng ${t.name} (${t.unitLabel})`)].forEach((h, i) => {
+  ['Tên nhân viên', 'Số ca báo cáo', ...activeTasks.map(t => `Tổng ${t.name}${t.unitLabel ? ` (${t.unitLabel})` : ''}`)].forEach((h, i) => {
     const cell = summaryHeaderRow.getCell(i + 1);
     cell.value = h;
     cell.fill = subHeaderFill;
