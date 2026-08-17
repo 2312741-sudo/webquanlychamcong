@@ -1,7 +1,34 @@
-export type UserRole = 'owner' | 'manager' | 'employee';
+export type UserRole = 'owner' | 'manager' | 'manager1' | 'manager2' | 'employee';
 export type MemberStatus = 'active' | 'pending' | 'kicked';
 export type EmployeeType = 'fulltime' | 'parttime';
 export type CheckInMethod = 'wifi' | 'gps' | 'manual' | 'qr';
+
+export function getRoleLabel(role?: UserRole | string): string {
+  switch (role) {
+    case 'owner':
+      return 'Chủ';
+    case 'manager1':
+    case 'manager':
+      return 'Quản lý 1';
+    case 'manager2':
+      return 'Quản lý 2';
+    case 'employee':
+    default:
+      return 'Nhân viên';
+  }
+}
+
+export function canManageSchedule(role?: UserRole | string): boolean {
+  return role === 'owner' || role === 'manager1' || role === 'manager';
+}
+
+export function canApproveMembers(role?: UserRole | string): boolean {
+  return role === 'owner' || role === 'manager1' || role === 'manager';
+}
+
+export function canAccessWeb(role?: UserRole | string): boolean {
+  return role === 'owner' || role === 'manager1' || role === 'manager2' || role === 'manager';
+}
 
 export interface Member {
   userId: string;
@@ -16,6 +43,7 @@ export interface Member {
   standardHoursPerMonth: number;
   joinedAt: any;
   employeeCode?: string;
+  birthday?: string;
 }
 
 export interface AttendanceRecord {
@@ -138,4 +166,34 @@ export interface ProductionReport {
   note: string;
   tasks: ProductionTaskEntry[];
   createdAt?: any;
+}
+
+// ─── Notifications System ───────────────────────────────────────────────────
+
+export type AppNotificationType =
+  | 'join_request'
+  | 'join_approved'
+  | 'join_rejected'
+  | 'advance_request'
+  | 'advance_approved'
+  | 'advance_rejected'
+  | 'schedule_changed'
+  | 'schedule_registration_reminder'
+  | 'checklist_reminder'
+  | 'delivery_update'
+  | 'birthday'
+  | 'general';
+
+export interface AppNotification {
+  id: string;
+  storeId: string;
+  title: string;
+  body: string;
+  type: AppNotificationType;
+  createdAt: any;
+  targetUserId?: string;
+  targetRoles?: UserRole[];
+  readBy: string[];
+  routePath?: string;
+  routeExtra?: Record<string, any>;
 }

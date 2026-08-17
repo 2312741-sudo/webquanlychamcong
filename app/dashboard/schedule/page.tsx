@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useApp } from '../layout';
 import { getWeekSchedule, saveWeekSchedule } from '@/lib/firestore';
 import { exportWeeklySchedule } from '@/lib/exportExcel';
-import { ScheduleModel, DaySchedule, ShiftDefinition } from '@/lib/types';
+import { ScheduleModel, DaySchedule, ShiftDefinition, getRoleLabel, canManageSchedule } from '@/lib/types';
 
 function getMondayOfWeek(date: Date): string {
   const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -26,8 +26,9 @@ const DAY_KEYS: (keyof DaySchedule)[] = ['monday','tuesday','wednesday','thursda
 const DAY_LABELS = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN'];
 
 export default function SchedulePage() {
-  const { storeId, store, members, user } = useApp();
+  const { storeId, store, members, user, role } = useApp();
   const currentMember = members.find(m => m.userId === user?.uid);
+  const canEdit = canManageSchedule(role);
   const [currentWeek, setCurrentWeek] = useState(() => getMondayOfWeek(new Date()));
   const [shifts, setShifts] = useState<Record<string, DaySchedule>>({});
   const [scheduleData, setScheduleData] = useState<ScheduleModel | null>(null);
@@ -250,9 +251,11 @@ export default function SchedulePage() {
           <button onClick={handleExport} className="btn btn-primary" style={{ background: 'var(--success)' }}>
             📥 Xuất Excel
           </button>
-          <button onClick={saveChanges} className="btn btn-primary" disabled={saving || loading}>
-            {saving ? 'Đang lưu...' : '💾 Lưu lịch'}
-          </button>
+          {canEdit && (
+            <button onClick={saveChanges} className="btn btn-primary" disabled={saving || loading}>
+              {saving ? 'Đang lưu...' : '💾 Lưu lịch'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -286,7 +289,7 @@ export default function SchedulePage() {
                   <tr key={m.userId} style={{ background: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
                     <td style={{ padding: '12px 16px', borderRadius: '8px 0 0 8px' }}>
                       <div style={{ fontWeight: 600 }}>{m.name}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{m.role === 'owner' ? 'Chủ' : m.role === 'manager' ? 'Quản lý' : 'Nhân viên'}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{getRoleLabel(m.role)}</div>
                     </td>
                     {DAY_KEYS.map((dayKey, i) => {
                       const currentVal = shifts[m.userId]?.[dayKey] || [];
@@ -298,7 +301,7 @@ export default function SchedulePage() {
                       return (
                         <td key={dayKey} style={{ padding: 4, borderRadius: i === 6 ? '0 8px 8px 0' : 0 }}>
                           <div
-                            onClick={() => openModal(m.userId, dayKey, m.name, `${DAY_LABELS[i]} ${datesInWeek[i]}`)}
+                            onClick={() => canEdit && openModal(m.userId, dayKey, m.name, `${DAY_LABELS[i]} ${datesInWeek[i]}`)}
                             style={{
                               width: '100%',
                               minHeight: 48,
@@ -313,7 +316,7 @@ export default function SchedulePage() {
                               color: textColor,
                               fontSize: 12,
                               fontWeight: 600,
-                              cursor: 'pointer',
+                              cursor: canEdit ? 'pointer' : 'default',
                               transition: 'all 0.2s',
                               wordBreak: 'break-word'
                             }}

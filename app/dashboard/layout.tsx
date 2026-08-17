@@ -1,10 +1,10 @@
 'use client';
-import { useEffect, useState, createContext, useContext } from 'react';
+import { useEffect, useState, createContext, useContext, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { onAuthChanged, signOut, getUserCurrentStoreId } from '@/lib/auth';
-import { watchStore, watchMembers, getUserStores, switchStore } from '@/lib/firestore';
-import { Store, Member } from '@/lib/types';
+import { watchStore, watchMembers, getUserStores, switchStore, watchNotifications, markNotificationAsRead, markAllNotificationsAsRead } from '@/lib/firestore';
+import { Store, Member, UserRole, AppNotification, getRoleLabel, canManageSchedule, canApproveMembers, canAccessWeb } from '@/lib/types';
 import { User } from 'firebase/auth';
 
 interface AppCtx {
@@ -12,8 +12,10 @@ interface AppCtx {
   storeId: string | null;
   store: Store | null;
   members: Member[];
+  currentMember: Member | null;
+  role: UserRole | undefined;
 }
-const AppContext = createContext<AppCtx>({ user: null, storeId: null, store: null, members: [] });
+const AppContext = createContext<AppCtx>({ user: null, storeId: null, store: null, members: [], currentMember: null, role: undefined });
 export const useApp = () => useContext(AppContext);
 
 const NAV = [
@@ -37,6 +39,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showStoreSwitcher, setShowStoreSwitcher] = useState(false);
+
+  // Notification state
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const notifDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const unsub = onAuthChanged(async (u) => {
@@ -67,13 +74,42 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return () => { unsubStore(); unsubMembers(); };
   }, [storeId]);
 
-  const currentMember = user ? members.find(m => m.userId === user.uid) : null;
+  const currentMember = user ? members.find(m => m.userId === user.uid) || null : null;
   const role = currentMember?.role;
 
-  // Quản lý chỉ được xem lịch làm
+  // Real-time notifications listener
   useEffect(() => {
-    if (role === 'manager') {
+    if (!storeId || !user) return;
+    const unsubNotifs = watchNotifications(storeId, user.uid, role, notifs => {
+      setNotifications(notifs);
+    });
+    return () => unsubNotifs();
+  }, [storeId, user, role]);
+
+  // Click outside to close notification dropdown
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (notifDropdownRef.current && !notifDropdownRef.current.contains(event.target as Node)) {
+        setShowNotifications(false);
+      }
+    }
+    if (showNotifications) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showNotifications]);
+
+  // Role based route protection
+  useEffect(() => {
+    if (!role) return;
+    if (role === 'manager2') {
       if (pathname !== '/dashboard/schedule') {
+        router.replace('/dashboard/schedule');
+      }
+    } else if (role === 'manager1' || role === 'manager') {
+      if (pathname !== '/dashboard/schedule' && pathname !== '/dashboard/members' && pathname !== '/dashboard/attendance') {
         router.replace('/dashboard/schedule');
       }
     }
@@ -96,17 +132,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <p style={{ color:'var(--text-secondary)', fontSize:14, marginBottom:24 }}>Vui lòng mở app điện thoại để tạo hoặc tham gia cửa hàng</p>
         
         <div style={{ background: '#f8d7da', color: '#721c24', padding: '12px 16px', borderRadius: '8px', fontSize: '12px', border: '1px solid #f5c6cb', maxWidth: '400px', textAlign: 'left' }}>
-          <strong>Thông tin Debug:</strong><br/>
+          <strong>Thông tin tài khoản:</strong><br/>
           - <b>Email:</b> {user?.email}<br/>
           - <b>UID:</b> {user?.uid}<br/>
-          - <b>Stores Found:</b> {userStores.length}<br/>
-          <br/>
-          <i>Ghi chú: Đảm bảo bạn đang đăng nhập đúng tài khoản email đã tạo cửa hàng trên App. Nếu tài khoản đúng nhưng vẫn lỗi, có thể do cấu hình Firebase Security Rules chưa đồng bộ.</i>
+          - <b>Cửa hàng tìm thấy:</b> {userStores.length}<br/>
         </div>
 
         <button 
           onClick={() => signOut().then(() => router.replace('/login'))}
-          style={{ marginTop: '20px', padding: '10px 20px', border: 'none', background: 'var(--primary)', color: 'white', borderRadius: '8px', cursor: 'pointer' }}
+          style={{ marginTop: '20px', padding: '10px 20px', border: 'none', background: 'var(--primary)', color: 'white', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}
         >
           Đăng xuất
         </button>
@@ -119,17 +153,66 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     : (user?.email?.[0] ?? 'U').toUpperCase();
 
   const filteredNav = NAV.filter(item => {
-    if (role === 'manager') {
+    if (role === 'manager2') {
       return item.href === '/dashboard/schedule';
     }
-    if (role === 'employee') {
-      return false; // Không hiện menu nào
+    if (role === 'manager1' || role === 'manager') {
+      return item.href === '/dashboard/schedule' || item.href === '/dashboard/members' || item.href === '/dashboard/attendance';
     }
-    return true;
+    if (role === 'employee') {
+      return false;
+    }
+    return true; // owner has full access
   });
 
+  const unreadCount = user ? notifications.filter(n => !n.readBy.includes(user.uid)).length : 0;
+
+  const handleNotificationClick = async (notif: AppNotification) => {
+    if (user && storeId) {
+      await markNotificationAsRead(storeId, notif.id, user.uid);
+    }
+    setShowNotifications(false);
+    if (notif.routePath) {
+      if (notif.routePath === '/schedule') router.push('/dashboard/schedule');
+      else if (notif.routePath === '/pending-members' || notif.routePath === '/members') router.push('/dashboard/members');
+      else if (notif.routePath === '/manage-advances' || notif.routePath === '/salary') router.push('/dashboard/salary');
+      else router.push(notif.routePath);
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    if (user && storeId) {
+      await markAllNotificationsAsRead(storeId, user.uid, notifications);
+    }
+  };
+
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'birthday': return '🎂';
+      case 'join_request': return '👤';
+      case 'join_approved': return '✅';
+      case 'advance_request': return '💵';
+      case 'advance_approved': return '💰';
+      case 'schedule_changed': return '🗓️';
+      case 'schedule_registration_reminder': return '⏰';
+      case 'checklist_reminder': return '📋';
+      case 'delivery_update': return '📦';
+      default: return '🔔';
+    }
+  };
+
+  const formatNotifTime = (createdAt: any) => {
+    if (!createdAt) return '';
+    try {
+      const d = createdAt.toDate ? createdAt.toDate() : new Date(createdAt);
+      return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' ' + d.toLocaleDateString('vi-VN');
+    } catch {
+      return '';
+    }
+  };
+
   return (
-    <AppContext.Provider value={{ user, storeId, store, members }}>
+    <AppContext.Provider value={{ user, storeId, store, members, currentMember, role }}>
       <div style={{ display:'flex', minHeight:'100vh' }}>
         {/* Mobile overlay */}
         {sidebarOpen && (
@@ -159,7 +242,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <img src="/logo.jpg" alt="Logo" style={{ width: 38, height: 38, borderRadius: 10, objectFit: 'cover' }} />
               <div>
                 <div style={{ fontWeight:800, fontSize:14, lineHeight:1.2 }}>Chấm Công Trạm</div>
-                <div style={{ fontSize:11, opacity:0.6, marginTop:2 }}>Cổng quản lý</div>
+                <div style={{ fontSize:11, opacity:0.6, marginTop:2 }}>Cổng quản lý Web</div>
               </div>
             </div>
           </div>
@@ -200,7 +283,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             })}
           </nav>
 
-          {/* User */}
+          {/* User Profile Footer */}
           <div style={{ padding:'16px 20px', borderTop:'1px solid rgba(255,255,255,0.1)' }}>
             <div style={{ display:'flex', alignItems:'center', gap:10 }}>
               <div className="avatar" style={{ width:36, height:36, fontSize:13 }}>{initials}</div>
@@ -208,8 +291,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <div style={{ fontSize:13, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                   {user?.displayName || user?.email}
                 </div>
-                <div style={{ fontSize:11, opacity:0.5 }}>
-                  {role === 'owner' ? 'Chủ cửa hàng' : role === 'manager' ? 'Quản lý' : 'Nhân viên'}
+                <div style={{ fontSize:11, opacity:0.7, color: role === 'owner' ? '#F5C842' : role === 'manager1' || role === 'manager' ? '#74C0FC' : role === 'manager2' ? '#63E6BE' : '#CED4DA' }}>
+                  {role === 'owner' ? '👑 Chủ cửa hàng' : (role === 'manager1' || role === 'manager') ? '👔 Quản lý 1' : role === 'manager2' ? '👔 Quản lý 2' : '👤 Nhân viên'}
                 </div>
               </div>
               <button onClick={signOut} title="Đăng xuất" style={{
@@ -242,6 +325,105 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {filteredNav.find(n => pathname === n.href || (n.href !== '/dashboard' && pathname.startsWith(n.href)))?.label ?? 'Dashboard'}
               </span>
             </div>
+
+            {/* Notification Bell */}
+            <div style={{ position: 'relative' }} ref={notifDropdownRef}>
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                style={{
+                  background: showNotifications ? 'var(--primary-light)' : 'var(--surface)',
+                  border: 'none', width: 38, height: 38, borderRadius: 10, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
+                  position: 'relative', transition: 'all 0.2s'
+                }}
+                title="Thông báo"
+              >
+                🔔
+                {unreadCount > 0 && (
+                  <span style={{
+                    position: 'absolute', top: -2, right: -2,
+                    background: 'var(--primary)', color: 'white',
+                    fontSize: 10, fontWeight: 700, borderRadius: 10,
+                    minWidth: 18, height: 18, padding: '0 4px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    border: '2px solid white'
+                  }}>
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Notification Dropdown */}
+              {showNotifications && (
+                <div style={{
+                  position: 'absolute', top: 48, right: 0, width: 360, maxWidth: '90vw',
+                  background: 'white', borderRadius: 16,
+                  boxShadow: '0 10px 40px rgba(0,0,0,0.15)', border: '1px solid var(--border)',
+                  zIndex: 100, overflow: 'hidden', display: 'flex', flexDirection: 'column'
+                }}>
+                  <div style={{
+                    padding: '14px 16px', borderBottom: '1px solid var(--border)',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                  }}>
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>
+                      Thông báo {unreadCount > 0 && <span style={{ color: 'var(--primary)', fontSize: 13 }}>({unreadCount} mới)</span>}
+                    </div>
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={handleMarkAllRead}
+                        style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
+                      >
+                        Đã đọc tất cả
+                      </button>
+                    )}
+                  </div>
+
+                  <div style={{ maxHeight: 360, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+                    {notifications.length === 0 ? (
+                      <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-secondary)' }}>
+                        <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
+                        <p style={{ fontSize: 13, margin: 0 }}>Không có thông báo nào</p>
+                      </div>
+                    ) : (
+                      notifications.map(notif => {
+                        const isRead = user ? notif.readBy.includes(user.uid) : true;
+                        return (
+                          <div
+                            key={notif.id}
+                            onClick={() => handleNotificationClick(notif)}
+                            style={{
+                              padding: '12px 16px', borderBottom: '1px solid var(--border)',
+                              background: isRead ? 'white' : 'var(--primary-light)',
+                              cursor: 'pointer', display: 'flex', gap: 12, alignItems: 'flex-start',
+                              transition: 'background 0.15s'
+                            }}
+                          >
+                            <span style={{ fontSize: 20, flexShrink: 0, marginTop: 2 }}>
+                              {getNotificationIcon(notif.type)}
+                            </span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontWeight: isRead ? 600 : 700, fontSize: 13, color: 'var(--neutral)', marginBottom: 2 }}>
+                                {notif.title}
+                              </div>
+                              <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.4, wordBreak: 'break-word' }}>
+                                {notif.body}
+                              </div>
+                              <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>
+                                {formatNotifTime(notif.createdAt)}
+                              </div>
+                            </div>
+                            {!isRead && (
+                              <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, marginTop: 6 }} />
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div style={{ fontSize:13, color:'var(--text-secondary)', display:'flex', alignItems:'center', gap:6 }}>
               <span style={{ width:8, height:8, borderRadius:'50%', background:'var(--success)', display:'inline-block' }} />
               {members.filter(m => m.status === 'active').length} nhân viên

@@ -2,9 +2,12 @@ import * as ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { Member, AttendanceRecord, ScheduleModel, Store, ShiftDefinition, DaySchedule, AdvanceRequest, ProductionReport, ProductionTask } from './types';
 
-const DAY_KEYS = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
 const ROLE_LABELS: Record<string, string> = {
-  owner: 'Chủ', manager: 'Quản lý', employee: 'Nhân viên',
+  owner: 'Chủ',
+  manager1: 'Quản lý 1',
+  manager: 'Quản lý 1',
+  manager2: 'Quản lý 2',
+  employee: 'Nhân viên',
 };
 
 /**
