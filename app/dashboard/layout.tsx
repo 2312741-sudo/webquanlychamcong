@@ -4,7 +4,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { onAuthChanged, signOut, getUserCurrentStoreId } from '@/lib/auth';
 import { watchStore, watchMembers, getUserStores, switchStore, watchNotifications, markNotificationAsRead, markAllNotificationsAsRead } from '@/lib/firestore';
-import { Store, Member, UserRole, AppNotification, getRoleLabel, canManageSchedule, canApproveMembers, canAccessWeb } from '@/lib/types';
+import { Store, Member, UserRole, AppNotification, getRoleLabel, normalizeRole, canManageSchedule, canApproveMembers, canAccessWeb } from '@/lib/types';
 import { User } from 'firebase/auth';
 
 interface AppCtx {
@@ -104,11 +104,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // Role based route protection
   useEffect(() => {
     if (!role) return;
-    if (role === 'manager2') {
+    const norm = normalizeRole(role);
+    if (norm === 'manager2') {
       if (pathname !== '/dashboard/schedule') {
         router.replace('/dashboard/schedule');
       }
-    } else if (role === 'manager1' || role === 'manager') {
+    } else if (norm === 'manager1') {
       if (pathname !== '/dashboard/schedule' && pathname !== '/dashboard/members' && pathname !== '/dashboard/attendance') {
         router.replace('/dashboard/schedule');
       }
@@ -152,14 +153,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     ? user.displayName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
     : (user?.email?.[0] ?? 'U').toUpperCase();
 
+  const normRole = normalizeRole(role);
+
   const filteredNav = NAV.filter(item => {
-    if (role === 'manager2') {
+    if (normRole === 'manager2') {
       return item.href === '/dashboard/schedule';
     }
-    if (role === 'manager1' || role === 'manager') {
+    if (normRole === 'manager1') {
       return item.href === '/dashboard/schedule' || item.href === '/dashboard/members' || item.href === '/dashboard/attendance';
     }
-    if (role === 'employee') {
+    if (normRole === 'employee') {
       return false;
     }
     return true; // owner has full access
@@ -291,8 +294,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <div style={{ fontSize:13, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                   {user?.displayName || user?.email}
                 </div>
-                <div style={{ fontSize:11, opacity:0.7, color: role === 'owner' ? '#F5C842' : role === 'manager1' || role === 'manager' ? '#74C0FC' : role === 'manager2' ? '#63E6BE' : '#CED4DA' }}>
-                  {role === 'owner' ? '👑 Chủ cửa hàng' : (role === 'manager1' || role === 'manager') ? '👔 Quản lý 1' : role === 'manager2' ? '👔 Quản lý 2' : '👤 Nhân viên'}
+                <div style={{ fontSize:11, opacity:0.7, color: normRole === 'owner' ? '#F5C842' : normRole === 'manager1' ? '#74C0FC' : normRole === 'manager2' ? '#63E6BE' : '#CED4DA' }}>
+                  {normRole === 'owner' ? '👑 Chủ cửa hàng' : normRole === 'manager1' ? '👔 Quản lý 1' : normRole === 'manager2' ? '👔 Quản lý 2' : '👤 Nhân viên'}
                 </div>
               </div>
               <button onClick={signOut} title="Đăng xuất" style={{
@@ -438,7 +441,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <div className="empty-state-text">Bạn chưa tham gia cửa hàng nào</div>
                 <div className="empty-state-sub">Vui lòng mở app điện thoại để tạo hoặc tham gia cửa hàng</div>
               </div>
-            ) : role === 'employee' ? (
+            ) : normRole === 'employee' ? (
               <div style={{ textAlign:'center', display:'flex', flexDirection:'column', alignItems:'center', gap:16, background:'white', padding:40, borderRadius:20, boxShadow:'0 10px 40px rgba(0,0,0,0.05)', maxWidth: 450, margin: '40px auto' }}>
                 <div style={{ fontSize:48 }}>📱</div>
                 <h2 style={{ margin:0, color:'var(--danger)' }}>Truy cập bị từ chối</h2>

@@ -4,7 +4,7 @@ import {
   updateDoc, addDoc, orderBy, Timestamp, onSnapshot,
   setDoc, limit, DocumentSnapshot, deleteDoc, collectionGroup
 } from 'firebase/firestore';
-import { Member, AttendanceRecord, Store, ScheduleModel, DaySchedule, AdvanceRequest, ProductionTask, ProductionReport, ProductionTaskEntry } from './types';
+import { Member, AttendanceRecord, Store, ScheduleModel, DaySchedule, AdvanceRequest, ProductionTask, ProductionReport, ProductionTaskEntry, AppNotification, normalizeRole } from './types';
 
 export async function getUserStoreId(uid: string): Promise<string | null> {
   try {
@@ -476,9 +476,8 @@ export function watchNotifications(
       if (notif.targetUserId) {
         isRelevant = notif.targetUserId === userId;
       } else if (notif.targetRoles && notif.targetRoles.length > 0) {
-        const effectiveRole = role || 'employee';
-        isRelevant = notif.targetRoles.includes(effectiveRole as any) ||
-          (effectiveRole === 'manager' && notif.targetRoles.includes('manager1' as any));
+        const userNorm = normalizeRole(role);
+        isRelevant = notif.targetRoles.some((tr: string) => normalizeRole(tr) === userNorm);
       }
 
       if (isRelevant) {

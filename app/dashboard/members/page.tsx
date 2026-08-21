@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useApp } from '../layout';
 import { setMemberStatus, updateMemberRole, updateMemberSalary, updateMemberInfo } from '@/lib/firestore';
-import { Member, UserRole, getRoleLabel } from '@/lib/types';
+import { Member, UserRole, getRoleLabel, normalizeRole, formatJoinedDate, canApproveMembers } from '@/lib/types';
 
 export default function MembersPage() {
   const { storeId, members, role } = useApp();
@@ -18,25 +18,27 @@ export default function MembersPage() {
   const [joinedAt, setJoinedAt] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const isOwner = role === 'owner';
-  const canApprove = role === 'owner' || role === 'manager1' || role === 'manager';
+  const isOwner = normalizeRole(role) === 'owner';
+  const canApprove = canApproveMembers(role);
 
   const activeMembers = members.filter(m => m.status === 'active');
   const pendingMembers = members.filter(m => m.status === 'pending');
 
   const filteredActiveMembers = activeMembers.filter(m => {
+    const norm = normalizeRole(m.role);
     if (roleFilter === 'all') return true;
-    if (roleFilter === 'owner') return m.role === 'owner';
-    if (roleFilter === 'manager1') return m.role === 'manager1' || m.role === 'manager';
-    if (roleFilter === 'manager2') return m.role === 'manager2';
-    if (roleFilter === 'employee') return m.role === 'employee' || !m.role;
+    if (roleFilter === 'owner') return norm === 'owner';
+    if (roleFilter === 'manager1') return norm === 'manager1';
+    if (roleFilter === 'manager2') return norm === 'manager2';
+    if (roleFilter === 'employee') return norm === 'employee';
     return true;
   });
 
   const handleRoleChange = async (userId: string, newRole: string) => {
     if (!storeId || !isOwner) return;
     try {
-      await updateMemberRole(storeId, userId, newRole);
+      const firestoreRole = newRole === 'manager1' ? 'manager_1' : newRole === 'manager2' ? 'manager_2' : newRole;
+      await updateMemberRole(storeId, userId, firestoreRole);
     } catch (e) {
       alert('Lỗi khi đổi vai trò');
     }
@@ -75,12 +77,12 @@ export default function MembersPage() {
     }
   };
 
-  const getRoleBadgeStyle = (memberRole: UserRole) => {
-    switch (memberRole) {
+  const getRoleBadgeStyle = (memberRole: UserRole | string) => {
+    const norm = normalizeRole(memberRole);
+    switch (norm) {
       case 'owner':
         return { background: '#FFF5F5', color: '#C8102E', border: '1px solid #FFC9C9' };
       case 'manager1':
-      case 'manager':
         return { background: '#E7F5FF', color: '#1C7ED6', border: '1px solid #A5D8FF' };
       case 'manager2':
         return { background: '#E6FCF5', color: '#0CA678', border: '1px solid #96F2D7' };
@@ -170,7 +172,7 @@ export default function MembersPage() {
             </thead>
             <tbody>
               {filteredActiveMembers.map(m => {
-                const currentRoleValue = (m.role === 'manager') ? 'manager1' : m.role;
+                const currentRoleValue = normalizeRole(m.role);
                 const badgeStyle = getRoleBadgeStyle(m.role);
 
                 return (
@@ -187,7 +189,7 @@ export default function MembersPage() {
                     <td>
                       <div style={{ fontWeight: 600, color: 'var(--neutral)' }}>{m.employeeCode || '-'}</div>
                       <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                        {m.joinedAt ? new Date(m.joinedAt).toLocaleDateString('vi-VN') : 'Chưa cập nhật'}
+                        {formatJoinedDate(m.joinedAt)}
                       </div>
                     </td>
                     <td>

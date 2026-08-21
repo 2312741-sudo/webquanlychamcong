@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useApp } from '../layout';
 import { getWeekSchedule, saveWeekSchedule } from '@/lib/firestore';
 import { exportWeeklySchedule } from '@/lib/exportExcel';
-import { ScheduleModel, DaySchedule, ShiftDefinition, getRoleLabel, canManageSchedule } from '@/lib/types';
+import { ScheduleModel, DaySchedule, ShiftDefinition, getRoleLabel, canManageSchedule, normalizeRole } from '@/lib/types';
 
 function getMondayOfWeek(date: Date): string {
   const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -388,7 +388,7 @@ export default function SchedulePage() {
                       </div>
                     </label>
                     
-                    {isSelected && (currentMember?.role === 'owner' || store?.departmentSelectionEnabled !== false) && (
+                    {isSelected && (normalizeRole(currentMember?.role) === 'owner' || store?.departmentSelectionEnabled !== false) && (
                       <div style={{ padding: '8px 12px', background: 'white' }}>
                         <select 
                           className="input" 

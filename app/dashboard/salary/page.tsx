@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useApp } from '../layout';
 import { getMonthAttendances, getSchedulesInRange, watchAdvances, createAdvanceRequest, updateAdvanceRequestStatus, getAttendancesInRange, getAdvancesInRange } from '@/lib/firestore';
 import { exportMonthlySalary } from '@/lib/exportExcel';
-import { AttendanceRecord, ScheduleModel, DaySchedule, AdvanceRequest } from '@/lib/types';
+import { AttendanceRecord, ScheduleModel, DaySchedule, AdvanceRequest, getRoleLabel, normalizeRole } from '@/lib/types';
 import ExportModal from '../components/ExportModal';
 import { auth } from '@/lib/firebase';
 
@@ -24,7 +24,7 @@ export default function SalaryPage() {
   const currentUser = auth.currentUser;
   
   const currentMember = currentUser ? members.find(m => m.userId === currentUser.uid) : null;
-  const isOwner = currentMember?.role === 'owner';
+  const isOwner = normalizeRole(currentMember?.role) === 'owner';
 
   const activeMembers = members.filter(m => m.status === 'active');
 
@@ -299,7 +299,7 @@ export default function SalaryPage() {
                         <div>
                           <span style={{ fontWeight: 600 }}>{row.name}</span>
                           <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
-                            {row.role === 'owner' ? 'Chủ' : row.role === 'manager' ? 'Quản lý' : 'Nhân viên'}
+                            {getRoleLabel(row.role)}
                           </div>
                         </div>
                       </div>

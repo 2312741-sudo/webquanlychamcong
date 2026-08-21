@@ -7,8 +7,10 @@ const DAY_KEYS = ['monday','tuesday','wednesday','thursday','friday','saturday',
 const ROLE_LABELS: Record<string, string> = {
   owner: 'Chủ',
   manager1: 'Quản lý 1',
+  manager_1: 'Quản lý 1',
   manager: 'Quản lý 1',
   manager2: 'Quản lý 2',
+  manager_2: 'Quản lý 2',
   employee: 'Nhân viên',
 };
 

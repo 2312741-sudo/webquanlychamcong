@@ -1,14 +1,22 @@
-export type UserRole = 'owner' | 'manager' | 'manager1' | 'manager2' | 'employee';
+export type UserRole = 'owner' | 'manager' | 'manager1' | 'manager2' | 'manager_1' | 'manager_2' | 'employee';
 export type MemberStatus = 'active' | 'pending' | 'kicked';
 export type EmployeeType = 'fulltime' | 'parttime';
 export type CheckInMethod = 'wifi' | 'gps' | 'manual' | 'qr';
 
-export function getRoleLabel(role?: UserRole | string): string {
-  switch (role) {
+export function normalizeRole(role?: UserRole | string | null): 'owner' | 'manager1' | 'manager2' | 'employee' {
+  if (!role) return 'employee';
+  if (role === 'owner') return 'owner';
+  if (role === 'manager1' || role === 'manager_1' || role === 'manager') return 'manager1';
+  if (role === 'manager2' || role === 'manager_2') return 'manager2';
+  return 'employee';
+}
+
+export function getRoleLabel(role?: UserRole | string | null): string {
+  const norm = normalizeRole(role);
+  switch (norm) {
     case 'owner':
       return 'Chủ';
     case 'manager1':
-    case 'manager':
       return 'Quản lý 1';
     case 'manager2':
       return 'Quản lý 2';
@@ -18,17 +26,38 @@ export function getRoleLabel(role?: UserRole | string): string {
   }
 }
 
-export function canManageSchedule(role?: UserRole | string): boolean {
-  return role === 'owner' || role === 'manager1' || role === 'manager';
+export function canManageSchedule(role?: UserRole | string | null): boolean {
+  const norm = normalizeRole(role);
+  return norm === 'owner' || norm === 'manager1';
 }
 
-export function canApproveMembers(role?: UserRole | string): boolean {
-  return role === 'owner' || role === 'manager1' || role === 'manager';
+export function canApproveMembers(role?: UserRole | string | null): boolean {
+  const norm = normalizeRole(role);
+  return norm === 'owner' || norm === 'manager1';
 }
 
-export function canAccessWeb(role?: UserRole | string): boolean {
-  return role === 'owner' || role === 'manager1' || role === 'manager2' || role === 'manager';
+export function canAccessWeb(role?: UserRole | string | null): boolean {
+  const norm = normalizeRole(role);
+  return norm === 'owner' || norm === 'manager1' || norm === 'manager2';
 }
+
+export function formatJoinedDate(joinedAt: any): string {
+  if (!joinedAt) return 'Chưa cập nhật';
+  try {
+    if (typeof joinedAt === 'object' && typeof joinedAt.toDate === 'function') {
+      return joinedAt.toDate().toLocaleDateString('vi-VN');
+    }
+    if (typeof joinedAt === 'object' && joinedAt.seconds != null) {
+      return new Date(joinedAt.seconds * 1000).toLocaleDateString('vi-VN');
+    }
+    const d = new Date(joinedAt);
+    if (isNaN(d.getTime())) return 'Chưa cập nhật';
+    return d.toLocaleDateString('vi-VN');
+  } catch {
+    return 'Chưa cập nhật';
+  }
+}
+
 
 export interface Member {
   userId: string;
