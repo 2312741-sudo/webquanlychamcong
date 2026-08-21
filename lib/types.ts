@@ -108,6 +108,20 @@ export interface Store {
   giaoHangEnabled?: boolean;
   departmentSelectionEnabled?: boolean;
   departments?: Department[];
+  memberOrder?: string[];
+  hiddenScheduleUserIds?: string[];
+}
+
+export function sortMembersByOrder(members: Member[], memberOrder?: string[]): Member[] {
+  if (!memberOrder || memberOrder.length === 0) return [...members];
+  return [...members].sort((a, b) => {
+    const idxA = memberOrder.indexOf(a.userId);
+    const idxB = memberOrder.indexOf(b.userId);
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+    if (idxA !== -1) return -1;
+    if (idxB !== -1) return 1;
+    return a.name.localeCompare(b.name);
+  });
 }
 
 export interface StoreWifi {

@@ -1,11 +1,11 @@
 'use client';
 import { useState } from 'react';
 import { useApp } from '../layout';
-import { setMemberStatus, updateMemberRole, updateMemberSalary, updateMemberInfo } from '@/lib/firestore';
-import { Member, UserRole, getRoleLabel, normalizeRole, formatJoinedDate, canApproveMembers } from '@/lib/types';
+import { setMemberStatus, updateMemberRole, updateMemberSalary, updateMemberInfo, updateMemberOrder, toggleHideMemberSchedule } from '@/lib/firestore';
+import { Member, UserRole, getRoleLabel, normalizeRole, formatJoinedDate, canApproveMembers, sortMembersByOrder } from '@/lib/types';
 
 export default function MembersPage() {
-  const { storeId, members, role } = useApp();
+  const { storeId, store, members, role } = useApp();
   const [activeTab, setActiveTab] = useState<'active'|'pending'>('active');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [editingSalary, setEditingSalary] = useState<Member | null>(null);
@@ -16,7 +16,9 @@ export default function MembersPage() {
   const [stdHours, setStdHours] = useState(208);
   const [employeeCode, setEmployeeCode] = useState('');
   const [joinedAt, setJoinedAt] = useState('');
+  const [hideSchedule, setHideSchedule] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
 
   const isOwner = normalizeRole(role) === 'owner';
   const canApprove = canApproveMembers(role);
@@ -24,7 +26,9 @@ export default function MembersPage() {
   const activeMembers = members.filter(m => m.status === 'active');
   const pendingMembers = members.filter(m => m.status === 'pending');
 
-  const filteredActiveMembers = activeMembers.filter(m => {
+  const sortedActiveMembers = sortMembersByOrder(activeMembers, store?.memberOrder);
+
+  const filteredActiveMembers = sortedActiveMembers.filter(m => {
     const norm = normalizeRole(m.role);
     if (roleFilter === 'all') return true;
     if (roleFilter === 'owner') return norm === 'owner';
@@ -54,6 +58,28 @@ export default function MembersPage() {
     }
   };
 
+  const handleToggleHide = async (userId: string, currentlyHidden: boolean) => {
+    if (!storeId || !isOwner) return;
+    try {
+      await toggleHideMemberSchedule(storeId, userId, !currentlyHidden);
+    } catch (e) {
+      alert('Lỗi khi thay đổi trạng thái ẩn lịch');
+    }
+  };
+
+  const handleMoveOrder = async (fromIdx: number, toIdx: number) => {
+    if (!storeId || !isOwner || toIdx < 0 || toIdx >= sortedActiveMembers.length) return;
+    const items = [...sortedActiveMembers];
+    const [moved] = items.splice(fromIdx, 1);
+    items.splice(toIdx, 0, moved);
+    const newOrder = items.map(m => m.userId);
+    try {
+      await updateMemberOrder(storeId, newOrder);
+    } catch (e) {
+      alert('Lỗi khi lưu thứ tự nhân viên');
+    }
+  };
+
   const openSalaryModal = (m: Member) => {
     setEditingSalary(m);
     setEmpType(m.employeeType || 'fulltime');
@@ -61,6 +87,7 @@ export default function MembersPage() {
     setStdHours(m.standardHoursPerMonth || 208);
     setEmployeeCode(m.employeeCode || '');
     setJoinedAt(m.joinedAt || '');
+    setHideSchedule((store?.hiddenScheduleUserIds || []).includes(m.userId));
   };
 
   const saveSalary = async () => {
@@ -69,6 +96,7 @@ export default function MembersPage() {
     try {
       await updateMemberSalary(storeId, editingSalary.userId, empType, salaryAmt, stdHours);
       await updateMemberInfo(storeId, editingSalary.userId, { employeeCode, joinedAt });
+      await toggleHideMemberSchedule(storeId, editingSalary.userId, hideSchedule);
       setEditingSalary(null);
     } catch (e) {
       alert('Lỗi khi lưu thông tin');
@@ -162,26 +190,75 @@ export default function MembersPage() {
           <table className="table">
             <thead>
               <tr>
+                {isOwner && roleFilter === 'all' && <th style={{ width: 40, textAlign: 'center' }}>Thứ tự</th>}
                 <th>Nhân viên</th>
                 <th>Mã NV / Ngày vào</th>
                 <th>Vai trò</th>
                 <th>Loại hợp đồng</th>
                 <th>Lương cơ bản</th>
+                {isOwner && <th style={{ textAlign: 'center' }}>Lịch cửa hàng</th>}
                 {isOwner && <th>Thao tác</th>}
               </tr>
             </thead>
             <tbody>
-              {filteredActiveMembers.map(m => {
+              {filteredActiveMembers.map((m, idx) => {
                 const currentRoleValue = normalizeRole(m.role);
                 const badgeStyle = getRoleBadgeStyle(m.role);
+                const isHidden = (store?.hiddenScheduleUserIds || []).includes(m.userId);
 
                 return (
-                  <tr key={m.userId}>
+                  <tr 
+                    key={m.userId}
+                    draggable={isOwner && roleFilter === 'all'}
+                    onDragStart={() => setDraggedIdx(idx)}
+                    onDragOver={(e) => {
+                      if (isOwner && roleFilter === 'all') e.preventDefault();
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (draggedIdx !== null && draggedIdx !== idx) {
+                        handleMoveOrder(draggedIdx, idx);
+                      }
+                      setDraggedIdx(null);
+                    }}
+                    style={{
+                      background: draggedIdx === idx ? 'rgba(200, 16, 46, 0.05)' : undefined,
+                      transition: 'background 0.2s'
+                    }}
+                  >
+                    {isOwner && roleFilter === 'all' && (
+                      <td style={{ textAlign: 'center', width: 60 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                          <button 
+                            type="button" 
+                            title="Di chuyển lên"
+                            disabled={idx === 0}
+                            onClick={() => handleMoveOrder(idx, idx - 1)}
+                            style={{ border: 'none', background: 'transparent', cursor: idx === 0 ? 'default' : 'pointer', opacity: idx === 0 ? 0.2 : 0.7, padding: '2px 4px', fontSize: 11 }}
+                          >▲</button>
+                          <span style={{ cursor: 'grab', fontSize: 14, opacity: 0.5, userSelect: 'none' }} title="Kéo để đổi thứ tự">☰</span>
+                          <button 
+                            type="button" 
+                            title="Di chuyển xuống"
+                            disabled={idx === filteredActiveMembers.length - 1}
+                            onClick={() => handleMoveOrder(idx, idx + 1)}
+                            style={{ border: 'none', background: 'transparent', cursor: idx === filteredActiveMembers.length - 1 ? 'default' : 'pointer', opacity: idx === filteredActiveMembers.length - 1 ? 0.2 : 0.7, padding: '2px 4px', fontSize: 11 }}
+                          >▼</button>
+                        </div>
+                      </td>
+                    )}
                     <td>
                       <div className="flex items-center gap-3">
                         <div className="avatar" style={{ width: 36, height: 36 }}>{m.name[0]}</div>
                         <div>
-                          <div style={{ fontWeight: 600 }}>{m.name}</div>
+                          <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            {m.name}
+                            {isHidden && (
+                              <span style={{ fontSize: 10, background: '#FFF3BF', color: '#D9480F', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>
+                                Ẩn lịch
+                              </span>
+                            )}
+                          </div>
                           <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{m.phone || 'Chưa cập nhật SĐT'}</div>
                         </div>
                       </div>
@@ -224,6 +301,27 @@ export default function MembersPage() {
                       </div>
                     </td>
                     {isOwner && (
+                      <td style={{ textAlign: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleHide(m.userId, isHidden)}
+                          title={isHidden ? "Đang ẩn khỏi Lịch cửa hàng (Chỉ Chủ thấy). Bấm để hiện lại." : "Đang hiện trên Lịch cửa hàng. Bấm để ẩn khỏi người khác."}
+                          style={{
+                            padding: '4px 8px',
+                            borderRadius: 6,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            border: `1px solid ${isHidden ? '#FFC9C9' : '#D0EBFF'}`,
+                            background: isHidden ? '#FFF5F5' : '#E7F5FF',
+                            color: isHidden ? '#C8102E' : '#1C7ED6',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {isHidden ? '🙈 Đã ẩn lịch' : '👁️ Hiện lịch'}
+                        </button>
+                      </td>
+                    )}
+                    {isOwner && (
                       <td>
                         <div className="flex gap-2">
                           <button className="btn btn-ghost btn-sm" onClick={() => openSalaryModal(m)}>Cài đặt</button>
@@ -235,7 +333,7 @@ export default function MembersPage() {
                 );
               })}
               {filteredActiveMembers.length === 0 && (
-                <tr><td colSpan={isOwner ? 6 : 5} style={{ textAlign: 'center', padding: 40, color: 'var(--text-secondary)' }}>Không có nhân viên nào phù hợp</td></tr>
+                <tr><td colSpan={isOwner ? 8 : 5} style={{ textAlign: 'center', padding: 40, color: 'var(--text-secondary)' }}>Không có nhân viên nào phù hợp</td></tr>
               )}
             </tbody>
           </table>
@@ -337,6 +435,20 @@ export default function MembersPage() {
                   </div>
                 </div>
               )}
+
+              {/* Hide schedule checkbox */}
+              <div style={{ padding: '12px 16px', background: '#F8F9FA', borderRadius: 8, border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--neutral)' }}>Ẩn lịch trên tab Lịch cửa hàng</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Khi bật, chỉ Chủ cửa hàng mới nhìn thấy lịch của nhân viên này</div>
+                </div>
+                <input 
+                  type="checkbox" 
+                  style={{ width: 18, height: 18, cursor: 'pointer' }}
+                  checked={hideSchedule}
+                  onChange={e => setHideSchedule(e.target.checked)}
+                />
+              </div>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>

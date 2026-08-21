@@ -2,7 +2,8 @@ import { db } from './firebase';
 import {
   collection, doc, query, where, getDocs, getDoc,
   updateDoc, addDoc, orderBy, Timestamp, onSnapshot,
-  setDoc, limit, DocumentSnapshot, deleteDoc, collectionGroup
+  setDoc, limit, DocumentSnapshot, deleteDoc, collectionGroup,
+  arrayUnion, arrayRemove, writeBatch
 } from 'firebase/firestore';
 import { Member, AttendanceRecord, Store, ScheduleModel, DaySchedule, AdvanceRequest, ProductionTask, ProductionReport, ProductionTaskEntry, AppNotification, normalizeRole } from './types';
 
@@ -254,6 +255,22 @@ export async function updateMemberInfo(storeId: string, userId: string, data: Re
   await updateDoc(doc(db, 'stores', storeId, 'members', userId), data);
 }
 
+export async function updateMemberOrder(storeId: string, memberOrder: string[]): Promise<void> {
+  await updateDoc(doc(db, 'stores', storeId), { memberOrder });
+}
+
+export async function toggleHideMemberSchedule(storeId: string, userId: string, hide: boolean): Promise<void> {
+  if (hide) {
+    await updateDoc(doc(db, 'stores', storeId), {
+      hiddenScheduleUserIds: arrayUnion(userId)
+    });
+  } else {
+    await updateDoc(doc(db, 'stores', storeId), {
+      hiddenScheduleUserIds: arrayRemove(userId)
+    });
+  }
+}
+
 export async function getWeekSchedule(storeId: string, weekStart: string): Promise<ScheduleModel | null> {
   try {
     const q = query(
@@ -389,6 +406,18 @@ export async function deleteProductionTask(
   taskId: string
 ): Promise<void> {
   await deleteDoc(doc(db, 'stores', storeId, 'production_tasks', taskId));
+}
+
+export async function reorderProductionTasks(
+  storeId: string,
+  orderedTasks: { id: string; order: number }[]
+): Promise<void> {
+  const batch = writeBatch(db);
+  orderedTasks.forEach(({ id, order }) => {
+    const ref = doc(db, 'stores', storeId, 'production_tasks', id);
+    batch.update(ref, { order });
+  });
+  await batch.commit();
 }
 
 // ─── Production Reports ──────────────────────────────────────────────────────

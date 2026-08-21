@@ -1,9 +1,9 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useApp } from '../layout';
-import { getWeekSchedule, saveWeekSchedule } from '@/lib/firestore';
+import { getWeekSchedule, saveWeekSchedule, updateMemberOrder, toggleHideMemberSchedule } from '@/lib/firestore';
 import { exportWeeklySchedule } from '@/lib/exportExcel';
-import { ScheduleModel, DaySchedule, ShiftDefinition, getRoleLabel, canManageSchedule, normalizeRole } from '@/lib/types';
+import { ScheduleModel, DaySchedule, ShiftDefinition, getRoleLabel, canManageSchedule, normalizeRole, sortMembersByOrder } from '@/lib/types';
 
 function getMondayOfWeek(date: Date): string {
   const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -29,17 +29,48 @@ export default function SchedulePage() {
   const { storeId, store, members, user, role } = useApp();
   const currentMember = members.find(m => m.userId === user?.uid);
   const canEdit = canManageSchedule(role);
+  const isOwner = normalizeRole(role) === 'owner';
   const [currentWeek, setCurrentWeek] = useState(() => getMondayOfWeek(new Date()));
   const [shifts, setShifts] = useState<Record<string, DaySchedule>>({});
   const [scheduleData, setScheduleData] = useState<ScheduleModel | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [draggedMemberIdx, setDraggedMemberIdx] = useState<number | null>(null);
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCell, setEditingCell] = useState<{userId: string; dayKey: keyof DaySchedule; memberName: string; dateLabel: string} | null>(null);
 
   const activeMembers = members.filter(m => m.status === 'active');
+  const sortedMembers = sortMembersByOrder(activeMembers, store?.memberOrder);
+  const hiddenScheduleUserIds = store?.hiddenScheduleUserIds || [];
+
+  const visibleMembers = isOwner 
+    ? sortedMembers 
+    : sortedMembers.filter(m => !hiddenScheduleUserIds.includes(m.userId) || m.userId === user?.uid);
+
+  const handleMoveMemberOrder = async (fromIdx: number, toIdx: number) => {
+    if (!storeId || !isOwner || toIdx < 0 || toIdx >= sortedMembers.length) return;
+    const items = [...sortedMembers];
+    const [moved] = items.splice(fromIdx, 1);
+    items.splice(toIdx, 0, moved);
+    const newOrder = items.map(m => m.userId);
+    try {
+      await updateMemberOrder(storeId, newOrder);
+    } catch (e) {
+      alert('Lỗi khi lưu thứ tự nhân viên');
+    }
+  };
+
+  const handleToggleHideSchedule = async (userId: string, currentlyHidden: boolean) => {
+    if (!storeId || !isOwner) return;
+    try {
+      await toggleHideMemberSchedule(storeId, userId, !currentlyHidden);
+    } catch (e) {
+      alert('Lỗi khi thay đổi trạng thái ẩn lịch');
+    }
+  };
+
   const customShifts = (store?.customShifts && store.customShifts.length > 0)
     ? store.customShifts
     : DEFAULT_SHIFTS;
@@ -285,11 +316,79 @@ export default function SchedulePage() {
                 </tr>
               </thead>
               <tbody style={{ background: 'var(--background)' }}>
-                {activeMembers.map(m => (
-                  <tr key={m.userId} style={{ background: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                    <td style={{ padding: '12px 16px', borderRadius: '8px 0 0 8px' }}>
-                      <div style={{ fontWeight: 600 }}>{m.name}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{getRoleLabel(m.role)}</div>
+                {visibleMembers.map((m, idx) => {
+                  const isHidden = hiddenScheduleUserIds.includes(m.userId);
+                  return (
+                  <tr 
+                    key={m.userId} 
+                    draggable={isOwner}
+                    onDragStart={() => setDraggedMemberIdx(idx)}
+                    onDragOver={(e) => { if (isOwner) e.preventDefault(); }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (draggedMemberIdx !== null && draggedMemberIdx !== idx) {
+                        handleMoveMemberOrder(draggedMemberIdx, idx);
+                      }
+                      setDraggedMemberIdx(null);
+                    }}
+                    style={{ 
+                      background: draggedMemberIdx === idx ? 'rgba(200, 16, 46, 0.05)' : 'white', 
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                      transition: 'background 0.2s'
+                    }}
+                  >
+                    <td style={{ padding: '10px 14px', borderRadius: '8px 0 0 8px', minWidth: 200 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          {isOwner && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                              <button 
+                                type="button" 
+                                title="Di chuyển lên"
+                                disabled={idx === 0}
+                                onClick={() => handleMoveMemberOrder(idx, idx - 1)}
+                                style={{ border: 'none', background: 'transparent', cursor: idx === 0 ? 'default' : 'pointer', opacity: idx === 0 ? 0.2 : 0.7, padding: 0, fontSize: 10, lineHeight: 1 }}
+                              >▲</button>
+                              <button 
+                                type="button" 
+                                title="Di chuyển xuống"
+                                disabled={idx === visibleMembers.length - 1}
+                                onClick={() => handleMoveMemberOrder(idx, idx + 1)}
+                                style={{ border: 'none', background: 'transparent', cursor: idx === visibleMembers.length - 1 ? 'default' : 'pointer', opacity: idx === visibleMembers.length - 1 ? 0.2 : 0.7, padding: 0, fontSize: 10, lineHeight: 1 }}
+                              >▼</button>
+                            </div>
+                          )}
+                          <div>
+                            <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                              {m.name}
+                              {isHidden && (
+                                <span style={{ fontSize: 10, background: '#FFF3BF', color: '#D9480F', padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>
+                                  Ẩn
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{getRoleLabel(m.role)}</div>
+                          </div>
+                        </div>
+                        {isOwner && (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleHideSchedule(m.userId, isHidden)}
+                            title={isHidden ? "Lịch đang bị ẩn với người khác (Chỉ Chủ thấy). Bấm để hiện lại." : "Lịch đang hiện trên Lịch cửa hàng. Bấm để ẩn khỏi người khác."}
+                            style={{
+                              border: 'none',
+                              background: isHidden ? '#FFF5F5' : 'transparent',
+                              color: isHidden ? '#C8102E' : 'var(--text-secondary)',
+                              padding: '4px 6px',
+                              borderRadius: 6,
+                              cursor: 'pointer',
+                              fontSize: 13
+                            }}
+                          >
+                            {isHidden ? '🙈' : '👁️'}
+                          </button>
+                        )}
+                      </div>
                     </td>
                     {DAY_KEYS.map((dayKey, i) => {
                       const currentVal = shifts[m.userId]?.[dayKey] || [];
@@ -327,8 +426,9 @@ export default function SchedulePage() {
                       );
                     })}
                   </tr>
-                ))}
-                {activeMembers.length === 0 && (
+                  );
+                })}
+                {visibleMembers.length === 0 && (
                   <tr><td colSpan={8} style={{ textAlign: 'center', padding: 40, color: 'var(--text-secondary)' }}>Chưa có nhân viên hoạt động</td></tr>
                 )}
               </tbody>

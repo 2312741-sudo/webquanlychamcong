@@ -4,22 +4,25 @@ import { useApp } from '../layout';
 import {
   watchProductionTasks, addProductionTask, updateProductionTask,
   deleteProductionTask, getProductionReports, deleteProductionReport,
+  reorderProductionTasks
 } from '@/lib/firestore';
 import { exportProductionReport } from '@/lib/exportExcel';
-import { ProductionTask, ProductionReport } from '@/lib/types';
+import { ProductionTask, ProductionReport, normalizeRole } from '@/lib/types';
 
 const COMMON_UNIT_PRESETS = [
   'Kg', 'Phút', 'Sản phẩm', 'Ca', 'Gói', 'Thùng', 'Ly', 'Hộp', 'Bao', 'Cái', 'Đơn'
 ];
 
 export default function ProductionPage() {
-  const { storeId, store, members } = useApp();
+  const { storeId, store, members, user, role } = useApp();
+  const isOwner = user?.uid === store?.ownerId || normalizeRole(role) === 'owner';
   const [activeTab, setActiveTab] = useState<'tasks' | 'reports'>('tasks');
 
   // — Task state —
   const [tasks, setTasks] = useState<ProductionTask[]>([]);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [editingTask, setEditingTask] = useState<ProductionTask | null>(null);
+  const [draggedTaskIdx, setDraggedTaskIdx] = useState<number | null>(null);
   const [taskForm, setTaskForm] = useState({
     name: '',
     hasUnit: true,
@@ -62,12 +65,14 @@ export default function ProductionPage() {
 
   // — Task handlers —
   const openAddTask = () => {
+    if (!isOwner) return;
     setEditingTask(null);
     setTaskForm({ name: '', hasUnit: true, unitLabel: 'Kg' });
     setShowTaskModal(true);
   };
 
   const openEditTask = (task: ProductionTask) => {
+    if (!isOwner) return;
     setEditingTask(task);
     const hasUnit = task.unitLabel ? task.unitLabel.trim().length > 0 : (task.unit !== 'none' && task.hasUnit !== false);
     setTaskForm({
@@ -79,7 +84,7 @@ export default function ProductionPage() {
   };
 
   const saveTask = async () => {
-    if (!storeId || !taskForm.name.trim()) return;
+    if (!storeId || !taskForm.name.trim() || !isOwner) return;
     setTaskSaving(true);
     const finalUnitLabel = taskForm.hasUnit ? (taskForm.unitLabel.trim() || 'Sản phẩm') : '';
     const finalUnitType = taskForm.hasUnit ? 'custom' : 'none';
@@ -109,14 +114,27 @@ export default function ProductionPage() {
   };
 
   const toggleTask = async (task: ProductionTask) => {
-    if (!storeId) return;
+    if (!storeId || !isOwner) return;
     await updateProductionTask(storeId, task.id, { active: !task.active });
   };
 
   const deleteTask = async (task: ProductionTask) => {
-    if (!storeId) return;
+    if (!storeId || !isOwner) return;
     if (!confirm(`Xóa công việc "${task.name}"? Hành động không thể hoàn tác.`)) return;
     await deleteProductionTask(storeId, task.id);
+  };
+
+  const handleMoveTaskOrder = async (fromIdx: number, toIdx: number) => {
+    if (!storeId || !isOwner || toIdx < 0 || toIdx >= tasks.length) return;
+    const items = [...tasks];
+    const [moved] = items.splice(fromIdx, 1);
+    items.splice(toIdx, 0, moved);
+    const orderedTasks = items.map((t, idx) => ({ id: t.id, order: idx + 1 }));
+    try {
+      await reorderProductionTasks(storeId, orderedTasks);
+    } catch (e) {
+      alert('Lỗi khi sắp xếp lại danh mục checklist');
+    }
   };
 
   const handleDeleteReport = async (reportId: string) => {
@@ -153,19 +171,19 @@ export default function ProductionPage() {
     <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
       {/* Header */}
       <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#1a1a1a', margin: 0 }}>
-          🏭 Công cụ Đo lường Hiệu quả Sản xuất & Checklist
+        <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#1a1a1a', margin: '0 0 6px 0' }}>
+          Sản xuất & Vận hành
         </h1>
-        <p style={{ color: '#666', marginTop: '6px', fontSize: '14px' }}>
-          Quản lý danh sách công việc/checklist và theo dõi báo cáo hiệu suất nhân viên khi out ca
+        <p style={{ color: '#666', margin: 0, fontSize: '14px' }}>
+          Quản lý danh sách công việc sản xuất và báo cáo checklist hàng ngày
         </p>
       </div>
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', borderBottom: '2px solid #eee', paddingBottom: '0' }}>
         {[
-          { key: 'tasks', label: '📋 Quản lý công việc & Checklist' },
-          { key: 'reports', label: '📊 Báo cáo sản xuất' },
+          { key: 'tasks', label: '📋 Danh mục Checklist' },
+          { key: 'reports', label: '📊 Báo cáo hàng ngày' },
         ].map(tab => (
           <button
             key={tab.key}
@@ -193,16 +211,18 @@ export default function ProductionPage() {
                 {tasks.filter(t => t.active).length} công việc đang bật / {tasks.length} tổng
               </span>
             </div>
-            <button
-              onClick={openAddTask}
-              style={{
-                background: '#C8102E', color: '#fff', border: 'none',
-                padding: '10px 20px', borderRadius: '8px', cursor: 'pointer',
-                fontWeight: 600, fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px',
-              }}
-            >
-              + Thêm công việc
-            </button>
+            {isOwner && (
+              <button
+                onClick={openAddTask}
+                style={{
+                  background: '#C8102E', color: '#fff', border: 'none',
+                  padding: '10px 20px', borderRadius: '8px', cursor: 'pointer',
+                  fontWeight: 600, fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px',
+                }}
+              >
+                + Thêm công việc
+              </button>
+            )}
           </div>
 
           {tasks.length === 0 ? (
@@ -212,14 +232,19 @@ export default function ProductionPage() {
             }}>
               <div style={{ fontSize: '48px', marginBottom: '16px' }}>📋</div>
               <h3 style={{ color: '#999', fontWeight: 500 }}>Chưa có công việc nào</h3>
-              <p style={{ color: '#bbb', fontSize: '14px' }}>Bấm "Thêm công việc" để tạo danh sách checklist cho nhân viên</p>
+              <p style={{ color: '#bbb', fontSize: '14px' }}>
+                {isOwner ? 'Bấm "Thêm công việc" để tạo danh sách checklist cho nhân viên' : 'Chưa có danh mục checklist sản xuất nào được tạo'}
+              </p>
             </div>
           ) : (
             <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #eee', overflow: 'hidden' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#f8f8f8' }}>
-                    {['STT', 'Tên công việc', 'Đơn vị đo lường', 'Trạng thái', 'Thao tác'].map(h => (
+                    {(isOwner 
+                      ? ['Thứ tự', 'Tên công việc', 'Đơn vị đo lường', 'Trạng thái', 'Thao tác'] 
+                      : ['STT', 'Tên công việc', 'Đơn vị đo lường', 'Trạng thái']
+                    ).map(h => (
                       <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#555', borderBottom: '1px solid #eee' }}>
                         {h}
                       </th>
@@ -230,8 +255,46 @@ export default function ProductionPage() {
                   {tasks.map((task, idx) => {
                     const hasUnit = task.unitLabel && task.unitLabel.trim().length > 0;
                     return (
-                      <tr key={task.id} style={{ borderBottom: '1px solid #f5f5f5' }}>
-                        <td style={{ padding: '12px 16px', color: '#999', fontSize: '13px' }}>{idx + 1}</td>
+                      <tr 
+                        key={task.id}
+                        draggable={isOwner}
+                        onDragStart={() => isOwner && setDraggedTaskIdx(idx)}
+                        onDragOver={(e) => isOwner && e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          if (isOwner && draggedTaskIdx !== null && draggedTaskIdx !== idx) {
+                            handleMoveTaskOrder(draggedTaskIdx, idx);
+                          }
+                          setDraggedTaskIdx(null);
+                        }}
+                        style={{ 
+                          borderBottom: '1px solid #f5f5f5',
+                          background: draggedTaskIdx === idx ? 'rgba(200, 16, 46, 0.05)' : undefined,
+                          transition: 'background 0.2s'
+                        }}
+                      >
+                        <td style={{ padding: '12px 16px', color: '#999', fontSize: '13px', width: isOwner ? 100 : 60 }}>
+                          {isOwner ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <button
+                                type="button"
+                                disabled={idx === 0}
+                                onClick={() => handleMoveTaskOrder(idx, idx - 1)}
+                                style={{ border: 'none', background: 'transparent', cursor: idx === 0 ? 'default' : 'pointer', opacity: idx === 0 ? 0.2 : 0.7, padding: '2px 4px', fontSize: 11 }}
+                              >▲</button>
+                              <span style={{ cursor: 'grab', fontSize: 14, opacity: 0.5, userSelect: 'none' }} title="Kéo để đổi thứ tự">☰</span>
+                              <button
+                                type="button"
+                                disabled={idx === tasks.length - 1}
+                                onClick={() => handleMoveTaskOrder(idx, idx + 1)}
+                                style={{ border: 'none', background: 'transparent', cursor: idx === tasks.length - 1 ? 'default' : 'pointer', opacity: idx === tasks.length - 1 ? 0.2 : 0.7, padding: '2px 4px', fontSize: 11 }}
+                              >▼</button>
+                              <span style={{ fontWeight: 600, marginLeft: 4, color: '#666' }}>{idx + 1}</span>
+                            </div>
+                          ) : (
+                            <span style={{ fontWeight: 600, color: '#666' }}>{idx + 1}</span>
+                          )}
+                        </td>
                         <td style={{ padding: '12px 16px', fontWeight: 600, color: '#1a1a1a' }}>{task.name}</td>
                         <td style={{ padding: '12px 16px' }}>
                           {hasUnit ? (
@@ -251,35 +314,51 @@ export default function ProductionPage() {
                           )}
                         </td>
                         <td style={{ padding: '12px 16px' }}>
-                          <button
-                            onClick={() => toggleTask(task)}
-                            style={{
-                              background: task.active ? '#e8f5e9' : '#fafafa',
-                              color: task.active ? '#1A6B5A' : '#999',
-                              border: `1px solid ${task.active ? '#1A6B5A' : '#ddd'}`,
-                              padding: '4px 12px', borderRadius: '20px', cursor: 'pointer',
-                              fontSize: '12px', fontWeight: 600,
-                            }}
-                          >
-                            {task.active ? '✓ Đang bật' : '○ Đang tắt'}
-                          </button>
-                        </td>
-                        <td style={{ padding: '12px 16px' }}>
-                          <div style={{ display: 'flex', gap: '8px' }}>
+                          {isOwner ? (
                             <button
-                              onClick={() => openEditTask(task)}
-                              style={{ background: '#f0f4ff', color: '#3b5bdb', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}
+                              onClick={() => toggleTask(task)}
+                              style={{
+                                background: task.active ? '#e8f5e9' : '#fafafa',
+                                color: task.active ? '#1A6B5A' : '#999',
+                                border: `1px solid ${task.active ? '#1A6B5A' : '#ddd'}`,
+                                padding: '4px 12px', borderRadius: '20px', cursor: 'pointer',
+                                fontSize: '12px', fontWeight: 600,
+                              }}
                             >
-                              ✏️ Sửa
+                              {task.active ? '✓ Đang bật' : '○ Đang tắt'}
                             </button>
-                            <button
-                              onClick={() => deleteTask(task)}
-                              style={{ background: '#fff5f5', color: '#C8102E', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}
+                          ) : (
+                            <span
+                              style={{
+                                background: task.active ? '#e8f5e9' : '#fafafa',
+                                color: task.active ? '#1A6B5A' : '#999',
+                                border: `1px solid ${task.active ? '#1A6B5A' : '#ddd'}`,
+                                padding: '4px 12px', borderRadius: '20px',
+                                fontSize: '12px', fontWeight: 600, display: 'inline-block'
+                              }}
                             >
-                              🗑️ Xóa
-                            </button>
-                          </div>
+                              {task.active ? '✓ Đang bật' : '○ Đang tắt'}
+                            </span>
+                          )}
                         </td>
+                        {isOwner && (
+                          <td style={{ padding: '12px 16px' }}>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <button
+                                onClick={() => openEditTask(task)}
+                                style={{ background: '#f0f4ff', color: '#3b5bdb', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}
+                              >
+                                ✏️ Sửa
+                              </button>
+                              <button
+                                onClick={() => deleteTask(task)}
+                                style={{ background: '#fff5f5', color: '#C8102E', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}
+                              >
+                                🗑️ Xóa
+                              </button>
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     );
                   })}
