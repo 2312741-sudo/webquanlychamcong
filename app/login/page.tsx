@@ -32,6 +32,16 @@ export default function LoginPage() {
     }
   }
 
+  function formatAuthError(err: any, providerName: string) {
+    if (err.code === 'auth/unauthorized-domain') {
+      return `Tên miền web hiện tại chưa được cấp phép trong Firebase Console. Vui lòng thêm tên miền này vào Firebase Console > Authentication > Settings > Authorized domains.`;
+    }
+    if (err.code === 'auth/operation-not-allowed') {
+      return `Phương thức đăng nhập ${providerName} chưa được kích hoạt trong Firebase Console > Authentication > Sign-in method.`;
+    }
+    return `Đăng nhập ${providerName} thất bại: ${err.message || 'Vui lòng thử lại.'}`;
+  }
+
   async function handleGoogleSignIn() {
     setError('');
     setGoogleLoading(true);
@@ -45,7 +55,7 @@ export default function LoginPage() {
       ) {
         // Người dùng đã đóng popup
       } else {
-        setError('Đăng nhập Google thất bại: ' + (err.message || 'Vui lòng thử lại.'));
+        setError(formatAuthError(err, 'Google'));
       }
     } finally {
       setGoogleLoading(false);
@@ -65,7 +75,7 @@ export default function LoginPage() {
       ) {
         // Người dùng đã đóng popup
       } else {
-        setError('Đăng nhập Apple thất bại: ' + (err.message || 'Vui lòng thử lại.'));
+        setError(formatAuthError(err, 'Apple'));
       }
     } finally {
       setAppleLoading(false);
