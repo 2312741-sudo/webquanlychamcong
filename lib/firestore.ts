@@ -368,6 +368,48 @@ export async function deleteAllAttendances(storeId: string): Promise<void> {
   }
 }
 
+export async function deleteStoreAndCleanup(storeId: string, storeName: string, ownerUid: string): Promise<void> {
+  const now = new Date();
+  // 1. Soft-delete store doc
+  await updateDoc(doc(db, 'stores', storeId), {
+    status: 'deleted',
+    deletedAt: Timestamp.fromDate(now),
+    deletedBy: ownerUid,
+  });
+
+  // 2. Fetch all members and remove storeId from their storeIds array
+  try {
+    const membersSnap = await getDocs(collection(db, 'stores', storeId, 'members'));
+    const affectedUserIds = new Set<string>();
+    membersSnap.forEach(d => affectedUserIds.add(d.id));
+    affectedUserIds.add(ownerUid);
+
+    for (const uid of Array.from(affectedUserIds)) {
+      try {
+        const userRef = doc(db, 'users', uid);
+        const uDoc = await getDoc(userRef);
+        if (!uDoc.exists()) continue;
+        const uData = uDoc.data() || {};
+        const currentStoreId = uData.currentStoreId;
+        const userStoreIds: string[] = Array.isArray(uData.storeIds) ? uData.storeIds.filter((id: string) => id !== storeId) : [];
+
+        const newCurrentStoreId = (currentStoreId === storeId)
+          ? (userStoreIds.length > 0 ? userStoreIds[0] : null)
+          : currentStoreId;
+
+        await updateDoc(userRef, {
+          storeIds: userStoreIds,
+          currentStoreId: newCurrentStoreId,
+        });
+      } catch (err) {
+        console.error(`Error updating user ${uid} on store deletion:`, err);
+      }
+    }
+  } catch (err) {
+    console.error('Error cleaning up members on store deletion:', err);
+  }
+}
+
 // ─── Production Tasks ────────────────────────────────────────────────────────
 
 export function watchProductionTasks(

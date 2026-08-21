@@ -1,6 +1,6 @@
 import * as ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
-import { Member, AttendanceRecord, ScheduleModel, Store, ShiftDefinition, DaySchedule, AdvanceRequest, ProductionReport, ProductionTask } from './types';
+import { Member, AttendanceRecord, ScheduleModel, Store, ShiftDefinition, DaySchedule, AdvanceRequest, ProductionReport, ProductionTask, sortMembersByOrder } from './types';
 
 const DAY_KEYS = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
 
@@ -119,7 +119,8 @@ export async function exportMonthlyAttendance(
     cell.alignment = { horizontal: 'center', vertical: 'middle' };
   });
 
-  members.forEach(member => {
+  const sortedMembers = sortMembersByOrder(members, store.memberOrder);
+  sortedMembers.forEach(member => {
     const memberAtts = attendances.filter(a => a.userId === member.userId);
     let totalHours = 0;
     
@@ -329,7 +330,8 @@ export async function exportMonthlySalary(
     cell.alignment = { horizontal: 'center', vertical: 'middle' };
   });
 
-  members.forEach(member => {
+  const sortedMembers = sortMembersByOrder(members, store.memberOrder);
+  sortedMembers.forEach(member => {
     const memberAtts = attendances.filter(a => a.userId === member.userId);
     const totalHours = memberAtts.reduce((sum, a) => sum + (a.totalHours || 0), 0);
     const typeLabel = member.employeeType === 'fulltime' ? 'Toàn thời gian' : 'Bán thời gian';
@@ -524,7 +526,8 @@ export async function exportWeeklySchedule(
 
   let currentRow = 4;
 
-  members.forEach(member => {
+  const sortedMembers = sortMembersByOrder(members, store.memberOrder);
+  sortedMembers.forEach(member => {
     const daySchedule = (schedule?.shifts[member.userId] || {}) as Partial<DaySchedule>;
     
     let maxShifts = 1;
@@ -687,7 +690,7 @@ export async function exportProductionReport(
     left: { style: 'thin' }, right: { style: 'thin' },
   };
 
-  const activeTasks = tasks.filter(t => t.active);
+  const activeTasks = tasks.filter(t => t.active).sort((a, b) => (a.order || 0) - (b.order || 0));
 
   // Title row
   sheet.mergeCells(1, 1, 1, 5 + activeTasks.length);

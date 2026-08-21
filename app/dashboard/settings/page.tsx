@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useApp } from '../layout';
-import { updateStore, clearAllSchedules, deleteAllAttendances } from '@/lib/firestore';
+import { updateStore, clearAllSchedules, deleteAllAttendances, deleteStoreAndCleanup } from '@/lib/firestore';
 import { ShiftDefinition, Department } from '@/lib/types';
 
 export default function SettingsPage() {
@@ -568,6 +568,47 @@ export default function SettingsPage() {
             >
               🗑️ Xóa toàn bộ dữ liệu IN/OUT (Chấm công)
             </button>
+            <br/>
+            <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid #FFC9C9', background: '#FFF5F5', padding: 16, borderRadius: 8 }}>
+              <h4 style={{ fontSize: 14, fontWeight: 700, color: '#C8102E', marginBottom: 8 }}>⚠️ Vùng nguy hiểm: Xóa cửa hàng</h4>
+              <p style={{ fontSize: 12, color: '#495057', marginBottom: 12, lineHeight: 1.5 }}>
+                Hành động này sẽ xóa vĩnh viễn cửa hàng <b>{store?.name}</b> cùng toàn bộ cấu hình, lịch làm và thành viên. Xác nhận bảo mật 2 bước là bắt buộc.
+              </p>
+              <button 
+                className="btn" 
+                onClick={async () => {
+                  if (!storeId || !store) return;
+                  if (!confirm(`CẢNH BÁO NGUY HIỂM!\n\nBạn có chắc chắn muốn XÓA VĨNH VIỄN cửa hàng "${store.name}"?\nToàn bộ dữ liệu thành viên, lịch làm và chấm công sẽ bị xóa và không thể khôi phục!`)) return;
+
+                  const pass = window.prompt('Bước 1/2: Nhập mật khẩu bảo mật của cửa hàng:');
+                  if (pass !== deletePassword) {
+                    alert('Mật khẩu không đúng. Đã hủy thao tác.');
+                    return;
+                  }
+
+                  const confirmName = window.prompt(`Bước 2/2: Nhập chính xác tên cửa hàng "${store.name}" hoặc chữ "XÓA" để hoàn tất:`);
+                  if (confirmName !== store.name && confirmName !== 'XÓA' && confirmName !== 'XOA') {
+                    alert('Tên xác nhận không khớp. Đã hủy thao tác xóa.');
+                    return;
+                  }
+
+                  setSaving(true);
+                  try {
+                    await deleteStoreAndCleanup(storeId, store.name, store.ownerId);
+                    alert('Đã xóa cửa hàng thành công!');
+                    window.location.reload();
+                  } catch (e) {
+                    alert('Lỗi khi xóa cửa hàng: ' + (e as any)?.message);
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+                disabled={saving}
+                style={{ color: 'white', background: '#C8102E', border: 'none', fontWeight: 700, padding: '10px 20px', borderRadius: 8, cursor: 'pointer' }}
+              >
+                🚨 Xóa vĩnh viễn cửa hàng này (2 Bước)
+              </button>
+            </div>
         </div>
       </div>
 
