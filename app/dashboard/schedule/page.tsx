@@ -266,6 +266,61 @@ export default function SchedulePage() {
     return store?.themeColor || 'var(--primary)';
   };
 
+  const calculateDayHours = (shiftIds: string[] | string | undefined): number => {
+    if (!shiftIds) return 0;
+    const arr = Array.isArray(shiftIds) ? shiftIds : (shiftIds === 'off' || !shiftIds ? [] : [shiftIds]);
+    const actualShifts = arr.filter(id => id !== 'delivery' && id !== 'giaohang');
+    if (actualShifts.length === 0) return 0;
+
+    let totalDayHours = 0;
+    actualShifts.forEach(entry => {
+      const shiftId = entry.split('|')[0];
+      const shiftDef = customShifts.find(s => s.id === shiftId) || DEFAULT_SHIFTS.find(s => s.id === shiftId);
+      if (shiftDef) {
+        let duration = (shiftDef.endHour - shiftDef.startHour) + (shiftDef.endMinute - shiftDef.startMinute) / 60;
+        if (duration < 0) duration += 24;
+        totalDayHours += duration;
+      }
+    });
+
+    return totalDayHours;
+  };
+
+  const isDeliveryShift = (shiftIds: string[] | string | undefined): boolean => {
+    if (!shiftIds) return false;
+    const arr = Array.isArray(shiftIds) ? shiftIds : (shiftIds === 'off' || !shiftIds ? [] : [shiftIds]);
+    const actualShifts = arr.filter(id => id !== 'delivery' && id !== 'giaohang');
+    return arr.includes('delivery') && actualShifts.length > 0;
+  };
+
+  // Calculations for all visible members and all days
+  const dayHoursTotals = DAY_KEYS.map(dayKey => {
+    return visibleMembers.reduce((sum, m) => {
+      const shiftVal = shifts[m.userId]?.[dayKey];
+      return sum + calculateDayHours(shiftVal);
+    }, 0);
+  });
+
+  const memberHoursTotals: Record<string, number> = {};
+  const memberDeliveryTotals: Record<string, number> = {};
+
+  visibleMembers.forEach(m => {
+    let mHours = 0;
+    let mDelivery = 0;
+    DAY_KEYS.forEach(dayKey => {
+      const shiftVal = shifts[m.userId]?.[dayKey];
+      mHours += calculateDayHours(shiftVal);
+      if (isDeliveryShift(shiftVal)) {
+        mDelivery += 1;
+      }
+    });
+    memberHoursTotals[m.userId] = mHours;
+    memberDeliveryTotals[m.userId] = mDelivery;
+  });
+
+  const grandTotalHours = visibleMembers.reduce((sum, m) => sum + (memberHoursTotals[m.userId] || 0), 0);
+  const grandTotalDelivery = visibleMembers.reduce((sum, m) => sum + (memberDeliveryTotals[m.userId] || 0), 0);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div className="flex justify-between items-center">
@@ -303,7 +358,7 @@ export default function SchedulePage() {
           <div style={{ padding: 60, textAlign: 'center' }}><span className="spinner spinner-primary" /></div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table className="table" style={{ minWidth: 1000, borderCollapse: 'separate', borderSpacing: '0 4px' }}>
+            <table className="table" style={{ minWidth: 1240, borderCollapse: 'separate', borderSpacing: '0 4px' }}>
               <thead>
                 <tr>
                   <th style={{ width: 200, paddingLeft: 16 }}>Nhân viên</th>
@@ -313,11 +368,111 @@ export default function SchedulePage() {
                       <div style={{ fontSize: 11, fontWeight: 400 }}>{datesInWeek[i]}</div>
                     </th>
                   ))}
+                  <th style={{ textAlign: 'center', width: 120, padding: '8px 4px' }}>
+                    <div style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 700 }}>Tổng giờ công</div>
+                    <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-secondary)' }}>Trong tuần</div>
+                  </th>
+                  <th style={{ textAlign: 'center', width: 120, padding: '8px 4px' }}>
+                    <div style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 700 }}>Tổng ca chở hàng</div>
+                    <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-secondary)' }}>Trong tuần</div>
+                  </th>
                 </tr>
               </thead>
               <tbody style={{ background: 'var(--background)' }}>
+                {/* HÀNG TỔNG THEO NGÀY (Dưới header) */}
+                <tr 
+                  style={{ 
+                    background: '#F8F9FA', 
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                  }}
+                >
+                  <td style={{ padding: '10px 14px', borderRadius: '8px 0 0 8px', minWidth: 200 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 15 }}>📊</span>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--neutral)' }}>Tổng giờ theo ngày</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Cộng dồn tất cả NV</div>
+                      </div>
+                    </div>
+                  </td>
+                  {DAY_KEYS.map((dayKey, i) => {
+                    const dayTotal = dayHoursTotals[i];
+                    return (
+                      <td key={`summary-${dayKey}`} style={{ padding: 4 }}>
+                        <div
+                          style={{
+                            width: '100%',
+                            minHeight: 48,
+                            padding: '6px 8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            textAlign: 'center',
+                            borderRadius: 8,
+                            border: dayTotal > 0 ? '1px solid #A5D8FF' : '1px dashed var(--border)',
+                            background: dayTotal > 0 ? '#E7F5FF' : 'var(--surface)',
+                            color: dayTotal > 0 ? '#1971C2' : 'var(--text-secondary)',
+                            fontSize: 13,
+                            fontWeight: 700,
+                          }}
+                        >
+                          {dayTotal > 0 ? (dayTotal % 1 === 0 ? `${dayTotal}h` : `${dayTotal.toFixed(1)}h`) : '0h'}
+                        </div>
+                      </td>
+                    );
+                  })}
+                  {/* Giao điểm với cột Tổng giờ công: Tổng giờ công cả tuần */}
+                  <td style={{ padding: 4 }}>
+                    <div
+                      style={{
+                        width: '100%',
+                        minHeight: 48,
+                        padding: '6px 8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        textAlign: 'center',
+                        borderRadius: 8,
+                        border: grandTotalHours > 0 ? '1px solid #96F2D7' : '1px dashed var(--border)',
+                        background: grandTotalHours > 0 ? '#E6FCF5' : 'var(--surface)',
+                        color: grandTotalHours > 0 ? '#0CA678' : 'var(--text-secondary)',
+                        fontSize: 13,
+                        fontWeight: 800,
+                      }}
+                    >
+                      {grandTotalHours > 0 ? (grandTotalHours % 1 === 0 ? `${grandTotalHours}h` : `${grandTotalHours.toFixed(1)}h`) : '0h'}
+                    </div>
+                  </td>
+                  {/* Giao điểm với cột Tổng ca chở hàng: Tổng ca chở hàng cả tuần */}
+                  <td style={{ padding: 4, borderRadius: '0 8px 8px 0' }}>
+                    <div
+                      style={{
+                        width: '100%',
+                        minHeight: 48,
+                        padding: '6px 8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        textAlign: 'center',
+                        borderRadius: 8,
+                        border: grandTotalDelivery > 0 ? '1px solid #FFD8A8' : '1px dashed var(--border)',
+                        background: grandTotalDelivery > 0 ? '#FFF4E6' : 'var(--surface)',
+                        color: grandTotalDelivery > 0 ? '#D9480F' : 'var(--text-secondary)',
+                        fontSize: 13,
+                        fontWeight: 800,
+                      }}
+                    >
+                      {grandTotalDelivery}
+                    </div>
+                  </td>
+                </tr>
+
+                {/* DANH SÁCH NHÂN VIÊN */}
                 {visibleMembers.map((m, idx) => {
                   const isHidden = hiddenScheduleUserIds.includes(m.userId);
+                  const memberHours = memberHoursTotals[m.userId] || 0;
+                  const memberDelivery = memberDeliveryTotals[m.userId] || 0;
+
                   return (
                   <tr 
                     key={m.userId} 
@@ -398,7 +553,7 @@ export default function SchedulePage() {
                       const label = getShiftLabel(currentVal);
                       
                       return (
-                        <td key={dayKey} style={{ padding: 4, borderRadius: i === 6 ? '0 8px 8px 0' : 0 }}>
+                        <td key={dayKey} style={{ padding: 4 }}>
                           <div
                             onClick={() => canEdit && openModal(m.userId, dayKey, m.name, `${DAY_LABELS[i]} ${datesInWeek[i]}`)}
                             style={{
@@ -425,11 +580,57 @@ export default function SchedulePage() {
                         </td>
                       );
                     })}
+                    {/* Cột Tổng giờ công của nhân viên */}
+                    <td style={{ padding: 4 }}>
+                      <div
+                        style={{
+                          width: '100%',
+                          minHeight: 48,
+                          padding: '6px 8px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          textAlign: 'center',
+                          borderRadius: 8,
+                          border: memberHours > 0 ? '1px solid var(--border)' : '1px dashed var(--border)',
+                          background: memberHours > 0 ? '#F8F9FA' : 'var(--surface)',
+                          color: memberHours > 0 ? 'var(--neutral)' : 'var(--text-secondary)',
+                          fontSize: 12.5,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {memberHours > 0 
+                          ? (memberHours % 1 === 0 ? `${memberHours}h` : `${memberHours.toFixed(1)}h`) 
+                          : '0'}
+                      </div>
+                    </td>
+                    {/* Cột Tổng ca chở hàng của nhân viên */}
+                    <td style={{ padding: 4, borderRadius: '0 8px 8px 0' }}>
+                      <div
+                        style={{
+                          width: '100%',
+                          minHeight: 48,
+                          padding: '6px 8px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          textAlign: 'center',
+                          borderRadius: 8,
+                          border: memberDelivery > 0 ? '1px solid #FFE066' : '1px dashed var(--border)',
+                          background: memberDelivery > 0 ? '#FFF9DB' : 'var(--surface)',
+                          color: memberDelivery > 0 ? '#E67700' : 'var(--text-secondary)',
+                          fontSize: 12.5,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {memberDelivery}
+                      </div>
+                    </td>
                   </tr>
                   );
                 })}
                 {visibleMembers.length === 0 && (
-                  <tr><td colSpan={8} style={{ textAlign: 'center', padding: 40, color: 'var(--text-secondary)' }}>Chưa có nhân viên hoạt động</td></tr>
+                  <tr><td colSpan={10} style={{ textAlign: 'center', padding: 40, color: 'var(--text-secondary)' }}>Chưa có nhân viên hoạt động</td></tr>
                 )}
               </tbody>
             </table>
