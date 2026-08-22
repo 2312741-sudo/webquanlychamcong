@@ -273,18 +273,32 @@ export async function toggleHideMemberSchedule(storeId: string, userId: string, 
 
 export async function getWeekSchedule(storeId: string, weekStart: string): Promise<ScheduleModel | null> {
   try {
-    const q = query(
-      collection(db, 'stores', storeId, 'schedules'),
-      where('weekStart', '==', weekStart),
-      limit(1)
-    );
-    const snap = await getDocs(q);
-    if (snap.empty) return null;
-    return { id: snap.docs[0].id, ...snap.docs[0].data() } as ScheduleModel;
+    const scheduleRef = doc(db, 'stores', storeId, 'schedules', weekStart);
+    const snap = await getDoc(scheduleRef);
+    if (!snap.exists()) return null;
+    return { id: snap.id, ...snap.data() } as ScheduleModel;
   } catch (err) {
     console.error('Error in getWeekSchedule:', err);
     return null;
   }
+}
+
+export function watchWeekSchedule(
+  storeId: string,
+  weekStart: string,
+  cb: (schedule: ScheduleModel | null) => void
+) {
+  const scheduleRef = doc(db, 'stores', storeId, 'schedules', weekStart);
+  return onSnapshot(scheduleRef, (snap) => {
+    if (!snap.exists()) {
+      cb(null);
+    } else {
+      cb({ id: snap.id, ...snap.data() } as ScheduleModel);
+    }
+  }, (err) => {
+    console.error('Error in watchWeekSchedule:', err);
+    cb(null);
+  });
 }
 
 export async function getSchedulesInRange(storeId: string, startDateStr: string, endDateStr: string): Promise<ScheduleModel[]> {
@@ -334,18 +348,13 @@ export function watchAdvances(storeId: string, month: string, cb: (advances: Adv
 export async function saveWeekSchedule(
   storeId: string, weekStart: string, shifts: Record<string, DaySchedule>
 ): Promise<void> {
-  const q = query(
-    collection(db, 'stores', storeId, 'schedules'),
-    where('weekStart', '==', weekStart),
-    limit(1)
-  );
-  const snap = await getDocs(q);
-  const data = { storeId, weekStart, shifts };
-  if (snap.empty) {
-    await addDoc(collection(db, 'stores', storeId, 'schedules'), data);
-  } else {
-    await updateDoc(snap.docs[0].ref, { shifts });
-  }
+  const scheduleRef = doc(db, 'stores', storeId, 'schedules', weekStart);
+  await setDoc(scheduleRef, {
+    storeId,
+    weekStart,
+    shifts,
+    updatedAt: Timestamp.now(),
+  }, { merge: true });
 }
 
 export async function updateStore(storeId: string, data: Record<string, any>) {
