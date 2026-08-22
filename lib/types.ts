@@ -31,6 +31,11 @@ export function canManageSchedule(role?: UserRole | string | null): boolean {
   return norm === 'owner' || norm === 'manager1';
 }
 
+export function canManageDelivery(role?: UserRole | string | null): boolean {
+  const norm = normalizeRole(role);
+  return norm === 'owner' || norm === 'manager1' || norm === 'manager2';
+}
+
 export function canApproveMembers(role?: UserRole | string | null): boolean {
   const norm = normalizeRole(role);
   return norm === 'owner' || norm === 'manager1';

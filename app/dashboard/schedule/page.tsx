@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useApp } from '../layout';
 import { getWeekSchedule, saveWeekSchedule, updateMemberOrder, toggleHideMemberSchedule } from '@/lib/firestore';
 import { exportWeeklySchedule } from '@/lib/exportExcel';
-import { ScheduleModel, DaySchedule, ShiftDefinition, getRoleLabel, canManageSchedule, normalizeRole, sortMembersByOrder } from '@/lib/types';
+import { ScheduleModel, DaySchedule, ShiftDefinition, getRoleLabel, canManageSchedule, canManageDelivery, normalizeRole, sortMembersByOrder } from '@/lib/types';
 
 function getMondayOfWeek(date: Date): string {
   const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -28,7 +28,9 @@ const DAY_LABELS = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Th�
 export default function SchedulePage() {
   const { storeId, store, members, user, role } = useApp();
   const currentMember = members.find(m => m.userId === user?.uid);
-  const canEdit = canManageSchedule(role);
+  const canEditSchedule = canManageSchedule(role); // Owner, Manager 1
+  const canEditDelivery = canManageDelivery(role); // Owner, Manager 1, Manager 2
+  const canInteract = canEditSchedule || canEditDelivery;
   const isOwner = normalizeRole(role) === 'owner';
   const [currentWeek, setCurrentWeek] = useState(() => getMondayOfWeek(new Date()));
   const [shifts, setShifts] = useState<Record<string, DaySchedule>>({});
@@ -154,6 +156,11 @@ export default function SchedulePage() {
 
   const toggleShiftForCell = (shiftId: string) => {
     if (!editingCell) return;
+    if (shiftId === 'delivery' || shiftId === 'giaohang') {
+      if (!canEditDelivery) return;
+    } else {
+      if (!canEditSchedule) return;
+    }
     const { userId, dayKey } = editingCell;
     setShifts(prev => {
       const userSchedule = prev[userId] || { monday:[], tuesday:[], wednesday:[], thursday:[], friday:[], saturday:[], sunday:[] };
@@ -337,7 +344,7 @@ export default function SchedulePage() {
           <button onClick={handleExport} className="btn btn-primary" style={{ background: 'var(--success)' }}>
             📥 Xuất Excel
           </button>
-          {canEdit && (
+          {canInteract && (
             <button onClick={saveChanges} className="btn btn-primary" disabled={saving || loading}>
               {saving ? 'Đang lưu...' : '💾 Lưu lịch'}
             </button>
@@ -555,7 +562,7 @@ export default function SchedulePage() {
                       return (
                         <td key={dayKey} style={{ padding: 4 }}>
                           <div
-                            onClick={() => canEdit && openModal(m.userId, dayKey, m.name, `${DAY_LABELS[i]} ${datesInWeek[i]}`)}
+                            onClick={() => canInteract && openModal(m.userId, dayKey, m.name, `${DAY_LABELS[i]} ${datesInWeek[i]}`)}
                             style={{
                               width: '100%',
                               minHeight: 48,
@@ -570,7 +577,7 @@ export default function SchedulePage() {
                               color: textColor,
                               fontSize: 12,
                               fontWeight: 600,
-                              cursor: canEdit ? 'pointer' : 'default',
+                              cursor: canInteract ? 'pointer' : 'default',
                               transition: 'all 0.2s',
                               wordBreak: 'break-word'
                             }}
@@ -654,6 +661,13 @@ export default function SchedulePage() {
               {editingCell.memberName} • {editingCell.dateLabel}
             </p>
 
+            {!canEditSchedule && canEditDelivery && (
+              <div style={{ fontSize: 12, color: '#D9480F', background: '#FFF4E6', padding: '8px 12px', borderRadius: 8, marginBottom: 14, fontWeight: 600, border: '1px solid #FFE066', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span>ℹ️</span>
+                <span>Tài khoản Quản lý 2: Chỉ được phép tích Chở hàng & Giao hàng (Không sửa ca làm việc).</span>
+              </div>
+            )}
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 320, overflowY: 'auto' }}>
               {customShifts.map(shift => {
                 const currentArr = shifts[editingCell.userId]?.[editingCell.dayKey] || [];
@@ -668,18 +682,21 @@ export default function SchedulePage() {
                     borderRadius: 8,
                     background: isSelected ? 'var(--primary-light)' : 'white',
                     overflow: 'hidden',
-                    flexShrink: 0
+                    flexShrink: 0,
+                    opacity: canEditSchedule ? 1 : (isSelected ? 0.95 : 0.45)
                   }}>
                     <label style={{
-                      display: 'flex', alignItems: 'center', gap: 12, padding: 12, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: 12, padding: 12,
+                      cursor: canEditSchedule ? 'pointer' : 'not-allowed',
                       background: isSelected ? 'var(--primary)' : 'transparent',
                       color: isSelected ? 'white' : 'var(--text-primary)'
                     }}>
                       <input 
                         type="checkbox" 
+                        disabled={!canEditSchedule}
                         checked={isSelected}
-                        onChange={() => toggleShiftForCell(shift.id)}
-                        style={{ transform: 'scale(1.2)' }}
+                        onChange={() => canEditSchedule && toggleShiftForCell(shift.id)}
+                        style={{ transform: 'scale(1.2)', cursor: canEditSchedule ? 'pointer' : 'not-allowed' }}
                       />
                       <div>
                         <div style={{ fontWeight: 700, fontSize: 14 }}>{shift.name}</div>
@@ -693,8 +710,10 @@ export default function SchedulePage() {
                       <div style={{ padding: '8px 12px', background: 'white' }}>
                         <select 
                           className="input" 
+                          disabled={!canEditSchedule}
                           value={selectedDeptId}
                           onChange={(e) => {
+                            if (!canEditSchedule) return;
                             const newDept = e.target.value;
                             setShifts(prev => {
                               const userSchedule = prev[editingCell.userId] || { monday:[], tuesday:[], wednesday:[], thursday:[], friday:[], saturday:[], sunday:[] };
@@ -708,7 +727,7 @@ export default function SchedulePage() {
                               return { ...prev, [editingCell.userId]: { ...userSchedule, [editingCell.dayKey]: nArr } };
                             });
                           }}
-                          style={{ width: '100%', padding: '6px 10px', fontSize: 13 }}
+                          style={{ width: '100%', padding: '6px 10px', fontSize: 13, cursor: canEditSchedule ? 'pointer' : 'not-allowed' }}
                         >
                           <option value="">-- Bộ phận mặc định --</option>
                           {store?.departments?.map(d => (
@@ -728,40 +747,45 @@ export default function SchedulePage() {
               const hasNormalShift = cellShifts.some(id => id !== 'delivery' && id !== 'giaohang');
               const isDeliveryChecked = cellShifts.includes('delivery');
               const isGiaoHangChecked = cellShifts.includes('giaohang');
+              const canTickDelivery = canEditDelivery && hasNormalShift;
 
               return (
                 <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px dashed var(--border)', display: 'flex', flexDirection: 'column', gap: 12 }}>
                   <div>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, color: 'var(--primary)', fontWeight: 600 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: canTickDelivery ? 'pointer' : 'not-allowed', fontSize: 14, color: 'var(--primary)', fontWeight: 600, opacity: canTickDelivery ? 1 : 0.5 }}>
                       <input 
                         type="checkbox" 
-                        disabled={!hasNormalShift}
+                        disabled={!canTickDelivery}
                         checked={isDeliveryChecked}
-                        onChange={() => toggleShiftForCell('delivery')}
-                        style={{ transform: 'scale(1.2)' }}
+                        onChange={() => canEditDelivery && toggleShiftForCell('delivery')}
+                        style={{ transform: 'scale(1.2)', cursor: canTickDelivery ? 'pointer' : 'not-allowed' }}
                       />
                       📦 Chở hàng (được nhận phụ cấp)
                     </label>
                   </div>
                   
                   <div>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, color: 'var(--primary)', fontWeight: 600 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: canTickDelivery ? 'pointer' : 'not-allowed', fontSize: 14, color: 'var(--primary)', fontWeight: 600, opacity: canTickDelivery ? 1 : 0.5 }}>
                       <input 
                         type="checkbox" 
-                        disabled={!hasNormalShift}
+                        disabled={!canTickDelivery}
                         checked={isGiaoHangChecked}
-                        onChange={() => toggleShiftForCell('giaohang')}
-                        style={{ transform: 'scale(1.2)' }}
+                        onChange={() => canEditDelivery && toggleShiftForCell('giaohang')}
+                        style={{ transform: 'scale(1.2)', cursor: canTickDelivery ? 'pointer' : 'not-allowed' }}
                       />
                       🛵 Giao hàng (được nhận phụ cấp)
                     </label>
                   </div>
 
-                  {!hasNormalShift && (
+                  {!hasNormalShift ? (
                     <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
-                      * Cần chọn ít nhất 1 ca làm để có thể tích chở hàng / giao hàng
+                      * Cần có ít nhất 1 ca làm việc để có thể tích chở hàng / giao hàng {canEditDelivery && !canEditSchedule ? '(Vui lòng nhờ Chủ quán hoặc Quản lý 1 xếp ca trước)' : ''}
                     </div>
-                  )}
+                  ) : (!canEditSchedule && canEditDelivery ? (
+                    <div style={{ fontSize: 12, color: '#0CA678', marginTop: 4, fontWeight: 600 }}>
+                      ✓ Bạn có thể tích hoặc bỏ tích Chở hàng / Giao hàng cho ca làm này
+                    </div>
+                  ) : null)}
                 </div>
               );
             })()}
