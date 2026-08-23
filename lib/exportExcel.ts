@@ -624,7 +624,8 @@ export async function exportWeeklySchedule(
   sortedMembers.forEach(member => {
     const daySchedule = (schedule?.shifts[member.userId] || {}) as Partial<DaySchedule>;
     
-    let maxShifts = 1;
+    // 1 nhân viên luôn luôn có tối thiểu 2 hàng giờ công kể cả không có ca sản xuất
+    let maxShifts = 2;
     let memberDeliveryCount = 0;
     DAY_KEYS.forEach(key => {
       const shiftsForDay = daySchedule[key as keyof DaySchedule] || [];
@@ -637,9 +638,7 @@ export async function exportWeeklySchedule(
     const startRow = currentRow;
     const endRow = currentRow + maxShifts - 1;
 
-    if (maxShifts > 1) {
-      sheet.mergeCells(startRow, 1, endRow, 1);
-    }
+    sheet.mergeCells(startRow, 1, endRow, 1);
     const nameCell = sheet.getCell(`A${startRow}`);
     nameCell.value = member.name.toUpperCase();
     nameCell.alignment = { vertical: 'middle', wrapText: true };
@@ -661,13 +660,11 @@ export async function exportWeeklySchedule(
           const [shiftId, deptId] = entry.includes('|') ? entry.split('|') : [entry, ''];
           const dept = store.departments?.find(d => d.id === deptId);
           
-          let shiftName = '';
           let startH = '', startM = '', endH = '', endM = '';
           let durationH = 0;
 
           const shiftDef = customShifts.find(s => s.id === shiftId) || DEFAULT_SHIFTS.find(s => s.id === shiftId);
           if (shiftDef) {
-            shiftName = dept ? dept.shortName : shiftDef.name;
             startH = shiftDef.startHour.toString().padStart(2, '0');
             startM = shiftDef.startMinute.toString().padStart(2, '0');
             endH = shiftDef.endHour.toString().padStart(2, '0');
@@ -676,12 +673,17 @@ export async function exportWeeklySchedule(
             if (durationH < 0) durationH += 24;
           }
           
-          if (shiftName) {
+          if (startH && endH) {
             totalHoursInWeek += durationH;
             sheet.getCell(startRow + r, startCol).value = `${startH}:${startM}`;
             sheet.getCell(startRow + r, startCol + 1).value = `${endH}:${endM}`;
+            
+            // Những ngày không có bộ phận thì không cần hiện gì hết ở cột bộ phận (để trống)
             const sNameCell = sheet.getCell(startRow + r, startCol + 2);
-            sNameCell.value = shiftName;
+            sNameCell.value = dept ? dept.shortName : '';
+            if (dept) {
+              sNameCell.font = { bold: true };
+            }
             
             const durCell = sheet.getCell(startRow + r, startCol + 3);
             durCell.value = durationH;
@@ -691,10 +693,6 @@ export async function exportWeeklySchedule(
               const currentCell = sheet.getCell(startRow + r, startCol + c);
               currentCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
               currentCell.alignment = { horizontal: 'center', vertical: 'middle' };
-            }
-            
-            if (dept) {
-              sNameCell.font = { bold: true };
             }
           } else {
             sheet.getCell(startRow + r, startCol).value = '-';
@@ -726,9 +724,7 @@ export async function exportWeeklySchedule(
     }
     
     // Col 30: TỔNG SỐ GIỜ TRONG TUẦN
-    if (maxShifts > 1) {
-      sheet.mergeCells(startRow, 30, endRow, 30);
-    }
+    sheet.mergeCells(startRow, 30, endRow, 30);
     const totalCell = sheet.getCell(startRow, 30);
     totalCell.value = totalHoursInWeek;
     totalCell.numFmt = '0.0';
@@ -736,9 +732,7 @@ export async function exportWeeklySchedule(
     totalCell.font = { bold: true };
 
     // Col 31: TỔNG SỐ CA CHỞ HÀNG
-    if (maxShifts > 1) {
-      sheet.mergeCells(startRow, 31, endRow, 31);
-    }
+    sheet.mergeCells(startRow, 31, endRow, 31);
     const deliveryCell = sheet.getCell(startRow, 31);
     deliveryCell.value = memberDeliveryCount;
     deliveryCell.numFmt = '0';
