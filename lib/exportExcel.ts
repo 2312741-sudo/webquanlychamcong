@@ -459,6 +459,93 @@ export async function exportMonthlySalary(
 
 // ─── 4. Xuất Lịch Làm Tuần ─────────────────────────────────────────────────────
 
+function isProductionEntry(entry: string, store: Store, customShifts: ShiftDefinition[]): boolean {
+  const [shiftId, deptId] = entry.includes('|') ? entry.split('|') : [entry, ''];
+  const dept = store.departments?.find(d => d.id === deptId);
+  if (dept) {
+    const sName = (dept.shortName || '').toLowerCase();
+    const name = (dept.name || '').toLowerCase();
+    const id = (dept.id || '').toLowerCase();
+    if (sName.includes('sx') || name.includes('sản xuất') || name.includes('san xuat') || id.includes('sx') || id.includes('production')) {
+      return true;
+    }
+  }
+  const shiftDef = customShifts.find(s => s.id === shiftId) || DEFAULT_SHIFTS.find(s => s.id === shiftId);
+  if (shiftDef) {
+    if ((shiftDef as any).isProduction === true) return true;
+    const name = (shiftDef.name || '').toLowerCase();
+    const id = (shiftDef.id || '').toLowerCase();
+    if (name.includes('sản xuất') || name.includes('san xuat') || id.includes('sx') || id.includes('production')) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function getSlotsForDay(
+  actualShifts: string[],
+  hasProductionInWeek: boolean,
+  maxShifts: number,
+  store: Store,
+  customShifts: ShiftDefinition[]
+): (string | null)[] {
+  const slots: (string | null)[] = new Array(maxShifts).fill(null);
+  if (actualShifts.length === 0) return slots;
+
+  if (hasProductionInWeek) {
+    const prodShifts: string[] = [];
+    const nonProdShifts: string[] = [];
+
+    actualShifts.forEach(entry => {
+      if (isProductionEntry(entry, store, customShifts)) {
+        prodShifts.push(entry);
+      } else {
+        nonProdShifts.push(entry);
+      }
+    });
+
+    if (prodShifts.length > 0 && nonProdShifts.length > 0) {
+      // Has both SX and non-SX on this day
+      slots[0] = prodShifts[0]; // SX always on Row 1
+      slots[1] = nonProdShifts[0]; // Non-SX (ca tối) on Row 2
+      let slotIdx = 2;
+      for (let i = 1; i < prodShifts.length; i++) {
+        if (slotIdx < maxShifts) slots[slotIdx++] = prodShifts[i];
+      }
+      for (let i = 1; i < nonProdShifts.length; i++) {
+        if (slotIdx < maxShifts) slots[slotIdx++] = nonProdShifts[i];
+      }
+    } else if (prodShifts.length > 0) {
+      // Only SX shifts on this day -> Row 1
+      slots[0] = prodShifts[0];
+      for (let i = 1; i < prodShifts.length; i++) {
+        if (i < maxShifts) slots[i] = prodShifts[i];
+      }
+    } else {
+      // Only non-prod (ca tối / ca thường) on this day for SX worker:
+      // "ca tối luôn luôn nằm hàng dưới cho dù không có lịch sx, còn ca sx thì luôn nằm hàng thứ nhất" -> Row 2
+      if (nonProdShifts.length === 1) {
+        slots[1] = nonProdShifts[0]; // Row 2
+      } else {
+        slots[0] = nonProdShifts[0];
+        slots[1] = nonProdShifts[1];
+        for (let i = 2; i < nonProdShifts.length; i++) {
+          if (i < maxShifts) slots[i] = nonProdShifts[i];
+        }
+      }
+    }
+  } else {
+    // Non-production worker: fill sequentially
+    actualShifts.forEach((entry, idx) => {
+      if (idx < maxShifts) {
+        slots[idx] = entry;
+      }
+    });
+  }
+
+  return slots;
+}
+
 export async function exportWeeklySchedule(
   members: Member[],
   schedule: ScheduleModel | null,
@@ -624,15 +711,21 @@ export async function exportWeeklySchedule(
   sortedMembers.forEach(member => {
     const daySchedule = (schedule?.shifts[member.userId] || {}) as Partial<DaySchedule>;
     
-    // 1 nhân viên luôn luôn có tối thiểu 2 hàng giờ công kể cả không có ca sản xuất
-    let maxShifts = 2;
+    // Check if this member has any production shift in the week
+    let hasProductionInWeek = false;
+    let maxShifts = 2; // Always minimum 2 rows per employee
     let memberDeliveryCount = 0;
+
     DAY_KEYS.forEach(key => {
       const shiftsForDay = daySchedule[key as keyof DaySchedule] || [];
       const arr = Array.isArray(shiftsForDay) ? shiftsForDay : (shiftsForDay === 'off' || !shiftsForDay ? [] : [shiftsForDay]);
       const actualArr = arr.filter(id => id && id !== 'delivery' && id !== 'giaohang' && id !== 'off');
       if (actualArr.length > maxShifts) maxShifts = actualArr.length;
       if (arr.includes('delivery') && actualArr.length > 0) memberDeliveryCount++;
+
+      if (!hasProductionInWeek) {
+        hasProductionInWeek = actualArr.some(entry => isProductionEntry(entry, store, customShifts));
+      }
     });
 
     const startRow = currentRow;
@@ -646,17 +739,22 @@ export async function exportWeeklySchedule(
 
     let totalHoursInWeek = 0;
 
+    // Pre-calculate slot assignments for all 7 days for this member
+    const weekSlots: (string | null)[][] = [];
+    for (let i = 0; i < 7; i++) {
+      const dayKey = DAY_KEYS[i];
+      const shiftsForDay = daySchedule[dayKey as keyof DaySchedule] || [];
+      const arr = Array.isArray(shiftsForDay) ? shiftsForDay : (shiftsForDay === 'off' || !shiftsForDay ? [] : [shiftsForDay]);
+      const actualShifts = arr.filter(id => id && id !== 'delivery' && id !== 'giaohang' && id !== 'off');
+      weekSlots.push(getSlotsForDay(actualShifts, hasProductionInWeek, maxShifts, store, customShifts));
+    }
+
     for (let r = 0; r < maxShifts; r++) {
       for (let i = 0; i < 7; i++) {
-        const dayKey = DAY_KEYS[i];
-        const shiftsForDay = daySchedule[dayKey as keyof DaySchedule] || [];
-        const arr = Array.isArray(shiftsForDay) ? shiftsForDay : (shiftsForDay === 'off' || !shiftsForDay ? [] : [shiftsForDay]);
-        const actualShifts = arr.filter(id => id && id !== 'delivery' && id !== 'giaohang' && id !== 'off');
-
         const startCol = 2 + i * 4;
-        
-        if (r < actualShifts.length) {
-          const entry = actualShifts[r];
+        const entry = weekSlots[i][r];
+
+        if (entry) {
           const [shiftId, deptId] = entry.includes('|') ? entry.split('|') : [entry, ''];
           const dept = store.departments?.find(d => d.id === deptId);
           
@@ -672,7 +770,7 @@ export async function exportWeeklySchedule(
             durationH = shiftDef.endHour - shiftDef.startHour + (shiftDef.endMinute - shiftDef.startMinute) / 60;
             if (durationH < 0) durationH += 24;
           }
-          
+
           if (startH && endH) {
             totalHoursInWeek += durationH;
             sheet.getCell(startRow + r, startCol).value = `${startH}:${startM}`;
