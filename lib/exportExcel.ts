@@ -4,6 +4,12 @@ import { Member, AttendanceRecord, ScheduleModel, Store, ShiftDefinition, DaySch
 
 const DAY_KEYS = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
 
+const DEFAULT_SHIFTS: ShiftDefinition[] = [
+  { id: 'morning', name: 'Ca sáng', startHour: 6, startMinute: 0, endHour: 14, endMinute: 0 },
+  { id: 'afternoon', name: 'Ca chiều', startHour: 14, startMinute: 0, endHour: 22, endMinute: 0 },
+  { id: 'evening', name: 'Ca tối', startHour: 22, startMinute: 0, endHour: 6, endMinute: 0 },
+];
+
 const ROLE_LABELS: Record<string, string> = {
   owner: 'Chủ',
   manager1: 'Quản lý 1',
@@ -468,22 +474,24 @@ export async function exportWeeklySchedule(
     return d;
   });
 
-  const customShifts = store.customShifts || [];
+  const customShifts = (store.customShifts && store.customShifts.length > 0)
+    ? store.customShifts
+    : DEFAULT_SHIFTS;
   const themeColor = (store.themeColor || '#C8102E').replace('#', '');
 
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Lịch Làm');
 
-  // Title Row
+  // Title Row (Col 1 to 31 = A1:AE1)
   const titleText = `CÔNG VIỆC THÁNG ${month} NĂM ${year} ${store.name.toUpperCase()}`;
-  sheet.mergeCells('A1:AD1');
+  sheet.mergeCells(1, 1, 1, 31);
   const titleCell = sheet.getCell('A1');
   titleCell.value = titleText;
   titleCell.font = { name: 'Times New Roman', size: 16, bold: true, color: { argb: themeColor } };
   titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
   sheet.getRow(1).height = 30;
 
-  // Header Row 1 (Days)
+  // Header Row 2 & 3: Col 1 (A) - TÍNH CHẤT
   sheet.getCell('A2').value = 'TÍNH CHẤT';
   sheet.mergeCells('A2:A3');
   sheet.getCell('A2').alignment = { horizontal: 'center', vertical: 'middle' };
@@ -495,14 +503,14 @@ export async function exportWeeklySchedule(
   for (let i = 0; i < 7; i++) {
     const startCol = 2 + i * 4;
     
-    // Row 2: Day name
+    // Row 2: Day name (Monday, Tuesday...)
     sheet.mergeCells(2, startCol, 2, startCol + 3);
     const dayCell = sheet.getCell(2, startCol);
     dayCell.value = dayNamesEn[i];
     dayCell.alignment = { horizontal: 'center', vertical: 'middle' };
     dayCell.font = { bold: true };
     
-    // Row 3: Date
+    // Row 3: Date (dd/mm, e.g. 24/08)
     sheet.mergeCells(3, startCol, 3, startCol + 3);
     const dateCell = sheet.getCell(3, startCol);
     const dateStr = `${days[i].getDate().toString().padStart(2, '0')}/${(days[i].getMonth() + 1).toString().padStart(2, '0')}`;
@@ -511,38 +519,126 @@ export async function exportWeeklySchedule(
     dateCell.font = { bold: true };
     
     // Background for day and date
-    for(let r = 2; r <= 3; r++) {
-      for(let c = 0; c < 4; c++) {
+    for (let r = 2; r <= 3; r++) {
+      for (let c = 0; c < 4; c++) {
         sheet.getCell(r, startCol + c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEAEAEA' } };
       }
     }
   }
 
+  // Col 30 (AD): TỔNG SỐ GIỜ TRONG TUẦN
   sheet.getCell(2, 30).value = 'TỔNG SỐ GIỜ\nTRONG TUẦN';
   sheet.mergeCells(2, 30, 3, 30);
   sheet.getCell(2, 30).alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
   sheet.getCell(2, 30).font = { bold: true };
   sheet.getCell(2, 30).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEAEAEA' } };
 
-  let currentRow = 4;
+  // Col 31 (AE): TỔNG SỐ CA CHỞ HÀNG
+  sheet.getCell(2, 31).value = 'TỔNG SỐ CA\nCHỞ HÀNG';
+  sheet.mergeCells(2, 31, 3, 31);
+  sheet.getCell(2, 31).alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  sheet.getCell(2, 31).font = { bold: true };
+  sheet.getCell(2, 31).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEAEAEA' } };
 
   const sortedMembers = sortMembersByOrder(members, store.memberOrder);
+
+  // Pre-calculate daily totals and grand totals
+  const dayTotalHours = [0, 0, 0, 0, 0, 0, 0];
+  let grandTotalHours = 0;
+  let grandTotalDelivery = 0;
+
+  sortedMembers.forEach(member => {
+    const daySchedule = (schedule?.shifts[member.userId] || {}) as Partial<DaySchedule>;
+    DAY_KEYS.forEach((dayKey, i) => {
+      const shiftsForDay = daySchedule[dayKey as keyof DaySchedule] || [];
+      const arr = Array.isArray(shiftsForDay) ? shiftsForDay : (shiftsForDay === 'off' || !shiftsForDay ? [] : [shiftsForDay]);
+      const actualShifts = arr.filter(id => id && id !== 'delivery' && id !== 'giaohang' && id !== 'off');
+
+      actualShifts.forEach(entry => {
+        const [shiftId] = entry.includes('|') ? entry.split('|') : [entry, ''];
+        const shiftDef = customShifts.find(s => s.id === shiftId) || DEFAULT_SHIFTS.find(s => s.id === shiftId);
+        if (shiftDef) {
+          let durationH = shiftDef.endHour - shiftDef.startHour + (shiftDef.endMinute - shiftDef.startMinute) / 60;
+          if (durationH < 0) durationH += 24;
+          dayTotalHours[i] += durationH;
+          grandTotalHours += durationH;
+        }
+      });
+
+      if (arr.includes('delivery') && actualShifts.length > 0) {
+        grandTotalDelivery++;
+      }
+    });
+  });
+
+  // Row 4: "TỔNG CÔNG THEO NGÀY"
+  sheet.getRow(4).height = 24;
+  sheet.getCell('A4').value = 'TỔNG CÔNG THEO NGÀY';
+  sheet.getCell('A4').alignment = { horizontal: 'center', vertical: 'middle' };
+  sheet.getCell('A4').font = { bold: true };
+  sheet.getCell('A4').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEAEAEA' } };
+
+  for (let i = 0; i < 7; i++) {
+    const startCol = 2 + i * 4;
+    sheet.mergeCells(4, startCol, 4, startCol + 3);
+    const daySumCell = sheet.getCell(4, startCol);
+    daySumCell.value = dayTotalHours[i];
+    daySumCell.numFmt = '0.0';
+    daySumCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    daySumCell.font = { bold: true };
+    for (let c = 0; c < 4; c++) {
+      sheet.getCell(4, startCol + c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
+    }
+  }
+
+  // Row 4, Col 30: Grand Total Hours
+  const totalHoursSummaryCell = sheet.getCell(4, 30);
+  totalHoursSummaryCell.value = grandTotalHours;
+  totalHoursSummaryCell.numFmt = '0.0';
+  totalHoursSummaryCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  totalHoursSummaryCell.font = { bold: true };
+  totalHoursSummaryCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEAEAEA' } };
+
+  // Row 4, Col 31: Grand Total Delivery
+  const totalDeliverySummaryCell = sheet.getCell(4, 31);
+  totalDeliverySummaryCell.value = grandTotalDelivery;
+  totalDeliverySummaryCell.numFmt = '0';
+  totalDeliverySummaryCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  totalDeliverySummaryCell.font = { bold: true };
+  totalDeliverySummaryCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEAEAEA' } };
+
+  // Border for header rows (2, 3, 4)
+  for (let r = 2; r <= 4; r++) {
+    for (let c = 1; c <= 31; c++) {
+      sheet.getCell(r, c).border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' },
+      };
+    }
+  }
+
+  let currentRow = 5;
+
   sortedMembers.forEach(member => {
     const daySchedule = (schedule?.shifts[member.userId] || {}) as Partial<DaySchedule>;
     
     let maxShifts = 1;
+    let memberDeliveryCount = 0;
     DAY_KEYS.forEach(key => {
       const shiftsForDay = daySchedule[key as keyof DaySchedule] || [];
-      const arr = Array.isArray(shiftsForDay) ? shiftsForDay : (shiftsForDay === 'off' ? [] : [shiftsForDay]);
-      const actualArr = arr.filter(id => id !== 'delivery' && id !== 'giaohang');
+      const arr = Array.isArray(shiftsForDay) ? shiftsForDay : (shiftsForDay === 'off' || !shiftsForDay ? [] : [shiftsForDay]);
+      const actualArr = arr.filter(id => id && id !== 'delivery' && id !== 'giaohang' && id !== 'off');
       if (actualArr.length > maxShifts) maxShifts = actualArr.length;
+      if (arr.includes('delivery') && actualArr.length > 0) memberDeliveryCount++;
     });
 
     const startRow = currentRow;
     const endRow = currentRow + maxShifts - 1;
 
     if (maxShifts > 1) {
-      sheet.mergeCells(`A${startRow}:A${endRow}`);
+      sheet.mergeCells(startRow, 1, endRow, 1);
     }
     const nameCell = sheet.getCell(`A${startRow}`);
     nameCell.value = member.name.toUpperCase();
@@ -555,8 +651,8 @@ export async function exportWeeklySchedule(
       for (let i = 0; i < 7; i++) {
         const dayKey = DAY_KEYS[i];
         const shiftsForDay = daySchedule[dayKey as keyof DaySchedule] || [];
-        const arr = Array.isArray(shiftsForDay) ? shiftsForDay : (shiftsForDay === 'off' ? [] : [shiftsForDay]);
-        const actualShifts = arr.filter(id => id !== 'delivery' && id !== 'giaohang');
+        const arr = Array.isArray(shiftsForDay) ? shiftsForDay : (shiftsForDay === 'off' || !shiftsForDay ? [] : [shiftsForDay]);
+        const actualShifts = arr.filter(id => id && id !== 'delivery' && id !== 'giaohang' && id !== 'off');
 
         const startCol = 2 + i * 4;
         
@@ -569,7 +665,7 @@ export async function exportWeeklySchedule(
           let startH = '', startM = '', endH = '', endM = '';
           let durationH = 0;
 
-          const shiftDef = customShifts.find(s => s.id === shiftId);
+          const shiftDef = customShifts.find(s => s.id === shiftId) || DEFAULT_SHIFTS.find(s => s.id === shiftId);
           if (shiftDef) {
             shiftName = dept ? dept.shortName : shiftDef.name;
             startH = shiftDef.startHour.toString().padStart(2, '0');
@@ -591,7 +687,7 @@ export async function exportWeeklySchedule(
             durCell.value = durationH;
             durCell.numFmt = '0.0';
             
-            for(let c = 0; c < 4; c++) {
+            for (let c = 0; c < 4; c++) {
               const currentCell = sheet.getCell(startRow + r, startCol + c);
               currentCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
               currentCell.alignment = { horizontal: 'center', vertical: 'middle' };
@@ -599,6 +695,18 @@ export async function exportWeeklySchedule(
             
             if (dept) {
               sNameCell.font = { bold: true };
+            }
+          } else {
+            sheet.getCell(startRow + r, startCol).value = '-';
+            sheet.getCell(startRow + r, startCol + 1).value = '-';
+            sheet.getCell(startRow + r, startCol + 2).value = '-';
+            const emptyDurCell = sheet.getCell(startRow + r, startCol + 3);
+            emptyDurCell.value = 0;
+            emptyDurCell.numFmt = '0.0';
+            for (let c = 0; c < 4; c++) {
+              const currentCell = sheet.getCell(startRow + r, startCol + c);
+              currentCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
+              currentCell.alignment = { horizontal: 'center', vertical: 'middle' };
             }
           }
         } else {
@@ -608,7 +716,7 @@ export async function exportWeeklySchedule(
           const emptyDurCell = sheet.getCell(startRow + r, startCol + 3);
           emptyDurCell.value = 0;
           emptyDurCell.numFmt = '0.0';
-          for(let c = 0; c < 4; c++) {
+          for (let c = 0; c < 4; c++) {
             const currentCell = sheet.getCell(startRow + r, startCol + c);
             currentCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
             currentCell.alignment = { horizontal: 'center', vertical: 'middle' };
@@ -617,6 +725,7 @@ export async function exportWeeklySchedule(
       }
     }
     
+    // Col 30: TỔNG SỐ GIỜ TRONG TUẦN
     if (maxShifts > 1) {
       sheet.mergeCells(startRow, 30, endRow, 30);
     }
@@ -626,10 +735,23 @@ export async function exportWeeklySchedule(
     totalCell.alignment = { horizontal: 'center', vertical: 'middle' };
     totalCell.font = { bold: true };
 
+    // Col 31: TỔNG SỐ CA CHỞ HÀNG
+    if (maxShifts > 1) {
+      sheet.mergeCells(startRow, 31, endRow, 31);
+    }
+    const deliveryCell = sheet.getCell(startRow, 31);
+    deliveryCell.value = memberDeliveryCount;
+    deliveryCell.numFmt = '0';
+    deliveryCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    deliveryCell.font = { bold: true };
+
     for (let r = startRow; r <= endRow; r++) {
-      for (let c = 1; c <= 30; c++) {
+      for (let c = 1; c <= 31; c++) {
         sheet.getCell(r, c).border = {
-          top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'}
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' },
         };
       }
     }
@@ -637,20 +759,16 @@ export async function exportWeeklySchedule(
     currentRow += maxShifts;
   });
 
-  for (let c = 1; c <= 30; c++) {
-    sheet.getCell(2, c).border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-    sheet.getCell(3, c).border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-  }
-
   sheet.getColumn(1).width = 25;
   for (let i = 0; i < 7; i++) {
     const startCol = 2 + i * 4;
     sheet.getColumn(startCol).width = 7;
     sheet.getColumn(startCol + 1).width = 7;
-    sheet.getColumn(startCol + 2).width = 6;
+    sheet.getColumn(startCol + 2).width = 7;
     sheet.getColumn(startCol + 3).width = 6;
   }
-  sheet.getColumn(30).width = 15;
+  sheet.getColumn(30).width = 16;
+  sheet.getColumn(31).width = 16;
 
   // Filename formatting
   const storePart = sanitize(store.name);

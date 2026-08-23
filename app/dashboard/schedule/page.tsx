@@ -146,7 +146,7 @@ export default function SchedulePage() {
       weekStart: currentWeek,
       shifts: shifts
     };
-    exportWeeklySchedule(activeMembers, currentSchedule, currentWeek, store);
+    exportWeeklySchedule(visibleMembers, currentSchedule, currentWeek, store);
   };
 
   const openModal = (userId: string, dayKey: keyof DaySchedule, memberName: string, dateLabel: string) => {
