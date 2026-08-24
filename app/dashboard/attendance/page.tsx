@@ -3,11 +3,13 @@ import { useState, useEffect } from 'react';
 import { useApp } from '../layout';
 import { getMonthAttendances, editAttendance, createManualAttendance, getSchedulesInRange, getAttendancesInRange } from '@/lib/firestore';
 import { exportMonthlyAttendance, exportDetailedInOut } from '@/lib/exportExcel';
-import { AttendanceRecord, ScheduleModel } from '@/lib/types';
+import { AttendanceRecord, ScheduleModel, canViewAllAttendance, canEditAttendance } from '@/lib/types';
 import ExportModal from '../components/ExportModal';
 
 export default function AttendancePage() {
-  const { storeId, members, user, store } = useApp();
+  const { storeId, members, user, store, role } = useApp();
+  const canView = canViewAllAttendance(role);
+  const canEdit = canEditAttendance(role);
   const [currentMonth, setCurrentMonth] = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -118,6 +120,7 @@ export default function AttendancePage() {
   };
 
   const openEditModal = (userId: string, date: string, att?: AttendanceRecord) => {
+    if (!canEdit) return;
     setEditingCell({ userId, date, att });
     if (att) {
       const ci = att.checkIn ? new Date(att.checkIn.seconds ? att.checkIn.seconds * 1000 : att.checkIn) : null;
@@ -135,6 +138,10 @@ export default function AttendancePage() {
   };
 
   const saveEdit = async () => {
+    if (!canEdit) {
+      alert('Bạn không có quyền chỉnh sửa giờ công của nhân viên.');
+      return;
+    }
     if (!editingCell || !storeId) return;
     if (!editForm.checkInTime || !editForm.checkOutTime) {
       alert('Vui lòng nhập giờ vào và giờ ra');
@@ -172,6 +179,16 @@ export default function AttendancePage() {
       alert('Lỗi khi lưu');
     }
   };
+
+  if (!canView) {
+    return (
+      <div className="card text-center p-8">
+        <div style={{ fontSize: 40, marginBottom: 12 }}>🔒</div>
+        <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--primary)', marginBottom: 6 }}>Không có quyền truy cập</h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Quản lý 2 không có quyền xem hoặc sửa bảng chấm công của nhân viên khác.</p>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>

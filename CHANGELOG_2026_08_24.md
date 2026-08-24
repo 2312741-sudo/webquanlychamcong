@@ -84,8 +84,12 @@
    - Xử lý mở thông báo khi app ở Background (`onMessageOpenedApp`), Foreground (`onDidReceiveNotificationResponse`), và Cold Start (`getInitialMessage` + `SplashScreen`).
    - Người dùng chạm vào thông báo trên màn hình khóa hoặc thanh thông báo sẽ tự động được điều hướng vào màn hình Thông báo (`/notifications`) để xem đầy đủ chi tiết.
 
+7. **NÂNG CẤP PHÂN QUYỀN: Khóa quyền Xem & Sửa Bảng chấm công đối với Quản lý 2:**
+   - **Tắt tính năng Sửa giờ vào/ra:** Cấu hình `AppPermissions.canEditAttendance` chặn `manager2`, ẩn nút "Sửa giờ vào/ra", "Thêm chấm công" và chặn lưu chỉnh sửa công.
+   - **Tắt tính năng Xem bảng chấm công:** Cấu hình `AppPermissions.canViewAllAttendance` chặn `manager2`, ẩn thẻ công cụ "Bảng chấm công" trên Manager Dashboard, chặn truy cập vào màn hình Bảng công (`/attendance-table`) và chặn xem lịch sử công của nhân sự khác trên cả Mobile App và Web Dashboard.
+
 ---
 
 ## 🧪 KẾT QUẢ KIỂM THỬ HỆ THỐNG
-- **Mobile App (`cham_cong_tram`):** Vượt qua toàn bộ **62/62 test cases (0 lỗi)** (`All tests passed!`). `flutter analyze` 0 errors.
+- **Mobile App (`cham_cong_tram`):** Vượt qua toàn bộ **66/66 test cases (0 lỗi)** (`All tests passed!`). `flutter analyze` 0 errors.
 - **Web Dashboard (`cham_cong_web`):** Lệnh `npm run build` thành công 100% (`Compiled successfully, 12/12 static pages generated`).

@@ -41,6 +41,16 @@ export function canApproveMembers(role?: UserRole | string | null): boolean {
   return norm === 'owner' || norm === 'manager1';
 }
 
+export function canEditAttendance(role?: UserRole | string | null): boolean {
+  const norm = normalizeRole(role);
+  return norm === 'owner' || norm === 'manager1';
+}
+
+export function canViewAllAttendance(role?: UserRole | string | null): boolean {
+  const norm = normalizeRole(role);
+  return norm === 'owner' || norm === 'manager1';
+}
+
 export function canAccessWeb(role?: UserRole | string | null): boolean {
   const norm = normalizeRole(role);
   return norm === 'owner' || norm === 'manager1' || norm === 'manager2';
