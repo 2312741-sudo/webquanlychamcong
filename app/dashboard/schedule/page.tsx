@@ -215,7 +215,7 @@ export default function SchedulePage() {
         };
       }
 
-      await saveWeekSchedule(storeId, currentWeek, sanitizedShifts);
+      await saveWeekSchedule(storeId, currentWeek, sanitizedShifts, user?.uid);
       const data = await getWeekSchedule(storeId, currentWeek);
       setScheduleData(data);
       setShifts(data?.shifts || {});
@@ -273,6 +273,8 @@ export default function SchedulePage() {
     return store?.themeColor || 'var(--primary)';
   };
 
+  // LƯU Ý: Thống kê giờ công dự kiến tính theo LỊCH ĐÃ XẾP (shifts) của tuần được chọn
+  // (không phải giờ chấm công thực tế attendances, để quản lý tiện đối chiếu định mức xếp ca).
   const calculateDayHours = (shiftIds: string[] | string | undefined): number => {
     if (!shiftIds) return 0;
     const arr = Array.isArray(shiftIds) ? shiftIds : (shiftIds === 'off' || !shiftIds ? [] : [shiftIds]);

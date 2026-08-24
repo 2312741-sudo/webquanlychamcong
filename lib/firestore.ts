@@ -346,7 +346,10 @@ export function watchAdvances(storeId: string, month: string, cb: (advances: Adv
 
 
 export async function saveWeekSchedule(
-  storeId: string, weekStart: string, shifts: Record<string, DaySchedule>
+  storeId: string,
+  weekStart: string,
+  shifts: Record<string, DaySchedule>,
+  updatedBy?: string
 ): Promise<void> {
   const scheduleRef = doc(db, 'stores', storeId, 'schedules', weekStart);
   await setDoc(scheduleRef, {
@@ -354,6 +357,7 @@ export async function saveWeekSchedule(
     weekStart,
     shifts,
     updatedAt: Timestamp.now(),
+    ...(updatedBy ? { updatedBy } : {}),
   }, { merge: true });
 }
 
