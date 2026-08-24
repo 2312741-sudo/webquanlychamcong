@@ -345,6 +345,7 @@ export function watchAdvances(storeId: string, month: string, cb: (advances: Adv
 }
 
 
+
 export async function saveWeekSchedule(
   storeId: string,
   weekStart: string,
@@ -352,13 +353,26 @@ export async function saveWeekSchedule(
   updatedBy?: string
 ): Promise<void> {
   const scheduleRef = doc(db, 'stores', storeId, 'schedules', weekStart);
-  await setDoc(scheduleRef, {
-    storeId,
-    weekStart,
-    shifts,
-    updatedAt: Timestamp.now(),
-    ...(updatedBy ? { updatedBy } : {}),
-  }, { merge: true });
+  try {
+    const snap = await getDoc(scheduleRef);
+    const existingShifts = snap.exists() ? (snap.data().shifts || {}) : {};
+    const mergedShifts = { ...existingShifts, ...shifts };
+    await setDoc(scheduleRef, {
+      storeId,
+      weekStart,
+      shifts: mergedShifts,
+      updatedAt: Timestamp.now(),
+      ...(updatedBy ? { updatedBy } : {}),
+    }, { merge: true });
+  } catch (_) {
+    await setDoc(scheduleRef, {
+      storeId,
+      weekStart,
+      shifts,
+      updatedAt: Timestamp.now(),
+      ...(updatedBy ? { updatedBy } : {}),
+    }, { merge: true });
+  }
 }
 
 export async function updateStore(storeId: string, data: Record<string, any>) {

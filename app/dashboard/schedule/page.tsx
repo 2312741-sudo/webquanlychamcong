@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useApp } from '../layout';
-import { getWeekSchedule, saveWeekSchedule, updateMemberOrder, toggleHideMemberSchedule } from '@/lib/firestore';
+import { getWeekSchedule, watchWeekSchedule, saveWeekSchedule, updateMemberOrder, toggleHideMemberSchedule } from '@/lib/firestore';
 import { exportWeeklySchedule } from '@/lib/exportExcel';
 import { ScheduleModel, DaySchedule, ShiftDefinition, getRoleLabel, canManageSchedule, canManageDelivery, normalizeRole, sortMembersByOrder } from '@/lib/types';
 
@@ -83,10 +83,8 @@ export default function SchedulePage() {
       return;
     }
     setLoading(true);
-    let isCancelled = false;
 
-    getWeekSchedule(storeId, currentWeek).then(data => {
-      if (isCancelled) return;
+    const unsubscribe = watchWeekSchedule(storeId, currentWeek, (data) => {
       setScheduleData(data);
       
       const loadedShifts = data?.shifts || {};
@@ -115,15 +113,11 @@ export default function SchedulePage() {
       }
       
       setShifts(cleanShifts);
-    }).catch(err => {
-      if (isCancelled) return;
-      console.error('Error fetching schedule:', err);
-    }).finally(() => {
-      if (!isCancelled) setLoading(false);
+      setLoading(false);
     });
 
     return () => {
-      isCancelled = true;
+      unsubscribe();
     };
   }, [storeId, currentWeek]);
 

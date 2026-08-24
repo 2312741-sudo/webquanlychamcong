@@ -1,4 +1,4 @@
-﻿# BÁO CÁO CẬP NHẬT TÍNH NĂNG & NHẬT KÝ THAY ĐỔI (CHANGELOG)
+# BÁO CÁO CẬP NHẬT TÍNH NĂNG & NHẬT KÝ THAY ĐỔI (CHANGELOG)
 **Ngày cập nhật:** 24/08/2026  
 **Phiên bản:** `v1.0.4` (Mobile App: `1.0.4+5`, Web Dashboard: `1.0.4`)  
 **Tác giả:** Nguyễn Thanh Tâm ([nthanhtam.402@gmail.com](mailto:nthanhtam.402@gmail.com))  
@@ -57,6 +57,35 @@
 
 ---
 
+---
+
+### 5. [HOTFIX v1.0.4-patch] Sửa 5 Lỗi Hệ Thống & Nâng Cấp Luồng Thông Báo Mở Chi Tiết
+
+1. **LỖI 1: Checklist Sản Xuất cho phép nhập số thập phân:**
+   - Cấu hình `inputFormatters` chấp nhận số, dấu chấm `.`, dấu phẩy `,` (`[\d.,]`).
+   - Tự động chuẩn hóa dấu phẩy thành dấu chấm trước khi parse sang `double`, cho phép nhập liệu linh hoạt (`2,5`, `0.75`, `12,5`...).
+
+2. **LỖI 2: Khắc phục triệt để mất dữ liệu đăng ký lịch làm:**
+   - **Repository Mobile:** Bổ sung `SetOptions(merge: true)` cho `setFullSchedule` để bảo toàn lịch tự đăng ký của nhân viên khác.
+   - **Web Dashboard:** Tự động nạp và merge dữ liệu Firestore mới nhất trước khi lưu; đồng thời chuyển sang `watchWeekSchedule` (real-time stream).
+   - **Navigation:** Router và màn hình Quản lý lịch hỗ trợ tham số `initialWeekStart`, điều hướng chính xác vào tuần nhân viên đăng ký khi nhấn vào thông báo.
+
+3. **LỖI 3: Khắc phục lệch 7 tiếng múi giờ:**
+   - Thêm `.toLocal()` tại Box "Đang làm việc" ở Owner Dashboard, Manager Dashboard, thẻ chấm công cá nhân của Chủ quán và màn hình Lịch sử chấm công.
+
+4. **LỖI 4: Chi tiết hóa toàn bộ nội dung Push Notification:**
+   - Cập nhật các hàm Cloud Function với nội dung tường minh: tên nhân viên, tên cửa hàng, format tiền tệ VNĐ chuẩn (`500.000đ`), thời gian ca và khoảng ngày tuần.
+   - Bổ sung trigger `onNotificationCreated` tự động bắn push notification khi có thông báo in-app mới.
+
+5. **TASK 5: Khắc phục lỗi mất dữ liệu ca làm xuyên đêm (Cross-Midnight):**
+   - Thêm `watchActiveAttendance` và sửa `checkOut` truy vấn theo `checkOut == null` (không bị chặn bởi `date == today`), duy trì trạng thái "Đang làm việc" và tính toán số giờ công chính xác khi bước qua 00:00.
+
+6. **TÍNH NĂNG MỚI: Luồng chạm thông báo ngoài màn hình -> Mở chi tiết trong App:**
+   - Xử lý mở thông báo khi app ở Background (`onMessageOpenedApp`), Foreground (`onDidReceiveNotificationResponse`), và Cold Start (`getInitialMessage` + `SplashScreen`).
+   - Người dùng chạm vào thông báo trên màn hình khóa hoặc thanh thông báo sẽ tự động được điều hướng vào màn hình Thông báo (`/notifications`) để xem đầy đủ chi tiết.
+
+---
+
 ## 🧪 KẾT QUẢ KIỂM THỬ HỆ THỐNG
-- **Mobile App (`cham_cong_tram`):** Vượt qua toàn bộ **55/55 test cases (0 lỗi)** (`All tests passed!`). `flutter analyze` 0 errors.
-- **Web Dashboard (`cham_cong_web`):** Lệnh `npm run build` thành công 100% không có cảnh báo/lỗi (`Compiled successfully, 12/12 static pages generated`).
+- **Mobile App (`cham_cong_tram`):** Vượt qua toàn bộ **62/62 test cases (0 lỗi)** (`All tests passed!`). `flutter analyze` 0 errors.
+- **Web Dashboard (`cham_cong_web`):** Lệnh `npm run build` thành công 100% (`Compiled successfully, 12/12 static pages generated`).
