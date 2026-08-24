@@ -33,8 +33,9 @@
 │ • Xem bảng lương & Lịch thu nhập      │   │ • Xếp lịch làm việc trực quan         │
 │ • Gửi yêu cầu ứng lương               │   │ • Cấu hình ca, WiFi, GPS & Chi nhánh  │
 │ • Checklist & Báo cáo ca Sản Xuất (SX)│   │ • Quản lý Checklist & Hiệu suất SX    │
-│ • Thông báo Real-time & Sinh nhật 🎂  │   │ • Xuất báo cáo Excel chuyên nghiệp    │
+│ • Thông báo Push FCM & Sinh nhật 🎂   │   │ • Xuất báo cáo Excel chuyên nghiệp    │
 │ • Chấm công cho Chủ & Quản lý         │   │ • Sắp xếp thứ tự & Ẩn lịch linh hoạt  │
+│ • Avatar đồng bộ toàn hệ thống        │   │ • Live Stream đồng bộ với Mobile      │
 └───────────────────────────────────────┘   └───────────────────────────────────────┘
 ```
 
@@ -46,12 +47,18 @@
 - **Ngôn ngữ & SDK**: Dart 3.6+ / Flutter 3.29+
 - **Kiến trúc mã nguồn**: Clean Feature-first Architecture kết hợp Repository Pattern.
 - **Quản lý trạng thái (State Management)**: `flutter_riverpod: ^2.6.1` (`Notifier`, `StreamProvider`, `FutureProvider`).
-- **Điều hướng (Routing)**: `go_router: ^14.3.0` với declarative routes và `GoRouterRefreshStream` lắng nghe thay đổi xác thực tức thì.
+- **Điều hướng (Routing)**: `go_router: ^14.3.0` kết hợp `rootNavigatorKey` toàn cục phục vụ điều hướng thông báo đẩy tức thì.
 - **Xác thực (Authentication)**: Firebase Auth hỗ trợ Email/Password, **Google Sign-In** (`google_sign_in`), **Apple Sign-In** (`sign_in_with_apple`).
+- **Push Notification & FCM Lifecycle**:
+  - `firebase_messaging: ^15.1.3` & `flutter_local_notifications: ^18.0.1`.
+  - Hỗ trợ đầy đủ 3 trạng thái click: **Cold Start** (`getInitialMessage`), **Background** (`onMessageOpenedApp`), **Foreground** (`onDidReceiveNotificationResponse`).
+  - Native iOS APNs bridge trong `AppDelegate.swift` (`Messaging.messaging().apnsToken = deviceToken`).
+  - Android Notification Channel: `cham_cong_notifications` ("Thông báo Chấm Công").
 - **Phần cứng & Thiết bị ngoại vi**:
   - `geolocator: ^13.0.1`: Tính toán khoảng cách tọa độ GPS Haversine theo bán kính cửa hàng.
   - `network_info_plus: ^6.0.1`: Xác thực tên mạng Wi-Fi (SSID), BSSID và IP Gateway.
   - `mobile_scanner: ^6.0.11`: Quét mã QR Code động điểm danh tại cửa hàng.
+  - `image_picker: ^1.1.2`: Chụp ảnh & chọn ảnh đại diện từ thư viện.
   - `table_calendar: ^3.1.2` & `fl_chart: ^0.69.0`: Lịch chấm công & biểu đồ thu nhập.
   - `excel: ^4.0.6`, `path_provider`, `open_filex`, `share_plus`: Xuất và chia sẻ file Excel trực tiếp từ điện thoại.
 
@@ -63,14 +70,12 @@
 
 ### 2.3. Dịch Vụ Đám Mây (Backend & Database)
 - **Cơ sở dữ liệu**: Cloud Firestore (NoSQL, mô hình Document-Subcollection).
-- **Lưu trữ tệp tin**: Firebase Storage (ảnh đại diện, hóa đơn).
-- **Thông báo**: Firebase Cloud Messaging (FCM) + In-app Real-time Notification Collection.
+- **Lưu trữ tệp tin**: Firebase Storage (`storage.rules`) cho ảnh đại diện (`avatars/{userId}.jpg`).
+- **Cloud Functions**: Node.js Firebase Functions v2 (`onScheduleChanged`, `onAdvanceCreated`, `onAdvanceUpdated`, `shiftReminders`, `onNotificationCreated`).
 
 ---
 
 ## 3. CƠ SỞ DỮ LIỆU CLOUD FIRESTORE (DATA SCHEMAS & MODELS)
-
-Hệ thống sử dụng cấu trúc cây thư mục Firestore chuẩn mực như sau:
 
 ```
 cloud_firestore
@@ -94,6 +99,8 @@ cloud_firestore
 | `name` | `string` | Họ và tên hiển thị |
 | `email` | `string` | Địa chỉ email đăng nhập |
 | `phone` | `string?` | Số điện thoại liên hệ |
+| `avatarUrl` | `string?` | URL ảnh đại diện trên Firebase Storage |
+| `fcmToken` | `string?` | Token thiết bị nhận push notifications |
 | `birthday` | `string?` / `Timestamp` | Ngày sinh (phục vụ tự động chúc mừng sinh nhật 🎂) |
 | `currentStoreId` | `string?` | ID cửa hàng đang được kích hoạt làm việc |
 | `storeIds` | `string[]` | Danh sách tất cả cửa hàng mà người dùng đã tham gia |
@@ -114,7 +121,7 @@ cloud_firestore
 | `departments` | `Department[]` | Danh sách bộ phận (`id`, `name`, `shortName` e.g. `SX`, `BH`, `KHO`) |
 | `deliveryAllowance` | `number` | Mức phụ cấp mỗi ca chở hàng (VNĐ) |
 | `giaoHangAllowance` | `number` | Mức phụ cấp mỗi ca giao hàng (VNĐ) |
-| `memberOrder` | `string[]` | Mảng chứa danh sách `userId` quy định **thứ tự hiển thị nhân viên tùy chỉnh** do Chủ quán kéo thả |
+| `memberOrder` | `string[]` | Mảng chứa danh sách `userId` quy định **thứ tự hiển thị nhân viên tùy chỉnh** do Chủ quán sắp xếp |
 | `hiddenScheduleUserIds` | `string[]` | Mảng các `userId` **bị ẩn lịch** trên Lịch chung của cửa hàng |
 | `deletePassword` | `string` | Mật khẩu bảo mật dùng khi xóa dữ liệu hoặc xóa cửa hàng |
 | `themeColor` | `string?` | Mã màu HEX thương hiệu cửa hàng |
@@ -125,6 +132,7 @@ cloud_firestore
 | `userId` | `string` | UID của thành viên |
 | `name` | `string` | Tên thành viên |
 | `phone` | `string?` | Số điện thoại |
+| `avatarUrl` | `string?` | URL ảnh đại diện đồng bộ tức thì |
 | `role` | `string` | Vai trò: `'owner'` \| `'manager1'` (`'manager_1'`) \| `'manager2'` (`'manager_2'`) \| `'employee'` |
 | `status` | `string` | Trạng thái: `'active'` (đang hoạt động) \| `'pending'` (chờ duyệt) \| `'kicked'` (đã xóa) |
 | `employeeType` | `string` | Loại hợp đồng: `'fulltime'` (lương tháng) \| `'parttime'` (lương giờ) |
@@ -140,8 +148,8 @@ cloud_firestore
 | `id` | `string` | Mã bản ghi chấm công |
 | `userId` | `string` | UID nhân viên chấm công |
 | `date` | `string` | Ngày chấm công (`YYYY-MM-DD`) |
-| `checkIn` | `Timestamp` | Thời điểm bấm vào ca |
-| `checkOut` | `Timestamp?` | Thời điểm bấm ra ca (null nếu đang trong ca) |
+| `checkIn` | `Timestamp` | Thời điểm bấm vào ca (UTC) |
+| `checkOut` | `Timestamp?` | Thời điểm bấm ra ca (UTC, null nếu đang trong ca) |
 | `checkInMethod` | `string` | Phương thức: `'wifi'` \| `'gps'` \| `'qr'` \| `'manual'` |
 | `totalHours` | `number` | Tổng số giờ làm việc thực tế tính được |
 | `isEdited` | `boolean` | Cờ đánh dấu đã qua chỉnh sửa thủ công |
@@ -155,60 +163,29 @@ cloud_firestore
 | `storeId` | `string` | ID cửa hàng |
 | `weekStart` | `string` | Ngày Thứ Hai đầu tuần (`YYYY-MM-DD`) |
 | `shifts` | `Record<userId, DaySchedule>` | Bản đồ ca trực trong tuần của từng nhân viên (`monday`, `tuesday`...`sunday` chứa mảng các mã ca như `['morning|deptId', 'delivery']`) |
-
-#### 6. Subcollection `/stores/{storeId}/advances/{advanceId}`
-| Trường (Field) | Kiểu dữ liệu | Mô tả |
-| :--- | :--- | :--- |
-| `id` | `string` | ID yêu cầu |
-| `userId` | `string` | UID nhân viên xin tạm ứng |
-| `month` | `string` | Tháng tạm ứng (`YYYY-MM`) |
-| `amount` | `number` | Số tiền xin tạm ứng (VNĐ) |
-| `status` | `string` | Trạng thái: `'pending'` (chờ duyệt) \| `'approved'` (đã duyệt) \| `'rejected'` (từ chối) |
-| `requestDate` | `string` | Ngày tạo yêu cầu |
-| `approvedDate` | `string?` | Ngày được xét duyệt |
-| `note` | `string?` | Ghi chú / lý do tạm ứng |
-
-#### 7. Subcollection `/stores/{storeId}/production_tasks/{taskId}`
-| Trường (Field) | Kiểu dữ liệu | Mô tả |
-| :--- | :--- | :--- |
-| `id` | `string` | ID đầu việc |
-| `name` | `string` | Tên đầu việc (VD: *Nấu trà sen*, *Rửa bình ủ*, *Vệ sinh sàn*) |
-| `hasUnit` | `boolean` | Có sử dụng đơn vị đo lường hay là checklist thuần túy |
-| `unit` | `string` | Kiểu đơn vị: `'custom'` \| `'none'` |
-| `unitLabel` | `string` | Nhãn đơn vị đo lường tùy chỉnh (VD: *Kg*, *Phút*, *Thùng*, *Ly*, *Hộp*, *Gói*, *Bao*, *Cái*...) |
-| `order` | `number` | Thứ tự sắp xếp hiển thị do Chủ quán cấu hình |
-| `active` | `boolean` | Trạng thái kích hoạt đầu việc |
-
-#### 8. Subcollection `/stores/{storeId}/production_reports/{reportId}`
-| Trường (Field) | Kiểu dữ liệu | Mô tả |
-| :--- | :--- | :--- |
-| `id` | `string` | ID báo cáo ca sản xuất |
-| `userId` | `string` | UID nhân viên nộp báo cáo |
-| `memberName` | `string` | Tên nhân viên |
-| `date` | `string` | Ngày báo cáo (`YYYY-MM-DD`) |
-| `shiftName` | `string` | Tên ca làm việc |
-| `checkoutTime` | `Timestamp` | Thời gian bấm ra ca |
-| `tasks` | `ProductionTaskEntry[]` | Mảng kết quả thực hiện (`taskId`, `taskName`, `unitLabel`, `value`) |
-| `note` | `string?` | Ghi chú phát sinh trong ca |
+| `updatedBy` | `string?` | UID của người cập nhật lịch gần nhất (Audit log) |
+| `updatedAt` | `Timestamp?` | Thời gian cập nhật gần nhất |
 
 ---
 
 ## 4. MA TRẬN PHÂN QUYỀN VAI TRÒ (RBAC MATRIX)
 
-Hệ thống phân cấp chặt chẽ thành **4 vai trò độc lập**:
+Hệ thống phân cấp chặt chẽ thành **4 vai trò độc lập** (`AppPermissions` trên Mobile & `can*` trên Web):
 
 | Chức năng / Quyền hạn | 👑 Chủ Cửa Hàng (`owner`) | 👔 Quản Lý 1 (`manager1`) | 👔 Quản Lý 2 (`manager2`) | 👤 Nhân Viên (`employee`) |
 | :--- | :---: | :---: | :---: | :---: |
 | **Truy cập Web Dashboard** | ✅ Toàn quyền | ✅ Lịch làm, Bảng công, Duyệt NV | ✅ Chỉ xem Lịch làm | ❌ Không có quyền |
 | **Chấm công qua Mobile (WiFi/GPS/QR)** | ✅ Có | ✅ Có | ✅ Có | ✅ Có |
 | **Xếp & Sửa Lịch làm việc tuần** | ✅ Toàn quyền | ✅ Toàn quyền | ❌ Chỉ xem | ❌ Đăng ký nguyện vọng |
+| **Xếp / Tick phụ cấp Chở & Giao hàng**| ✅ Toàn quyền | ✅ Có | ✅ Có | ❌ Không |
 | **Duyệt thành viên mới xin vào quán** | ✅ Có | ✅ Có | ❌ Không | ❌ Không |
+| **Xem bảng chấm công toàn bộ NV** | ✅ Có | ✅ Có | ❌ **(ĐÃ KHÓA)** | ❌ |
+| **Sửa giờ in/out công của NV** | ✅ Toàn quyền | ✅ Có | ❌ **(ĐÃ KHÓA)** | ❌ |
 | **Kéo thả đổi thứ tự nhân viên (`memberOrder`)** | ✅ Toàn quyền | ❌ Theo thứ tự của Chủ | ❌ Theo thứ tự của Chủ | ❌ Theo thứ tự của Chủ |
 | **Bật/tắt Ẩn lịch nhân viên (`hiddenScheduleUserIds`)** | ✅ Toàn quyền | ❌ Không thấy NV bị ẩn | ❌ Không thấy NV bị ẩn | ❌ Không thấy NV bị ẩn |
 | **Quản lý danh mục Checklist & Thứ tự SX** | ✅ Toàn quyền | ❌ Chỉ xem | ❌ Chỉ xem | ❌ Nộp báo cáo khi out ca |
 | **Duyệt yêu cầu Tạm ứng lương** | ✅ Toàn quyền | ❌ Không | ❌ Không | ❌ Gửi yêu cầu |
 | **Chỉnh sửa Bảng lương & Hợp đồng** | ✅ Toàn quyền | ❌ Không | ❌ Không | ❌ Xem lương cá nhân |
-| **Sửa giờ công thủ công (Edit IN/OUT)** | ✅ Toàn quyền | ❌ Không | ❌ Không | ❌ Không |
 | **Cài đặt cửa hàng (WiFi, GPS, Ca, Xóa quán)**| ✅ Toàn quyền | ❌ Không | ❌ Không | ❌ Không |
 | **Xuất báo cáo Excel (Bảng công, Lương, Lịch)**| ✅ Toàn quyền | ✅ Theo phân quyền | ❌ Không | ❌ Không |
 
@@ -216,88 +193,47 @@ Hệ thống phân cấp chặt chẽ thành **4 vai trò độc lập**:
 
 ## 5. CÁC QUY TRÌNH NGHIỆP VỤ CỐT LÕI (CORE BUSINESS LOGIC)
 
-### 5.1. Quy Trình Chấm Công Đa Kênh (Check-In / Check-Out)
-1. **Chấm công qua Wi-Fi**: Thiết bị đọc SSID/BSSID hiện tại và đối chiếu với danh sách tối đa **10 điểm WiFi** được cấu hình trong `stores/{storeId}.wifis`.
-2. **Chấm công qua GPS**: Thiết bị lấy tọa độ hiện tại qua Geolocator, tính khoảng cách tới `(latitude, longitude)` của quán. Hợp lệ nếu `khoangCach <= radiusMeters`.
-3. **Chấm công qua QR Code**: Quét mã QR động của cửa hàng để xác thực tại chỗ.
-4. **Tính toán giờ công**:
-   - Tự động tính toán tổng số giờ làm `totalHours = (checkOut - checkIn) / 3600000`.
-   - **Xử lý ca xuyên đêm (Cross-midnight)**: Khi ca làm việc bắt đầu từ `22:00` tối hôm nay và kết thúc vào `06:00` sáng hôm sau, hệ thống tính toán chính xác 8.0 giờ mà không bị âm thời gian.
+### 5.1. Quy Trình Chấm Công Đa Kênh & Ca Xuyên Đêm (Cross-Midnight)
+1. **Chấm công đa phương thức**: Hỗ trợ WiFi (so khớp tối đa 10 IP/SSID), GPS (bán kính `radiusMeters`) và QR Code động.
+2. **Cơ chế ca xuyên đêm (Cross-Midnight Persistence)**:
+   - Hệ thống truy vấn trạng thái làm việc qua `watchActiveAttendance(storeId, userId)`: Tìm bản ghi có `checkOut == null` (không bị giới hạn cứng bởi ngày `date == today`).
+   - Khi nhân viên vào ca lúc `22:00` tối hôm nay và checkout lúc `06:00` sáng hôm sau, trạng thái "Đang làm việc" vẫn duy trì nguyên vẹn và số giờ công được tính chính xác là 8.0 giờ.
 
-### 5.2. Quy Trình Báo Cáo Checklist Sản Xuất (SX Checklist Trigger)
-- **Cơ chế nhận diện tự động**:
-  - Khi nhân viên bấm **Chấm Ra Ca (Check-out)** trên Mobile App, hệ thống kiểm tra lịch làm hôm nay của nhân viên đó.
-  - Nếu trong ca trực có gán bộ phận Sản Xuất (`shortName == 'SX'`), app tự động bật BottomSheet/Modal yêu cầu hoàn thành Checklist Sản Xuất trước khi kết thúc ca.
-- **Tính linh hoạt của đơn vị đo lường**:
-  - Đơn vị đo lường là tùy chọn (`hasUnit: boolean`).
-  - Nếu tắt đơn vị đo lường: Đầu việc hoạt động như checklist thuần túy (chỉ cần tích chọn `✓ Đã hoàn thành`, hệ thống tự ghi nhận `value = 1.0`).
-  - Nếu bật đơn vị đo lường: Chủ quán có thể tùy ý gán nhãn đơn vị tự do (*Kg*, *Phút*, *Sản phẩm*, *Ca*, *Gói*, *Thùng*, *Ly*, *Hộp*, *Bao*, *Cái*...) và nhân viên nhập số lượng thực tế đạt được.
+### 5.2. Quy Trình Báo Cáo Checklist Sản Xuất (SX Checklist)
+- **Kích hoạt tự động khi Checkout**: Nếu ca trực hôm nay có gán bộ phận Sản Xuất (`shortName == 'SX'`), app tự động mở modal Checklist Sản Xuất trước khi cho phép ra ca.
+- **Hỗ trợ số thập phân linh hoạt**: Ô nhập số lượng chấp nhận cả dấu chấm `.` và dấu phẩy `,` (`2,5`, `0.75`, `12,5` kg). Hệ thống tự động chuẩn hóa sang định dạng `double` chuẩn trước khi lưu Firestore.
 
-### 5.3. Quy Trình Tính Lương & Tạm Ứng
-- **Nhân viên Toàn thời gian (Full-time)**:
-  $$\text{Lương Thực Nhận} = \left(\text{Lương Cơ Bản} \times \frac{\text{Tổng Giờ Làm}}{\text{Giờ Chuẩn (208h)}}\right) + \text{Phụ Cấp Chở/Giao Hàng} - \text{Tạm Ứng Đã Duyệt}$$
-- **Nhân viên Bán thời gian (Part-time)**:
-  $$\text{Lương Thực Nhận} = \left(\text{Tổng Giờ Làm} \times \text{Đơn Giá Theo Giờ}\right) + \text{Phụ Cấp Chở/Giao Hàng} - \text{Tạm Ứng Đã Duyệt}$$
-- **Lịch thu nhập tương tác (Earnings Calendar)**: Màn hình chi tiết lương trên Mobile hiển thị số tiền kiếm được theo từng ngày, giúp nhân viên theo dõi thu nhập minh bạch.
+### 5.3. Quy Trình Đăng Ký Lịch & Bảo Toàn Dữ Liệu (Merge Scheduling)
+- Khi nhân viên tự đăng ký ca tuần, quản lý nhận được thông báo đẩy dẫn thẳng vào đúng tuần làm việc (`initialWeekStart`).
+- Khi Quản lý hoặc Chủ lưu lịch làm việc, phương thức `setFullSchedule` tự động sử dụng `SetOptions(merge: true)` và merge dữ liệu Firestore mới nhất trên Web để không ghi đè làm mất lịch của các nhân sự khác.
+- Mini-badges thống kê năng suất tuần hiển thị tức thì trên danh sách nhân sự: `⏱️ X.Xh` (tổng giờ làm đã xếp) và `📦 Y ca` (tổng ca chở hàng).
 
-### 5.4. Quy Trình Sắp Xếp Thứ Tự Nhân Viên & Đồng Bộ Excel
-- Khi Chủ quán sắp xếp thứ tự hiển thị nhân viên (Drag & Drop trên Web hoặc Mobile), mảng `memberOrder` được cập nhật lên document `stores/{storeId}`.
-- Mọi giao diện danh sách nhân viên, bảng lịch làm việc và **tất cả 5 file xuất Excel** đều tự động áp dụng hàm `sortMembersByOrder(members, store.memberOrder)` để đồng bộ thứ tự 100% nhất quán.
+### 5.4. Quy Trình Tải Lên & Đồng Bộ Ảnh Đại Diện (Avatar Sync)
+- Người dùng chụp ảnh hoặc chọn ảnh từ máy $\rightarrow$ Client nén ảnh (`800x800`, chất lượng 85%) $\rightarrow$ Tải lên Firebase Storage `avatars/{userId}.jpg` $\rightarrow$ Cập nhật `/users/{userId}`, `FirebaseAuth.currentUser.photoURL` và tự động phát tán tới `/stores/{storeId}/members/{userId}` của toàn bộ cửa hàng liên quan.
+- Quy tắc `storage.rules` đảm bảo chỉ chính chủ mới có quyền ghi đè avatar của chính mình.
 
-### 5.5. Quy Trình Ẩn Lịch Nhân Viên Riêng Tư
-- Khi nhân viên được gắn cờ trong `store.hiddenScheduleUserIds`:
-  - **Chủ quán**: Vẫn xem đầy đủ và có nhãn 🙈 `Ẩn`.
-  - **Bản thân nhân viên đó**: Vẫn xem được lịch cá nhân của mình.
-  - **Quản lý & Nhân viên khác**: Hoàn toàn bị ẩn dòng lịch của nhân viên này trên lịch cửa hàng.
+### 5.5. Quy Trình Điều Hướng Thông Báo Đẩy (FCM Deep Linking)
+- Khi nhận được push notification trên màn hình khóa hoặc thanh thông báo hệ điều hành (kể cả khi app đang chạy ngầm hoặc bị tắt hoàn toàn), việc chạm vào thông báo sẽ tự động kích hoạt `handleNotificationTap` điều hướng người dùng thẳng vào màn hình danh sách Thông báo (`/notifications`) để xem chi tiết.
 
 ---
 
 ## 6. QUY CHUẨN XUẤT FILE EXCEL (.XLSX)
 
-Hệ thống cung cấp bộ công cụ xuất file Excel chuẩn mực, chuyên nghiệp được định dạng tỉ mỉ bằng `ExcelJS`:
-
-1. **Bảng Chấm Công Tháng (`exportMonthlyAttendance`)**:
-   - File: `BangCong_[TenQuan]_T[Thang]-[Nam].xlsx`
-   - Cột: Nhân viên, Vai trò, Tổng giờ, Ngày 1 -> Ngày 31.
-   - Định dạng: Header phủ màu thương hiệu `themeColor`, ô có giờ làm được highlight màu nền nhẹ, số giờ định dạng `0.0`. Sắp xếp chuẩn theo `memberOrder`.
-2. **Chi Tiết Giờ Vào/Ra IN-OUT (`exportDetailedInOut`)**:
-   - File: `ChiTietInOut_[TenQuan]_T[Thang]-[Nam].xlsx`
-   - Cột: Ngày, Mã NV, Tên nhân viên, Giờ, IN/OUT.
-3. **Báo Cáo Bảng Lương Tháng (`exportMonthlySalary`)**:
-   - File: `BaoCaoLuong_[TenQuan]_T[Thang]-[Nam].xlsx`
-   - Cột: Tên nhân viên, Vai trò, Loại HĐ, Tổng giờ, Giờ chuẩn, Lương cơ bản, Số ca chở, Phụ cấp chở, Số ca giao, Phụ cấp giao, Đã tạm ứng, Lương thực nhận.
-   - Định dạng tiền tệ: `#,##0` đ, tự động tính tổng quỹ lương.
-4. **Lịch Làm Việc Tuần (`exportWeeklySchedule`)**:
-   - File: `LichLam_[TenQuan]_T[Thang]-[Nam]_[Tuan].xlsx`
-   - Bảng ma trận 7 ngày trong tuần, phân tách ca theo từng bộ phận (`[SX]`, `[BH]`, `📦 Chở`, `🛵 Giao`), hiển thị thời gian bắt đầu - kết thúc và tổng giờ từng ca.
-5. **Báo Cáo Hiệu Quả Sản Xuất (`exportProductionReport`)**:
-   - File: `BaoCaoSanXuat_[TenQuan]_T[Thang]-[Nam].xlsx`
-   - Chi tiết từng ca nộp báo cáo kèm bảng **Tổng hợp theo từng nhân viên** ở cuối trang.
+1. **Bảng Chấm Công Tháng (`exportMonthlyAttendance`)**: Header phủ màu thương hiệu `themeColor`, sắp xếp đúng thứ tự `memberOrder`, hiển thị chi tiết số giờ từng ngày và tổng giờ tháng.
+2. **Chi Tiết Giờ Vào/Ra IN-OUT (`exportDetailedInOut`)**: Xuất chi tiết mốc thời gian IN/OUT thực tế.
+3. **Báo Cáo Bảng Lương Tháng (`exportMonthlySalary`)**: Phân tách rõ lương cơ bản, số ca chở/giao hàng, tiền phụ cấp, tạm ứng và lương thực nhận.
+4. **Lịch Làm Việc Tuần (`exportWeeklySchedule`)**: Ma trận lịch 7 ngày phân ca theo bộ phận.
+5. **Báo Cáo Hiệu Quả Sản Xuất (`exportProductionReport`)**: Thống kê sản lượng hoàn thành của từng nhân viên.
 
 ---
 
-## 7. CƠ CHẾ TỰ PHỤC HỒI & AN TOÀN DỮ LIỆU (SELF-HEALING & SECURITY)
+## 7. HƯỚNG DẪN DÀNH CHO AI & LẬP TRÌNH VIÊN TIẾP NHẬN
 
-1. **Cơ chế tự phục hồi cửa hàng (Self-healing Stores Discovery)**:
-   - Nếu mảng `storeIds` trong hồ sơ người dùng bị rỗng hoặc thiếu, hệ thống tự động chạy truy vấn `collectionGroup('members').where('userId', '==', uid)` để dò tìm toàn bộ các cửa hàng mà người dùng là thành viên hợp lệ và tự động phục hồi `storeIds`.
-2. **Cập nhật Lịch làm việc nguyên tử (Atomic Dot-Notation Updates)**:
-   - Khi lưu lịch ca của nhân viên, hệ thống sử dụng update dạng dot-notation `shifts.${userId}` để tránh ghi đè làm mất dữ liệu của các nhân viên khác khi thao tác đồng thời.
-3. **Xóa cửa hàng bảo mật 2 lớp (2-Step Store Deletion)**:
-   - Bước 1: Xác thực mật khẩu bảo mật của cửa hàng.
-   - Bước 2: Yêu cầu gõ chính xác tên cửa hàng hoặc từ khóa "XÓA".
-   - Thực hiện soft-delete (`status: 'deleted'`) và tự động dọn dẹp liên kết `storeIds` cho toàn bộ thành viên.
-
----
-
-## 8. HƯỚNG DẪN DÀNH CHO AI & LẬP TRÌNH VIÊN TIẾP NHẬN
-
-### Khi thực hiện chỉnh sửa hoặc thêm tính năng mới:
-1. **Kiểm tra phân quyền (RBAC)**: Luôn sử dụng các hàm chuẩn hóa trong `lib/types.ts` trên Web (`normalizeRole`, `canManageSchedule`, `canApproveMembers`) hoặc `lib/core/auth/app_permissions.dart` trên Mobile.
-2. **Đồng bộ song phương (Mobile & Web)**: Bất kỳ thay đổi nào liên quan đến cấu trúc dữ liệu Firestore (Schema), thứ tự sắp xếp (`memberOrder`), đơn vị checklist hay logic tính lương phải được triển khai đồng thời trên cả **Flutter Mobile App** (`cham_cong_tram`) và **Next.js Web Dashboard** (`cham_cong_web`).
-3. **Quy tắc xuất Excel**: Mọi bảng xuất dữ liệu liên quan đến nhân viên phải luôn sắp xếp qua `sortMembersByOrder(members, store.memberOrder)`.
-4. **Kiểm thử trước khi deploy**:
-   - Mobile: Chạy `flutter test` (đảm bảo vượt qua toàn bộ test suites) và `flutter analyze` (0 errors).
-   - Web: Chạy `npm run build` tại `cham_cong_web` để đảm bảo biên dịch TypeScript và Next.js thành công 100%.
+1. **Tuân thủ RBAC**: Luôn kiểm tra quyền thông qua `AppPermissions` (Mobile) và `lib/types.ts` (Web). Tuyệt đối không hardcode logic kiểm tra vai trò đơn lẻ.
+2. **Đồng bộ song phương**: Bất kỳ nâng cấp logic nào về dữ liệu, tính lương, lịch làm việc hoặc checklist phải được cập nhật đồng thời trên cả Mobile và Web.
+3. **Kiểm thử tự động bắt buộc**:
+   - Mobile: Chạy `flutter test` (đảm bảo vượt qua toàn bộ 66/66 test cases) và `flutter analyze` (0 errors).
+   - Web: Chạy `npm run build` tại `cham_cong_web` (đảm bảo biên dịch thành công 12/12 routes).
 
 ---
 *Tài liệu được cập nhật tự động và đồng bộ định kỳ theo tiến trình phát triển hệ thống Chấm Công Trạm.*
