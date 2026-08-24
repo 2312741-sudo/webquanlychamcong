@@ -289,7 +289,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* User Profile Footer */}
           <div style={{ padding:'16px 20px', borderTop:'1px solid rgba(255,255,255,0.1)' }}>
             <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-              <div className="avatar" style={{ width:36, height:36, fontSize:13 }}>{initials}</div>
+              {currentMember?.avatarUrl || user?.photoURL ? (
+                <img 
+                  src={currentMember?.avatarUrl || user?.photoURL || ''} 
+                  alt="Avatar" 
+                  style={{ width:36, height:36, borderRadius:'50%', objectFit:'cover', border:'1px solid rgba(255,255,255,0.3)' }} 
+                />
+              ) : (
+                <div className="avatar" style={{ width:36, height:36, fontSize:13 }}>{initials}</div>
+              )}
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontSize:13, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                   {user?.displayName || user?.email}

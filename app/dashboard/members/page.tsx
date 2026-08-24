@@ -249,7 +249,15 @@ export default function MembersPage() {
                     )}
                     <td>
                       <div className="flex items-center gap-3">
-                        <div className="avatar" style={{ width: 36, height: 36 }}>{m.name[0]}</div>
+                        {m.avatarUrl ? (
+                          <img
+                            src={m.avatarUrl}
+                            alt={m.name}
+                            style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border)' }}
+                          />
+                        ) : (
+                          <div className="avatar" style={{ width: 36, height: 36 }}>{m.name[0]}</div>
+                        )}
                         <div>
                           <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
                             {m.name}

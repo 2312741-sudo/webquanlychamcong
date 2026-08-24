@@ -499,7 +499,7 @@ export default function SchedulePage() {
                       transition: 'background 0.2s'
                     }}
                   >
-                    <td style={{ padding: '10px 14px', borderRadius: '8px 0 0 8px', minWidth: 200 }}>
+                    <td style={{ padding: '10px 14px', borderRadius: '8px 0 0 8px', minWidth: 220 }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           {isOwner && (
@@ -520,8 +520,17 @@ export default function SchedulePage() {
                               >▼</button>
                             </div>
                           )}
+                          {m.avatarUrl ? (
+                            <img
+                              src={m.avatarUrl}
+                              alt={m.name}
+                              style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border)' }}
+                            />
+                          ) : (
+                            <div className="avatar" style={{ width: 32, height: 32, fontSize: 12 }}>{m.name[0]}</div>
+                          )}
                           <div>
-                            <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, fontSize: 13.5 }}>
                               {m.name}
                               {isHidden && (
                                 <span style={{ fontSize: 10, background: '#FFF3BF', color: '#D9480F', padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>
@@ -529,7 +538,18 @@ export default function SchedulePage() {
                                 </span>
                               )}
                             </div>
-                            <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{getRoleLabel(m.role)}</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 5, marginTop: 2 }}>
+                              <span>{getRoleLabel(m.role)}</span>
+                              <span>•</span>
+                              <span style={{ fontWeight: 600, color: 'var(--neutral)' }}>
+                                ⏱️ {memberHours > 0 ? (memberHours % 1 === 0 ? `${memberHours}h` : `${memberHours.toFixed(1)}h`) : '0h'}
+                              </span>
+                              {memberDelivery > 0 && (
+                                <span style={{ fontWeight: 600, color: '#D9480F' }}>
+                                  • 📦 {memberDelivery}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                         {isOwner && (
