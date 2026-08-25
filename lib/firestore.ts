@@ -7,55 +7,46 @@ import {
 } from 'firebase/firestore';
 import { Member, AttendanceRecord, Store, ScheduleModel, DaySchedule, AdvanceRequest, ProductionTask, ProductionReport, ProductionTaskEntry, AppNotification, normalizeRole } from './types';
 
-export async function getUserStoreId(uid: string): Promise<string | null> {
-  try {
-    const snap = await getDoc(doc(db, 'users', uid));
-    let sid = snap.data()?.currentStoreId ?? null;
-    if (!sid) {
-      const stores = await getUserStores(uid);
-      if (stores.length > 0) {
-        sid = stores[0].id;
-        await updateDoc(doc(db, 'users', uid), { currentStoreId: sid }).catch(() => {});
-      }
-    }
-    return sid;
-  } catch (err) {
-    console.error('Error in getUserStoreId:', err);
-    return null;
-  }
-}
-
-export async function getUserStores(uid: string): Promise<Store[]> {
+export async function getUserStoresData(uid: string): Promise<{ stores: Store[]; currentStoreId: string | null }> {
   try {
     const storeMap = new Map<string, Store>();
     const foundStoreIds = new Set<string>();
+    let currentStoreId: string | null = null;
+    let userHasStoreIds = false;
 
-    // 1. Get storeIds & currentStoreId from users/{uid} document
+    // 1. Get storeIds & currentStoreId from users/{uid} document in 1 read
     try {
       const uSnap = await getDoc(doc(db, 'users', uid));
       if (uSnap.exists()) {
         const uData = uSnap.data();
         const ids: string[] = uData?.storeIds || [];
         ids.forEach(id => { if (id) foundStoreIds.add(id); });
-        if (uData?.currentStoreId) foundStoreIds.add(uData.currentStoreId);
+        if (uData?.currentStoreId) {
+          foundStoreIds.add(uData.currentStoreId);
+          currentStoreId = uData.currentStoreId;
+        }
+        if (ids.length > 0) {
+          userHasStoreIds = true;
+        }
       }
     } catch (e) {
       console.error('Error reading user document:', e);
     }
 
-    // 2. Query collectionGroup('members') where userId == uid to find all joined stores
-    try {
-      const qMembers = query(collectionGroup(db, 'members'), where('userId', '==', uid));
-      const mSnap = await getDocs(qMembers);
-      for (const mDoc of mSnap.docs) {
-        // mDoc.ref.path is stores/{storeId}/members/{userId}
-        const storeRef = mDoc.ref.parent.parent;
-        if (storeRef) {
-          foundStoreIds.add(storeRef.id);
+    // 2. Only fallback to collectionGroup if user doc had NO storeIds recorded
+    if (!userHasStoreIds && foundStoreIds.size === 0) {
+      try {
+        const qMembers = query(collectionGroup(db, 'members'), where('userId', '==', uid));
+        const mSnap = await getDocs(qMembers);
+        for (const mDoc of mSnap.docs) {
+          const storeRef = mDoc.ref.parent.parent;
+          if (storeRef) {
+            foundStoreIds.add(storeRef.id);
+          }
         }
+      } catch (e) {
+        console.error('Error querying members collection group fallback:', e);
       }
-    } catch (e) {
-      console.error('Error querying members collection group:', e);
     }
 
     // 3. Fetch store documents in parallel
@@ -65,7 +56,10 @@ export async function getUserStores(uid: string): Promise<Store[]> {
         try {
           const sDoc = await getDoc(doc(db, 'stores', storeId));
           if (sDoc.exists()) {
-            storeMap.set(sDoc.id, { id: sDoc.id, ...sDoc.data() } as Store);
+            const data = sDoc.data();
+            if (data.status !== 'deleted') {
+              storeMap.set(sDoc.id, { id: sDoc.id, ...data } as Store);
+            }
           }
         } catch (e) {
           console.error(`Error fetching store ${storeId}:`, e);
@@ -73,22 +67,35 @@ export async function getUserStores(uid: string): Promise<Store[]> {
       })
     );
 
-    const result = Array.from(storeMap.values());
+    const stores = Array.from(storeMap.values());
+    if (!currentStoreId && stores.length > 0) {
+      currentStoreId = stores[0].id;
+    }
 
-    // 4. Self-heal: Update user's storeIds array if new stores were discovered via collectionGroup
-    if (result.length > 0) {
-      const resultIds = result.map(s => s.id);
+    // Self-heal if needed
+    if (!userHasStoreIds && stores.length > 0) {
+      const resultIds = stores.map(s => s.id);
       updateDoc(doc(db, 'users', uid), {
         storeIds: resultIds,
-        ...(resultIds.length > 0 ? {} : {})
+        currentStoreId: currentStoreId,
       }).catch(() => {});
     }
 
-    return result;
+    return { stores, currentStoreId };
   } catch (err) {
-    console.error('Error in getUserStores:', err);
-    return [];
+    console.error('Error in getUserStoresData:', err);
+    return { stores: [], currentStoreId: null };
   }
+}
+
+export async function getUserStoreId(uid: string): Promise<string | null> {
+  const { currentStoreId } = await getUserStoresData(uid);
+  return currentStoreId;
+}
+
+export async function getUserStores(uid: string): Promise<Store[]> {
+  const { stores } = await getUserStoresData(uid);
+  return stores;
 }
 
 export async function getAdvancesInRange(storeId: string, startDate: string, endDate: string): Promise<AdvanceRequest[]> {
@@ -353,26 +360,13 @@ export async function saveWeekSchedule(
   updatedBy?: string
 ): Promise<void> {
   const scheduleRef = doc(db, 'stores', storeId, 'schedules', weekStart);
-  try {
-    const snap = await getDoc(scheduleRef);
-    const existingShifts = snap.exists() ? (snap.data().shifts || {}) : {};
-    const mergedShifts = { ...existingShifts, ...shifts };
-    await setDoc(scheduleRef, {
-      storeId,
-      weekStart,
-      shifts: mergedShifts,
-      updatedAt: Timestamp.now(),
-      ...(updatedBy ? { updatedBy } : {}),
-    }, { merge: true });
-  } catch (_) {
-    await setDoc(scheduleRef, {
-      storeId,
-      weekStart,
-      shifts,
-      updatedAt: Timestamp.now(),
-      ...(updatedBy ? { updatedBy } : {}),
-    }, { merge: true });
-  }
+  await setDoc(scheduleRef, {
+    storeId,
+    weekStart,
+    shifts,
+    updatedAt: Timestamp.now(),
+    ...(updatedBy ? { updatedBy } : {}),
+  }, { merge: true });
 }
 
 export async function updateStore(storeId: string, data: Record<string, any>) {
@@ -550,7 +544,11 @@ export function watchNotifications(
     return () => {};
   }
 
-  const q = collection(db, 'stores', storeId, 'notifications');
+  const q = query(
+    collection(db, 'stores', storeId, 'notifications'),
+    orderBy('createdAt', 'desc'),
+    limit(50)
+  );
   return onSnapshot(q, (snapshot) => {
     const list: import('./types').AppNotification[] = [];
     snapshot.forEach(docSnap => {

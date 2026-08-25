@@ -28,6 +28,32 @@
 
 ## 📅 NGÀY 25/08/2026: BẢN VÁ LỖI HỆ THỐNG & ĐIỀU CHỈNH PHÂN QUYỀN (v1.0.4-patch)
 
+### 0. [NÂNG CẤP MỚI] Khắc Phục 4 Vấn Đề Vừa Phát Sinh (Avatar, FCM Logout, Back Button, Web Perf)
+- **Vấn đề 1 (Avatar Trắng/Xám trên Mobile):**
+  - Cập nhật `storage.rules` cho phép `allow read: if true;` đối với `avatars/{fileName}`, giúp các HTTP client như `CachedNetworkImage` và thẻ `<img>` đọc ảnh mượt mà không bị 403 Forbidden.
+  - Đồng bộ `AvatarWidget` với fallback chữ cái đầu tên trên nền màu thương hiệu vào Drawer (`store_drawer.dart`) và các dashboard; tự động fallback sang `photoURL` từ Firebase Auth nếu `avatarUrl` trong Firestore chưa kịp đồng bộ.
+- **Vấn đề 2 (Đè Tài Khoản Thông Báo & Lặp Thông Báo):**
+  - **Khi Đăng xuất:** Thêm `clearTokenForUser(uid)` tự động xóa field `fcmToken` khỏi Firestore `/users/{uid}`, gọi `deleteToken()` trên thiết bị và hủy toàn bộ stream subscriptions trước khi hoàn tất đăng xuất.
+  - **Khi Đăng nhập:** Thêm cơ chế **Deduplication** tự động quét và xóa token cũ của các tài khoản khác trên cùng thiết bị này, đảm bảo mỗi device token chỉ gắn với 1 tài khoản đang hoạt động duy nhất.
+- **Vấn đề 3 (Nút Quay Về Màn Hình Thông Báo Bị Trùng Màu):**
+  - Bổ sung `leading: IconButton(icon: Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1A1A1A)))` và `iconTheme: IconThemeData(color: Color(0xFF1A1A1A))` trong `notifications_screen.dart`, tạo độ tương phản rõ ràng và bấm dễ dàng trên AppBar nền trắng.
+- **Vấn đề 4 (Web Load Chậm Khi F5 & Xoay Lâu Khi Lưu Lịch):**
+  - **Tối ưu F5:** Chuyển `getUserStoresData` sang đọc 1 lần duy nhất từ document `/users/{uid}` và tải danh sách cửa hàng song song (`Promise.all`). Bỏ query nặng `collectionGroup` khi đã có sẵn `storeIds`. Giới hạn `watchNotifications` ở `limit(50)` mới nhất.
+  - **Tối ưu Lưu Lịch:** Thay thế hàm `window.alert()` chặn luồng (blocking) bằng thông báo Toast nổi (`toastMessage`) tự động đóng sau 3 giây, tắt trạng thái xoay loading ngay khi Firestore ghi thành công.
+
+### 0.2 [FIX TRIỆT ĐỂ] Sửa Lỗi Phải Bấm Đăng Xuất 2 Lần (Mobile & Web)
+- **Nguyên nhân cốt lõi phát hiện:**
+  1. **GoRouter Redirect Lag:** Trước đây Router đọc `ref.read(authStateChangesProvider)` (StreamProvider bất đồng bộ) thay vì `FirebaseAuth.instance.currentUser` (trạng thái tức thời). Khi gọi `context.go('/login')` lúc StreamProvider chưa kịp phát ra `null`, GoRouter tưởng người dùng vẫn còn đăng nhập trên trang auth và lập tức redirect ngược về `/splash` -> Dashboard.
+  2. **Xung đột `ref.listen` trong các Dashboard:** Khi `signOut()` gọi `_invalidateAllUserData()`, các bộ lắng nghe `ref.listen` trên `currentMemberProvider` và `storeMembersProvider` bị kích hoạt và tự động gọi `context.go(...)` đè lên luồng đăng xuất.
+  3. **Google Sign-In Token:** `AuthRepository.signOut()` chưa gọi `GoogleSignIn().signOut()`.
+- **Giải pháp triệt để:**
+  - Cập nhật `router.dart`: Kiểm tra trực tiếp `FirebaseAuth.instance.currentUser != null` (đồng bộ 100%).
+  - Chặn đứng toàn bộ `ref.listen` trong `owner_dashboard.dart`, `manager_dashboard.dart`, `employee_dashboard.dart` bằng điều kiện `if (FirebaseAuth.instance.currentUser == null) return;`.
+  - Tích hợp `GoogleSignIn().signOut()` vào `AuthRepository.signOut()`.
+  - Đảm bảo gọi `await signOut()` hoàn tất trước khi chuyển trang trên tất cả các màn hình và Drawer.
+
+
+
 ### 1. [RBAC] Khóa Quyền Xem & Sửa Bảng Chấm Công Đối Với Quản Lý 2 (`manager2`)
 - **Vấn đề phát hiện:** Trước đây Quản lý 2 vẫn có thể xem danh sách bảng công toàn bộ nhân viên và mở modal chỉnh sửa giờ vào/ra của nhân sự khác.
 - **Giải pháp triển khai:**

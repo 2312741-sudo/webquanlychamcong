@@ -3,7 +3,7 @@ import { useEffect, useState, createContext, useContext, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { onAuthChanged, signOut, getUserCurrentStoreId } from '@/lib/auth';
-import { watchStore, watchMembers, getUserStores, switchStore, watchNotifications, markNotificationAsRead, markAllNotificationsAsRead } from '@/lib/firestore';
+import { watchStore, watchMembers, getUserStoresData, switchStore, watchNotifications, markNotificationAsRead, markAllNotificationsAsRead } from '@/lib/firestore';
 import { Store, Member, UserRole, AppNotification, getRoleLabel, normalizeRole, canManageSchedule, canApproveMembers, canAccessWeb } from '@/lib/types';
 import { User } from 'firebase/auth';
 
@@ -50,14 +50,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       if (!u) { router.replace('/login'); return; }
       setUser(u);
       try {
-        const stores = await getUserStores(u.uid);
+        const { stores, currentStoreId } = await getUserStoresData(u.uid);
         setUserStores(stores);
-
-        let sid = await getUserCurrentStoreId(u.uid);
-        if (!sid && stores.length > 0) {
-          sid = stores[0].id;
-        }
-        setStoreId(sid);
+        setStoreId(currentStoreId);
       } catch (err) {
         console.error('Lỗi khi tải dữ liệu người dùng:', err);
       } finally {
@@ -306,7 +301,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   {normRole === 'owner' ? '👑 Chủ cửa hàng' : normRole === 'manager1' ? '👔 Quản lý 1' : normRole === 'manager2' ? '👔 Quản lý 2' : '👤 Nhân viên'}
                 </div>
               </div>
-              <button onClick={signOut} title="Đăng xuất" style={{
+              <button onClick={() => signOut().then(() => router.replace('/login'))} title="Đăng xuất" style={{
                 background:'rgba(255,255,255,0.1)', border:'none', color:'rgba(255,255,255,0.7)',
                 width:30, height:30, borderRadius:8, cursor:'pointer', fontSize:14, display:'flex', alignItems:'center', justifyContent:'center'
               }}>↩</button>

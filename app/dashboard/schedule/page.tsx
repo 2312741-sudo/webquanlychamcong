@@ -37,6 +37,12 @@ export default function SchedulePage() {
   const [scheduleData, setScheduleData] = useState<ScheduleModel | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
   const [draggedMemberIdx, setDraggedMemberIdx] = useState<number | null>(null);
 
   // Modal state
@@ -210,15 +216,12 @@ export default function SchedulePage() {
       }
 
       await saveWeekSchedule(storeId, currentWeek, sanitizedShifts, user?.uid);
-      const data = await getWeekSchedule(storeId, currentWeek);
-      setScheduleData(data);
-      setShifts(data?.shifts || {});
-      alert('Đã lưu lịch làm việc thành công!');
+      setSaving(false);
+      showToast('Đã lưu lịch làm việc thành công!');
     } catch (e) {
       console.error('Error saving schedule:', e);
-      alert('Lỗi khi lưu lịch làm: ' + e);
-    } finally {
       setSaving(false);
+      showToast('Lỗi khi lưu lịch làm: ' + e);
     }
   };
 
@@ -812,6 +815,30 @@ export default function SchedulePage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Floating Non-Blocking Toast Notification */}
+      {toastMessage && (
+        <div style={{
+          position: 'fixed',
+          bottom: 28,
+          right: 28,
+          background: toastMessage.startsWith('Lỗi') ? '#C8102E' : '#1A6B5A',
+          color: 'white',
+          padding: '14px 24px',
+          borderRadius: 12,
+          boxShadow: '0 8px 30px rgba(0,0,0,0.25)',
+          fontWeight: 700,
+          fontSize: 14,
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          transition: 'all 0.3s ease'
+        }}>
+          <span>{toastMessage.startsWith('Lỗi') ? '❌' : '✅'}</span>
+          {toastMessage}
         </div>
       )}
     </div>

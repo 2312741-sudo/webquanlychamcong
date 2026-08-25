@@ -8,7 +8,7 @@ import {
   OAuthProvider,
   signInWithPopup
 } from 'firebase/auth';
-import { getDoc, setDoc, doc } from 'firebase/firestore';
+import { getDoc, setDoc, updateDoc, doc } from 'firebase/firestore';
 
 async function ensureUserDoc(user: User) {
   try {
@@ -24,11 +24,18 @@ async function ensureUserDoc(user: User) {
         storeIds: [],
         currentStoreId: null,
       });
+    } else {
+      const data = snap.data();
+      if (!data?.avatarUrl && user.photoURL) {
+        await updateDoc(userRef, { avatarUrl: user.photoURL }).catch(() => {});
+      }
     }
+    return;
   } catch (err) {
     console.error('Lỗi khởi tạo tài liệu người dùng Firestore:', err);
   }
 }
+
 
 export async function signIn(email: string, password: string) {
   return signInWithEmailAndPassword(auth, email, password);
