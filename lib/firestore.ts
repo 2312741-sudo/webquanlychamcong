@@ -194,6 +194,16 @@ export async function getMemberMonthAttendances(storeId: string, userId: string,
   return snap.docs.map(d => ({ id: d.id, ...d.data() } as AttendanceRecord));
 }
 
+export function watchActiveAttendances(storeId: string, cb: (records: AttendanceRecord[]) => void) {
+  const q = query(
+    collection(db, 'stores', storeId, 'attendances'),
+    where('checkOut', '==', null)
+  );
+  return onSnapshot(q, snap => {
+    cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as AttendanceRecord)));
+  });
+}
+
 export function watchTodayAttendances(storeId: string, cb: (records: AttendanceRecord[]) => void) {
   const today = new Date();
   const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;

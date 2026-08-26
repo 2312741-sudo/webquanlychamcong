@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useApp } from './layout';
-import { watchTodayAttendances, getMonthAttendances } from '@/lib/firestore';
+import { watchTodayAttendances, watchActiveAttendances, getMonthAttendances } from '@/lib/firestore';
 import { AttendanceRecord, Member } from '@/lib/types';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
@@ -29,18 +29,23 @@ const METHOD_LABEL: Record<string, string> = {
 export default function DashboardPage() {
   const { storeId, members } = useApp();
   const [todayAtts, setTodayAtts] = useState<AttendanceRecord[]>([]);
+  const [activeAtts, setActiveAtts] = useState<AttendanceRecord[]>([]);
   const [chartData, setChartData] = useState<{ date: string; hours: number }[]>([]);
   const [totalMonthHours, setTotalMonthHours] = useState(0);
 
   const activeMembers = members.filter(m => m.status === 'active');
   const pendingMembers = members.filter(m => m.status === 'pending');
-  const inProgressToday = todayAtts.filter(a => !a.checkOut);
+  const inProgressToday = activeAtts;
   const doneToday = todayAtts.filter(a => a.checkOut);
 
   useEffect(() => {
     if (!storeId) return;
-    const unsub = watchTodayAttendances(storeId, setTodayAtts);
-    return unsub;
+    const unsubToday = watchTodayAttendances(storeId, setTodayAtts);
+    const unsubActive = watchActiveAttendances(storeId, setActiveAtts);
+    return () => {
+      unsubToday();
+      unsubActive();
+    };
   }, [storeId]);
 
   useEffect(() => {
