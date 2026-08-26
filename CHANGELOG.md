@@ -28,7 +28,15 @@
 
 ## 📅 NGÀY 25/08/2026: BẢN VÁ LỖI HỆ THỐNG & ĐIỀU CHỈNH PHÂN QUYỀN (v1.0.4-patch)
 
-### 0. [NÂNG CẤP MỚI] Khắc Phục 4 Vấn Đề Vừa Phát Sinh (Avatar, FCM Logout, Back Button, Web Perf)
+### 0. [FIX CỐT LÕI] Chuẩn Hóa Ngày Làm Việc (Workday) = Ngày In Ca & Báo Cáo Checklist SX Ca Đêm
+- **Vấn đề phát hiện:** Nhân viên vào ca lúc 18h00 ngày 25 (ngày 25 không có ca SX), ra ca lúc 00h20 ngày 26 (ngày 26 có ca SX). Khi ra ca bị hệ thống bắt nộp checklist do lấy nhầm lịch ngày 26 và fallback theo bộ phận gốc của nhân viên.
+- **Giải pháp triệt để:**
+  - **Cố định Ngày làm việc:** Lấy thời điểm Check-in (theo giờ Việt Nam UTC+7) làm gốc 100% để xác định `workdayDate` và ngày trong tuần (`weekday`). Bất kể ra ca lúc 00h20, 01h00 hay 03h00 sáng hôm sau, ngày làm việc vẫn cố định là ngày In ca.
+  - **Kiểm tra lịch chính xác:** Chỉ tra cứu lịch tuần của ngày In ca (ngày 25). Nếu ngày 25 không có ca SX $\rightarrow$ Cho phép ra ca ngay, **tuyệt đối không đòi checklist** dù ngày 26 có ca SX.
+  - **Duy trì đòi checklist sau 24h đến 3h sáng:** Nếu ngày In ca có ca SX, nhân viên ra ca sau 24h00 (00h20, 01h00, 02h59 sáng hôm sau) **vẫn bắt buộc phải nộp checklist** cho ca ngày 25; chỉ sau 03h00 sáng hôm sau mới tự động thông qua.
+  - **Khắc phục Fallback `DepartmentUtils`:** Không tự động fallback về bộ phận gốc nếu ngày In ca đã có lịch xác định không có ca SX hoặc không xếp ca SX.
+
+### 0.1 [NÂNG CẤP MỚI] Khắc Phục 4 Vấn Đề Vừa Phát Sinh (Avatar, FCM Logout, Back Button, Web Perf)
 - **Vấn đề 1 (Avatar Trắng/Xám trên Mobile):**
   - Cập nhật `storage.rules` cho phép `allow read: if true;` đối với `avatars/{fileName}`, giúp các HTTP client như `CachedNetworkImage` và thẻ `<img>` đọc ảnh mượt mà không bị 403 Forbidden.
   - Đồng bộ `AvatarWidget` với fallback chữ cái đầu tên trên nền màu thương hiệu vào Drawer (`store_drawer.dart`) và các dashboard; tự động fallback sang `photoURL` từ Firebase Auth nếu `avatarUrl` trong Firestore chưa kịp đồng bộ.
