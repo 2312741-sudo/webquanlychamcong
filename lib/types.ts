@@ -104,6 +104,14 @@ export interface AttendanceRecord {
   editNote?: string;
 }
 
+export interface StoreLocation {
+  id?: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  radiusMeters: number;
+}
+
 export interface Store {
   id: string;
   name: string;
@@ -115,6 +123,7 @@ export interface Store {
   latitude?: number;
   longitude?: number;
   radiusMeters: number;
+  locations?: StoreLocation[];
   customShifts?: ShiftDefinition[];
   themeColor?: string;
   deliveryAllowance?: number; // Chở hàng
@@ -141,7 +150,9 @@ export function sortMembersByOrder(members: Member[], memberOrder?: string[]): M
 
 export interface StoreWifi {
   name: string;
-  ip: string;
+  ssid?: string;
+  bssid?: string;
+  ip?: string;
 }
 
 export interface Department {

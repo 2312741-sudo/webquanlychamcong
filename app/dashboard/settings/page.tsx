@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../layout';
 import { updateStore, clearAllSchedules, deleteAllAttendances, deleteStoreAndCleanup } from '@/lib/firestore';
-import { ShiftDefinition, Department } from '@/lib/types';
+import { ShiftDefinition, Department, StoreLocation } from '@/lib/types';
 
 export default function SettingsPage() {
   const { storeId, store } = useApp();
@@ -14,8 +14,8 @@ export default function SettingsPage() {
   const [giaoHangAllowance, setGiaoHangAllowance] = useState(0);
   const [deliveryEnabled, setDeliveryEnabled] = useState(true);
   const [giaoHangEnabled, setGiaoHangEnabled] = useState(true);
-  const [departmentSelectionEnabled, setDepartmentSelectionEnabled] = useState(true);
-  const [wifis, setWifis] = useState<{name: string; ip: string}[]>([]);
+  const [wifis, setWifis] = useState<StoreWifi[]>([]);
+  const [locations, setLocations] = useState<StoreLocation[]>([]);
   const [shifts, setShifts] = useState<ShiftDefinition[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [deletePassword, setDeletePassword] = useState('123456');
@@ -35,6 +35,18 @@ export default function SettingsPage() {
       setGiaoHangEnabled(store.giaoHangEnabled ?? true);
       setDepartmentSelectionEnabled(store.departmentSelectionEnabled ?? true);
       setWifis(store.wifis || []);
+      const rawLocs: StoreLocation[] = (store as any).locations || [];
+      if (rawLocs.length === 0 && (store.latitude || (store as any).latitude)) {
+        setLocations([{
+          id: 'loc_primary',
+          name: 'Vị trí chính',
+          latitude: store.latitude || (store as any).latitude,
+          longitude: store.longitude || (store as any).longitude,
+          radiusMeters: store.radiusMeters || 100,
+        }]);
+      } else {
+        setLocations(rawLocs);
+      }
       setShifts(store.customShifts || []);
       setDepartments(store.departments || []);
       setDeletePassword((store as any).deletePassword || '123456');
@@ -45,10 +57,14 @@ export default function SettingsPage() {
     if (!storeId) return;
     setSaving(true);
     try {
+      const primaryLoc = locations.length > 0 ? locations[0] : null;
       await updateStore(storeId, {
         name,
         address,
-        radiusMeters: radius,
+        radiusMeters: primaryLoc?.radiusMeters || radius,
+        latitude: primaryLoc?.latitude ?? null,
+        longitude: primaryLoc?.longitude ?? null,
+        locations,
         themeColor,
         deliveryAllowance,
         giaoHangAllowance,
@@ -136,15 +152,39 @@ export default function SettingsPage() {
 
   const addWifi = () => {
     if (wifis.length >= 10) return;
-    setWifis([...wifis, { name: `WiFi ${wifis.length + 1}`, ip: '' }]);
+    setWifis([...wifis, { name: `WiFi ${wifis.length + 1}`, ssid: '', bssid: '' }]);
   };
-  const updateWifi = (index: number, field: 'name' | 'ip', value: string) => {
+  const updateWifi = (index: number, field: keyof StoreWifi, value: string) => {
     const newWifis = [...wifis];
     newWifis[index] = { ...newWifis[index], [field]: value };
     setWifis(newWifis);
   };
   const removeWifi = (index: number) => {
     setWifis(wifis.filter((_, i) => i !== index));
+  };
+
+  const addLocation = () => {
+    if (locations.length >= 5) return;
+    setLocations([
+      ...locations,
+      {
+        id: `loc_${Date.now()}`,
+        name: locations.length === 0 ? 'Cơ sở chính' : `Vị trí ${locations.length + 1}`,
+        latitude: store?.latitude || 21.028511,
+        longitude: store?.longitude || 105.854444,
+        radiusMeters: 100,
+      }
+    ]);
+  };
+
+  const updateLocation = (index: number, field: keyof StoreLocation, val: any) => {
+    const updated = [...locations];
+    updated[index] = { ...updated[index], [field]: val };
+    setLocations(updated);
+  };
+
+  const removeLocation = (index: number) => {
+    setLocations(locations.filter((_, i) => i !== index));
   };
 
   const addShift = () => {
@@ -308,9 +348,9 @@ export default function SettingsPage() {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <div>
-            <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Danh sách WiFi Chấm Công</h3>
+            <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Danh sách WiFi Chấm Công (BSSID Access Point)</h3>
             <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
-              Cấu hình tối đa 10 địa chỉ WiFi/IP để nhân viên chấm công
+              Cấu hình tối đa 10 địa chỉ WiFi (BSSID MAC Access Point) để nhân viên chấm công
             </p>
           </div>
           <button className="btn btn-secondary" onClick={addWifi} disabled={wifis.length >= 10} style={{ fontSize: 13, padding: '6px 12px' }}>
@@ -326,32 +366,128 @@ export default function SettingsPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {wifis.map((w, i) => (
               <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'center', background: 'var(--surface)', padding: 12, borderRadius: 8 }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>Tên WiFi</label>
+                <div style={{ flex: 1.2 }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>Tên nhận diện</label>
                   <input 
                     type="text" 
                     className="input" 
                     value={w.name}
                     onChange={e => updateWifi(i, 'name', e.target.value)}
                     style={{ padding: '6px 10px', marginTop: 4 }}
-                    placeholder="VD: CuaHang_T1"
+                    placeholder="VD: Quầy bar / Tầng 1"
                   />
                 </div>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>Địa chỉ IP</label>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>SSID (Tên mạng)</label>
                   <input 
                     type="text" 
                     className="input" 
-                    value={w.ip}
-                    onChange={e => updateWifi(i, 'ip', e.target.value)}
+                    value={w.ssid || ''}
+                    onChange={e => updateWifi(i, 'ssid', e.target.value)}
                     style={{ padding: '6px 10px', marginTop: 4 }}
-                    placeholder="VD: 113.113.113.113"
+                    placeholder="VD: CuaHang_WiFi"
+                  />
+                </div>
+                <div style={{ flex: 1.2 }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>BSSID (MAC Access Point)</label>
+                  <input 
+                    type="text" 
+                    className="input" 
+                    value={w.bssid || ''}
+                    onChange={e => updateWifi(i, 'bssid', e.target.value)}
+                    style={{ padding: '6px 10px', marginTop: 4 }}
+                    placeholder="aa:bb:cc:dd:ee:ff"
                   />
                 </div>
                 <div style={{ paddingTop: 20 }}>
                   <button 
                     onClick={() => removeWifi(i)}
                     style={{ width: 36, height: 36, borderRadius: 18, border: 'none', background: 'var(--primary)', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <div>
+            <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Danh sách Vị trí GPS Chấm Công</h3>
+            <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+              Cấu hình tối đa 5 vị trí tọa độ GPS và đặt tên riêng cho từng vị trí để nhân viên chấm công
+            </p>
+          </div>
+          <button className="btn btn-secondary" onClick={addLocation} disabled={locations.length >= 5} style={{ fontSize: 13, padding: '6px 12px' }}>
+            + Thêm vị trí ({locations.length}/5)
+          </button>
+        </div>
+        
+        {locations.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-secondary)', background: 'var(--surface)', borderRadius: 8 }}>
+            Chưa có vị trí GPS nào. Bấm "+ Thêm vị trí" để tạo (tối đa 5 vị trí).
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {locations.map((loc, i) => (
+              <div key={loc.id || i} style={{ display: 'flex', gap: 12, alignItems: 'center', background: 'var(--surface)', padding: 12, borderRadius: 8 }}>
+                <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(200, 16, 46, 0.1)', color: 'var(--primary)', fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {i + 1}
+                </div>
+                <div style={{ flex: 1.5 }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>Tên vị trí *</label>
+                  <input 
+                    type="text" 
+                    className="input" 
+                    value={loc.name}
+                    onChange={e => updateLocation(i, 'name', e.target.value)}
+                    style={{ padding: '6px 10px', marginTop: 4 }}
+                    placeholder="VD: Cơ sở chính, Kho..."
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>Vĩ độ (Lat)</label>
+                  <input 
+                    type="number"
+                    step="any"
+                    className="input" 
+                    value={loc.latitude}
+                    onChange={e => updateLocation(i, 'latitude', parseFloat(e.target.value) || 0)}
+                    style={{ padding: '6px 10px', marginTop: 4 }}
+                    placeholder="VD: 21.02851"
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>Kinh độ (Lng)</label>
+                  <input 
+                    type="number"
+                    step="any"
+                    className="input" 
+                    value={loc.longitude}
+                    onChange={e => updateLocation(i, 'longitude', parseFloat(e.target.value) || 0)}
+                    style={{ padding: '6px 10px', marginTop: 4 }}
+                    placeholder="VD: 105.85444"
+                  />
+                </div>
+                <div style={{ width: 110 }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>Bán kính (m)</label>
+                  <input 
+                    type="number" 
+                    className="input" 
+                    value={loc.radiusMeters}
+                    onChange={e => updateLocation(i, 'radiusMeters', parseInt(e.target.value) || 100)}
+                    style={{ padding: '6px 10px', marginTop: 4 }}
+                    placeholder="100"
+                  />
+                </div>
+                <div style={{ paddingTop: 20 }}>
+                  <button 
+                    onClick={() => removeLocation(i)}
+                    style={{ width: 36, height: 36, borderRadius: 18, border: 'none', background: 'var(--primary)', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    title="Xóa vị trí này"
                   >
                     ×
                   </button>

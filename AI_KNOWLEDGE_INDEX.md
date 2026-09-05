@@ -113,10 +113,10 @@ cloud_firestore
 | `name` | `string` | Tên cửa hàng (VD: *Trạm Chanh Tràng Tiền*) |
 | `code` | `string` | Mã tham gia 6 ký tự viết hoa (VD: `TC8899`) |
 | `ownerId` | `string` | UID của Chủ cửa hàng |
-| `address` | `string?` | Địa chỉ vật lý |
-| `latitude`, `longitude` | `number?` | Tọa độ GPS của cửa hàng |
+| `locations` | `StoreLocation[]` | Danh sách tối đa **5 vị trí GPS** có đặt tên riêng (`id`, `name`, `latitude`, `longitude`, `radiusMeters`) |
+| `latitude`, `longitude` | `number?` | Tọa độ GPS chính của cửa hàng (tự động đồng bộ từ vị trí đầu tiên) |
 | `radiusMeters` | `number` | Bán kính cho phép chấm công GPS (Mặc định: 100m) |
-| `wifis` | `StoreWifi[]` | Danh sách tối đa **10 điểm WiFi** (`name`, `ip`) |
+| `wifis` | `StoreWifi[]` | Danh sách tối đa **10 điểm WiFi** xác thực theo BSSID Access Point (`name`, `ssid`, `bssid`, `createdAt`) |
 | `customShifts` | `ShiftDefinition[]` | Cấu hình ca làm việc riêng (`id`, `name`, `startHour`, `startMinute`, `endHour`, `endMinute`) |
 | `departments` | `Department[]` | Danh sách bộ phận (`id`, `name`, `shortName` e.g. `SX`, `BH`, `KHO`) |
 | `deliveryAllowance` | `number` | Mức phụ cấp mỗi ca chở hàng (VNĐ) |
@@ -194,7 +194,10 @@ Hệ thống phân cấp chặt chẽ thành **4 vai trò độc lập** (`AppPe
 ## 5. CÁC QUY TRÌNH NGHIỆP VỤ CỐT LÕI (CORE BUSINESS LOGIC)
 
 ### 5.1. Quy Trình Chấm Công Đa Kênh & Ca Xuyên Đêm (Cross-Midnight)
-1. **Chấm công đa phương thức**: Hỗ trợ WiFi (so khớp tối đa 10 IP/SSID), GPS (bán kính `radiusMeters`) và QR Code động.
+1. **Chấm công đa phương thức**:
+   - **WiFi**: So khớp tối đa 10 điểm IP/SSID cửa hàng cho phép.
+   - **GPS Đa Vị Trí (Tối đa 5 vị trí có đặt tên)**: Cửa hàng có thể thiết lập tối đa **5 vị trí GPS** với tên tùy chỉnh riêng (VD: *Cơ sở chính, Kho sản xuất, Chi nhánh 2...*) và bán kính riêng từng điểm. Nhân viên có mặt trong bán kính của bất kỳ vị trí nào đều chấm công hợp lệ. Hệ thống thông báo rõ tên vị trí mà nhân viên đang có mặt, hoặc thông báo khoảng cách tới vị trí gần nhất nếu đứng ngoài bán kính.
+   - **QR Code**: Quét mã QR động điểm danh tại cửa hàng.
 2. **Cơ chế ca xuyên đêm (Cross-Midnight Persistence)**:
    - Hệ thống truy vấn trạng thái làm việc qua `watchActiveAttendance(storeId, userId)`: Tìm bản ghi có `checkOut == null` (không bị giới hạn cứng bởi ngày `date == today`).
    - Khi nhân viên vào ca lúc `22:00` tối hôm nay và checkout lúc `06:00` sáng hôm sau, trạng thái "Đang làm việc" vẫn duy trì nguyên vẹn và số giờ công được tính chính xác là 8.0 giờ.
