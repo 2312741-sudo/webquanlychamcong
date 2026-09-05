@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../layout';
 import { updateStore, clearAllSchedules, deleteAllAttendances, deleteStoreAndCleanup } from '@/lib/firestore';
-import { ShiftDefinition, Department, StoreLocation } from '@/lib/types';
+import { ShiftDefinition, Department, StoreLocation, StoreWifi } from '@/lib/types';
 
 export default function SettingsPage() {
   const { storeId, store } = useApp();
@@ -14,6 +14,7 @@ export default function SettingsPage() {
   const [giaoHangAllowance, setGiaoHangAllowance] = useState(0);
   const [deliveryEnabled, setDeliveryEnabled] = useState(true);
   const [giaoHangEnabled, setGiaoHangEnabled] = useState(true);
+  const [departmentSelectionEnabled, setDepartmentSelectionEnabled] = useState(true);
   const [wifis, setWifis] = useState<StoreWifi[]>([]);
   const [locations, setLocations] = useState<StoreLocation[]>([]);
   const [shifts, setShifts] = useState<ShiftDefinition[]>([]);
