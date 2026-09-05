@@ -1,7 +1,8 @@
 # 🧠 CHẤM CÔNG TRẠM — TÀI LIỆU TOÀN DIỆN & CHỈ MỤC TRI THỨC HỆ THỐNG (AI KNOWLEDGE INDEX)
 
 > **Dành cho các AI Agents, Nhà phát triển & Kỹ sư hệ thống kế thừa.**  
-> Tài liệu này chuẩn hóa toàn bộ bức tranh kiến trúc, mô hình dữ liệu, phân quyền (RBAC), quy trình nghiệp vụ và các quy chuẩn kỹ thuật của hệ thống **Chấm Công Trạm**. Bất kỳ AI hoặc lập trình viên nào khi đọc tài liệu này đều có thể nắm bắt 100% ngữ cảnh để tiếp tục phát triển, bảo trì hoặc mở rộng hệ thống mà không làm gãy vỡ logic hiện tại.
+> Tài liệu này chuẩn hóa toàn bộ bức tranh kiến trúc, mô hình dữ liệu, phân quyền (RBAC), quy trình nghiệp vụ và các quy chuẩn kỹ thuật của hệ thống **Chấm Công Trạm**. Bất kỳ AI hoặc lập trình viên nào khi đọc tài liệu này đều có thể nắm bắt 100% ngữ cảnh để tiếp tục phát triển, bảo trì hoặc mở rộng hệ thống mà không làm gãy vỡ logic hiện tại.  
+> **Phiên bản hệ thống hiện tại:** `v1.0.7` (Mobile: `1.0.7+9`, Web: `1.0.7`)
 
 ---
 
