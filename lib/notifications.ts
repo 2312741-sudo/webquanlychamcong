@@ -24,12 +24,13 @@ export function watchNotifications(storeId: string, userId: string | null | unde
     subscriptions.forEach(stop => stop());
     cb([]); onUnread?.(0);
     const sources = queries(storeId, userId, role, profile.data()?.notifyShiftInOut !== false);
+    let failed = false;
     const pages = new Map<number, AppNotification[]>();
     const counts = new Map<number, number>();
-    const fail = (error: Error) => { if (!stopped) { cb([]); onUnread?.(0); onError(error); } };
+    const fail = (error: Error) => { failed = true; pages.clear(); counts.clear(); if (!stopped) { cb([]); onUnread?.(0); onError(error); } };
     subscriptions = sources.flatMap((source, index) => [
       onSnapshot(query(source, orderBy('createdAt', 'desc'), limit(pageSize)), snapshot => {
-        if (stopped) return;
+        if (stopped || failed) return;
         pages.set(index, snapshot.docs.map(item => {
           const data = item.data();
           return { ...data, id: item.id, readBy: data.readAt ? [userId] : [] } as AppNotification;
@@ -38,7 +39,7 @@ export function watchNotifications(storeId: string, userId: string | null | unde
           (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0) || a.id.localeCompare(b.id)));
       }, fail),
       onSnapshot(query(source, where('readAt', '==', null)), snapshot => {
-        if (stopped) return;
+        if (stopped || failed) return;
         counts.set(index, snapshot.size);
         if (counts.size === sources.length) onUnread?.([...counts.values()].reduce((a, b) => a + b, 0));
       }, fail),

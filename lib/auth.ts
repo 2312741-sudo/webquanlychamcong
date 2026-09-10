@@ -6,7 +6,8 @@ import {
   User,
   GoogleAuthProvider,
   OAuthProvider,
-  signInWithPopup
+  signInWithPopup,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import { getDoc, setDoc, updateDoc, doc } from 'firebase/firestore';
 
@@ -39,6 +40,14 @@ async function ensureUserDoc(user: User) {
 
 export async function signIn(email: string, password: string) {
   return signInWithEmailAndPassword(auth, email, password);
+}
+
+export async function sendPasswordReset(email: string) {
+  const cleanEmail = email.trim().toLowerCase();
+  if (!cleanEmail) {
+    throw new Error('Vui lòng nhập địa chỉ email');
+  }
+  return sendPasswordResetEmail(auth, cleanEmail);
 }
 
 export async function signInWithGoogle() {

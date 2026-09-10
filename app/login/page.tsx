@@ -1,7 +1,7 @@
 'use client';
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { signIn, signInWithGoogle, signInWithApple } from '@/lib/auth';
+import { signIn, signInWithGoogle, signInWithApple, sendPasswordReset } from '@/lib/auth';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,7 +12,14 @@ export default function LoginPage() {
   const [appleLoading, setAppleLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const isAnyLoading = loading || googleLoading || appleLoading;
+  // Forgot password state
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetError, setResetError] = useState('');
+  const [resetSuccess, setResetSuccess] = useState(false);
+
+  const isAnyLoading = loading || googleLoading || appleLoading || resetLoading;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -79,6 +86,33 @@ export default function LoginPage() {
       }
     } finally {
       setAppleLoading(false);
+    }
+  }
+
+  async function handleResetPassword(e: FormEvent) {
+    e.preventDefault();
+    setResetError('');
+    const clean = resetEmail.trim().toLowerCase();
+    if (!clean) {
+      setResetError('Vui lòng nhập địa chỉ email');
+      return;
+    }
+    setResetLoading(true);
+    try {
+      await sendPasswordReset(clean);
+      setResetSuccess(true);
+    } catch (err: any) {
+      if (err.code === 'auth/invalid-email') {
+        setResetError('Địa chỉ email không đúng định dạng');
+      } else if (err.code === 'auth/user-not-found') {
+        setResetError('Không tìm thấy tài khoản với email này');
+      } else if (err.code === 'auth/too-many-requests') {
+        setResetError('Quá nhiều yêu cầu. Vui lòng thử lại sau ít phút');
+      } else {
+        setResetError(err.message || 'Gửi email đặt lại mật khẩu thất bại. Vui lòng thử lại.');
+      }
+    } finally {
+      setResetLoading(false);
     }
   }
 
@@ -152,7 +186,31 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <label className="label">Mật khẩu</label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <label className="label" style={{ margin: 0 }}>Mật khẩu</label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResetEmail(email.trim());
+                    setResetError('');
+                    setResetSuccess(false);
+                    setShowResetModal(true);
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    color: 'var(--primary)',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+                  onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+                >
+                  Quên mật khẩu?
+                </button>
+              </div>
               <input
                 type="password"
                 className="input"
@@ -294,6 +352,165 @@ export default function LoginPage() {
           </p>
         </div>
       </div>
+
+      {/* Forgot Password Modal */}
+      {showResetModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.55)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 20,
+          zIndex: 9999,
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: 20,
+            padding: 28,
+            maxWidth: 440,
+            width: '100%',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+          }}>
+            {resetSuccess ? (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{
+                  width: 60,
+                  height: 60,
+                  borderRadius: '50%',
+                  background: 'rgba(26, 107, 90, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 16px',
+                  color: 'var(--success, #1A6B5A)',
+                }}>
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </div>
+                <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, color: 'var(--neutral)' }}>
+                  Đã gửi email đặt lại mật khẩu
+                </h3>
+                <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: 16 }}>
+                  Link đặt lại mật khẩu đã được gửi đến: <br />
+                  <strong style={{ color: 'var(--neutral)' }}>{resetEmail}</strong>
+                </p>
+
+                <div style={{
+                  background: '#FFFBEB',
+                  border: '1px solid #FDE68A',
+                  borderRadius: 12,
+                  padding: 14,
+                  textAlign: 'left',
+                  fontSize: 12,
+                  color: '#78350F',
+                  lineHeight: 1.5,
+                  marginBottom: 20,
+                }}>
+                  <div style={{ fontWeight: 700, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6, color: '#92400E' }}>
+                    <span>⚠️ Lưu ý quan trọng:</span>
+                  </div>
+                  <ul style={{ paddingLeft: 16, margin: 0 }}>
+                    <li>Hãy kiểm tra kỹ mục <b>Thư rác (Spam / Junk)</b> hoặc <b>Quảng cáo</b> nếu không thấy ở Hộp thư đến.</li>
+                    <li>Nếu bạn đăng ký qua <b>Google</b> hoặc <b>Apple</b>, bạn không cần mật khẩu. Hãy dùng nút Google/Apple để đăng nhập.</li>
+                    <li>Bấm vào link trong email để nhập mật khẩu mới, sau đó quay lại đăng nhập.</li>
+                  </ul>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowResetModal(false)}
+                  className="btn btn-primary"
+                  style={{ width: '100%', justifyContent: 'center', padding: '12px 20px', fontSize: 14 }}
+                >
+                  Đã hiểu, quay lại đăng nhập
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleResetPassword}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                  <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: 'var(--neutral)' }}>
+                    Quên mật khẩu
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowResetModal(false)}
+                    disabled={resetLoading}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: 20,
+                      color: 'var(--text-secondary)',
+                      lineHeight: 1,
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+
+                <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16 }}>
+                  Nhập email tài khoản của bạn để nhận liên kết đặt lại mật khẩu:
+                </p>
+
+                {resetError && (
+                  <div style={{
+                    background: 'var(--primary-light)',
+                    color: 'var(--primary)',
+                    padding: '10px 14px',
+                    borderRadius: 8,
+                    fontSize: 13,
+                    marginBottom: 16,
+                    borderLeft: '3px solid var(--primary)',
+                  }}>
+                    {resetError}
+                  </div>
+                )}
+
+                <div style={{ marginBottom: 20 }}>
+                  <label className="label">Địa chỉ email</label>
+                  <input
+                    type="email"
+                    className="input"
+                    placeholder="example@email.com"
+                    value={resetEmail}
+                    onChange={e => setResetEmail(e.target.value)}
+                    required
+                    autoFocus
+                    disabled={resetLoading}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowResetModal(false)}
+                    disabled={resetLoading}
+                    className="btn btn-secondary"
+                    style={{ padding: '10px 16px' }}
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={resetLoading}
+                    className="btn btn-primary"
+                    style={{ padding: '10px 20px' }}
+                  >
+                    {resetLoading ? 'Đang gửi...' : 'Gửi email đặt lại'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
