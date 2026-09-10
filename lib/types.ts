@@ -252,6 +252,8 @@ export type AppNotificationType =
   | 'checklist_reminder'
   | 'delivery_update'
   | 'birthday'
+  | 'check_in'
+  | 'check_out'
   | 'general';
 
 export interface AppNotification {
@@ -265,6 +267,7 @@ export interface AppNotification {
   targetUserId?: string;
   targetRoles?: UserRole[];
   readBy: string[];
+  readAt?: any;
   routePath?: string;
   routeExtra?: Record<string, any>;
 }

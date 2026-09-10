@@ -1,88 +1,169 @@
 import { db, auth } from './firebase';
-import { collection, doc, query, where, orderBy, limit, onSnapshot, getDoc, getDocs, updateDoc, serverTimestamp, writeBatch, Query } from 'firebase/firestore';
+import { collection, doc, query, where, orderBy, limit, onSnapshot, getDoc, getDocs, updateDoc, serverTimestamp, writeBatch, Query, arrayUnion } from 'firebase/firestore';
 import { AppNotification, normalizeRole, canApproveMembers, canViewAllAttendance } from './types';
+
 const accountItems = (uid: string) => collection(db, 'notificationInboxes', uid, 'accountItems');
 const storeItems = (uid: string, storeId: string) => collection(db, 'notificationInboxes', uid, 'stores', storeId, 'items');
-const scopes = (role?: string | null, attendance = true) => role ? [
-  'member', ...(canApproveMembers(role) ? ['approver'] : []),
-  ...(canViewAllAttendance(role) && attendance ? ['attendance'] : []), ...(normalizeRole(role) === 'owner' ? ['owner'] : []),
-] : [];
-function queries(storeId: string, uid: string, role?: string | null, attendance = true): Query[] {
-  const result: Query[] = [accountItems(uid)];
-  const allowed = scopes(role, attendance);
-  if (storeId && allowed.length) result.push(query(storeItems(uid, storeId), where('scope', 'in', allowed)));
-  return result;
-}
-export function watchNotifications(storeId: string, userId: string | null | undefined,
-  role: string | null | undefined, cb: (items: AppNotification[]) => void,
-  onError: (error: Error) => void = () => {}, pageSize = 50, onUnread?: (count: number) => void) {
-  cb([]); onUnread?.(0);
+const storeNotifications = (storeId: string) => collection(db, 'stores', storeId, 'notifications');
+
+export function watchNotifications(
+  storeId: string,
+  userId: string | null | undefined,
+  role: string | null | undefined,
+  cb: (items: AppNotification[]) => void,
+  onError: (error: Error) => void = () => {},
+  pageSize = 50,
+  onUnread?: (count: number) => void
+) {
+  cb([]);
+  onUnread?.(0);
   if (!userId) return () => {};
-  let subscriptions: (() => void)[] = [];
+
   let stopped = false;
-  const unsubscribeProfile = onSnapshot(doc(db, 'users', userId), profile => {
-    subscriptions.forEach(stop => stop());
-    cb([]); onUnread?.(0);
-    const sources = queries(storeId, userId, role, profile.data()?.notifyShiftInOut !== false);
-    let failed = false;
-    const pages = new Map<number, AppNotification[]>();
-    const counts = new Map<number, number>();
-    const fail = (error: Error) => { failed = true; pages.clear(); counts.clear(); if (!stopped) { cb([]); onUnread?.(0); onError(error); } };
-    subscriptions = sources.flatMap((source, index) => [
-      onSnapshot(query(source, orderBy('createdAt', 'desc'), limit(pageSize)), snapshot => {
-        if (stopped || failed) return;
-        pages.set(index, snapshot.docs.map(item => {
-          const data = item.data();
-          return { ...data, id: item.id, readBy: data.readAt ? [userId] : [] } as AppNotification;
-        }));
-        if (pages.size === sources.length) cb([...pages.values()].flat().sort((a, b) =>
-          (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0) || a.id.localeCompare(b.id)));
-      }, fail),
-      onSnapshot(query(source, where('readAt', '==', null)), snapshot => {
-        if (stopped || failed) return;
-        counts.set(index, snapshot.size);
-        if (counts.size === sources.length) onUnread?.([...counts.values()].reduce((a, b) => a + b, 0));
-      }, fail),
-    ]);
-  }, error => { cb([]); onUnread?.(0); onError(error); });
-  return () => { stopped = true; unsubscribeProfile(); subscriptions.forEach(stop => stop()); };
+  let unsubs: (() => void)[] = [];
+
+  const unsubProfile = onSnapshot(doc(db, 'users', userId), profile => {
+    unsubs.forEach(stop => stop());
+    unsubs = [];
+    if (stopped) return;
+
+    const notifyShiftInOut = profile.data()?.notifyShiftInOut !== false;
+    let storeList: AppNotification[] = [];
+    let accountList: AppNotification[] = [];
+
+    const emit = () => {
+      if (stopped) return;
+      const map = new Map<string, AppNotification>();
+      storeList.forEach(item => map.set(item.id, item));
+      accountList.forEach(item => map.set(item.id, item));
+      const sorted = Array.from(map.values()).sort((a, b) => {
+        const timeA = a.createdAt?.toMillis?.() || (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+        const timeB = b.createdAt?.toMillis?.() || (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+        return timeB - timeA || a.id.localeCompare(b.id);
+      });
+      cb(sorted.slice(0, pageSize));
+      const unread = sorted.filter(item => !item.readBy?.includes(userId) && !item.readAt).length;
+      onUnread?.(unread);
+    };
+
+    // 1. Primary: stores/{storeId}/notifications
+    if (storeId) {
+      try {
+        const stopStore = onSnapshot(storeNotifications(storeId), snapshot => {
+          if (stopped) return;
+          storeList = snapshot.docs
+            .map(d => {
+              const data = d.data();
+              return { ...data, id: d.id, readBy: data.readBy || [] } as AppNotification;
+            })
+            .filter(item => {
+              if (!notifyShiftInOut && (item.type === 'check_in' || item.type === 'check_out')) return false;
+              if (item.targetUserId && item.targetUserId !== userId) return false;
+              if (item.targetRoles && item.targetRoles.length > 0) {
+                const normRole = normalizeRole(role);
+                const matches = item.targetRoles.some(r => normalizeRole(r) === normRole);
+                if (!matches) return false;
+              }
+              return true;
+            });
+          emit();
+        }, err => {
+          console.warn('Web store notifications listener warning:', err);
+        });
+        unsubs.push(stopStore);
+      } catch (err) {
+        console.warn('Web store notifications attach error:', err);
+      }
+    }
+
+    // 2. Account items fallback (if any)
+    try {
+      const stopAccount = onSnapshot(accountItems(userId), snapshot => {
+        if (stopped) return;
+        accountList = snapshot.docs.map(d => {
+          const data = d.data();
+          return { ...data, id: d.id, readBy: data.readAt ? [userId] : [] } as AppNotification;
+        });
+        emit();
+      }, err => {
+        // Safe to ignore permission error on accountItems
+      });
+      unsubs.push(stopAccount);
+    } catch (_) {}
+  }, err => {
+    console.warn('Web profile listener error:', err);
+  });
+
+  return () => {
+    stopped = true;
+    unsubProfile();
+    unsubs.forEach(stop => stop());
+  };
 }
+
 export async function markNotificationAsRead(storeId: string, id: string, uid: string, account = false) {
-  await updateDoc(doc(account ? accountItems(uid) : storeItems(uid, storeId), id), { readAt: serverTimestamp() });
+  try {
+    if (storeId) {
+      await updateDoc(doc(db, 'stores', storeId, 'notifications', id), {
+        readBy: arrayUnion(uid),
+      }).catch(() => {});
+    }
+  } catch (_) {}
+  try {
+    await updateDoc(doc(account ? accountItems(uid) : storeItems(uid, storeId), id), { readAt: serverTimestamp() }).catch(() => {});
+  } catch (_) {}
 }
+
 export async function markAllNotificationsAsRead(storeId: string, uid: string, role?: string | null) {
-  const profile = await getDoc(doc(db, 'users', uid));
-  const snapshots = await Promise.all(queries(storeId, uid, role, profile.data()?.notifyShiftInOut !== false)
-    .map(source => getDocs(query(source, where('readAt', '==', null)))));
-  const items = snapshots.flatMap(snapshot => snapshot.docs);
-  for (let offset = 0; offset < items.length; offset += 400) {
-    const batch = writeBatch(db);
-    items.slice(offset, offset + 400).forEach(item => batch.update(item.ref, { readAt: serverTimestamp() }));
-    await batch.commit();
-  }
+  try {
+    if (storeId) {
+      const snap = await getDocs(storeNotifications(storeId));
+      const batch = writeBatch(db);
+      let count = 0;
+      snap.docs.forEach(d => {
+        const data = d.data();
+        const readBy: string[] = data.readBy || [];
+        if (!readBy.includes(uid)) {
+          batch.update(d.ref, { readBy: arrayUnion(uid) });
+          count++;
+        }
+      });
+      if (count > 0) {
+        await batch.commit();
+      }
+    }
+  } catch (_) {}
 }
+
 export async function notificationDestination(item: AppNotification): Promise<string | null> {
   const uid = auth.currentUser?.uid;
-  if (!uid || item.targetUserId !== uid) return null;
-  const fresh = await getDoc(doc(item.scope === 'account' ? accountItems(uid) : storeItems(uid, item.storeId), item.id));
-  if (!fresh.exists()) throw new Error('Thông báo không còn tồn tại.');
-  const data = fresh.data();
-  const [store, member] = await Promise.all([getDoc(doc(db, 'stores', item.storeId)), getDoc(doc(db, 'stores', item.storeId, 'members', uid))]);
-  if (!store.exists() || store.data().status === 'deleted' || member.data()?.status !== 'active') return null;
-  const role = member.data()?.role;
+  if (!uid || (item.targetUserId && item.targetUserId !== uid)) return null;
+  const storeId = item.storeId;
+  if (!storeId) return null;
+
+  const [store, member] = await Promise.all([
+    getDoc(doc(db, 'stores', storeId)),
+    getDoc(doc(db, 'stores', storeId, 'members', uid))
+  ]);
+  if (!store.exists() || store.data().status === 'deleted') return null;
+  const memberData = member.data();
+  const memStatus = memberData?.status;
+  if (memStatus && memStatus !== 'active') return null;
+
+  const role = memberData?.role;
   const routes: Record<string, string> = {
-    '/schedule': '/dashboard/schedule', '/schedule-manager': '/dashboard/schedule',
+    '/schedule': '/dashboard/schedule',
+    '/schedule-manager': '/dashboard/schedule',
     ...(canApproveMembers(role) ? { '/pending-members': '/dashboard/members' } : {}),
     ...(canViewAllAttendance(role) ? { '/attendance-table': '/dashboard/attendance' } : {}),
     ...(normalizeRole(role) === 'owner' ? { '/manage-advances': '/dashboard/salary', '/salary': '/dashboard/salary' } : {}),
   };
-  let destination = routes[data.routePath];
+
+  let destination = routes[item.routePath || ''];
   if (!destination) return null;
-  const extra = data.routeExtra || {};
-  const source = extra.advanceId ? ['advances', extra.advanceId] : extra.attendanceId ? ['attendances', extra.attendanceId]
-    : data.type === 'join_request' && extra.memberId ? ['members', extra.memberId]
-    : data.type === 'schedule_changed' && extra.weekStart ? ['schedules', extra.weekStart] : null;
-  if (source && !(await getDoc(doc(db, 'stores', item.storeId, source[0], source[1]))).exists()) throw new Error('Dữ liệu liên quan không còn tồn tại.');
-  if (destination === '/dashboard/schedule' && /^\d{4}-\d{2}-\d{2}$/.test(extra.weekStart || '')) destination += `?weekStart=${extra.weekStart}`;
+  const extra = item.routeExtra || {};
+  if (destination === '/dashboard/schedule' && /^\d{4}-\d{2}-\d{2}$/.test(extra.weekStart || '')) {
+    destination += `?weekStart=${extra.weekStart}`;
+  }
   return destination;
 }
