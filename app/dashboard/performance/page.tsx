@@ -225,12 +225,12 @@ export default function PerformanceOverviewPage() {
 
     return Array.from(map.values()).map((v) => ({
       date: v.dateStr,
-      'TB Nước (s)': v.rawDrinkQty > 0 ? Math.round(v.rawDrinkSec / v.rawDrinkQty) : null,
-      'TB Bánh (s)': v.rawCakeQty > 0 ? Math.round(v.rawCakeSec / v.rawCakeQty) : null,
-      'TB Đơn (s)': v.rawOrderCount > 0 ? Math.round(v.rawOrderSec / v.rawOrderCount) : null,
-      'Số ly Nước': v.rawDrinkQty,
-      'Số Bánh': v.rawCakeQty,
-      'Số Đơn hàng': v.rawOrderCount,
+      'TB Làm nước (s)': v.rawDrinkQty > 0 ? Math.round(v.rawDrinkSec / v.rawDrinkQty) : null,
+      'TB Nướng bánh (s)': v.rawCakeQty > 0 ? Math.round(v.rawCakeSec / v.rawCakeQty) : null,
+      'TB SOS Đơn (s)': v.rawOrderCount > 0 ? Math.round(v.rawOrderSec / v.rawOrderCount) : null,
+      'Số ly Làm nước': v.rawDrinkQty,
+      'Số Nướng bánh': v.rawCakeQty,
+      'Số SOS Đơn': v.rawOrderCount,
       'Sự cố': v.incidentCount,
     }));
   }, [filteredReports]);
@@ -327,7 +327,7 @@ export default function PerformanceOverviewPage() {
         {/* NƯỚC */}
         <div className="card" style={{ borderLeft: '4px solid #0284C7', padding: '16px 20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>🥤 PHA CHẾ NƯỚC</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>🥤 LÀM NƯỚC</span>
             <span style={{ fontSize: 11, background: '#E0F2FE', color: '#0369A1', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
               Chuẩn: {standards.drink}s
             </span>
@@ -346,7 +346,7 @@ export default function PerformanceOverviewPage() {
         {/* BÁNH */}
         <div className="card" style={{ borderLeft: '4px solid #D97706', padding: '16px 20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>🍰 CHẾ BIẾN BÁNH</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>🍰 NƯỚNG BÁNH</span>
             <span style={{ fontSize: 11, background: '#FEF3C7', color: '#B45309', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
               Chuẩn: {standards.cake}s
             </span>
@@ -365,7 +365,7 @@ export default function PerformanceOverviewPage() {
         {/* ĐƠN HÀNG */}
         <div className="card" style={{ borderLeft: '4px solid #1C4E6B', padding: '16px 20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>📦 XỬ LÝ ĐƠN HÀNG</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>📦 SOS ĐƠN HÀNG</span>
             <span style={{ fontSize: 11, background: '#E3EEF5', color: '#1C4E6B', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
               Chuẩn: {standards.order}s
             </span>
@@ -439,12 +439,12 @@ export default function PerformanceOverviewPage() {
                   <Tooltip formatter={(val: any) => [`${val} giây (${formatSecondsToMMSS(val)})`]} />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
                   {/* Đường tiêu chuẩn */}
-                  <ReferenceLine y={standards.drink} stroke="#0284C7" strokeDasharray="4 4" label={{ value: `Chuẩn Nước: ${standards.drink}s`, position: 'insideTopRight', fill: '#0284C7', fontSize: 10 }} />
-                  <ReferenceLine y={standards.order} stroke="#1C4E6B" strokeDasharray="4 4" label={{ value: `Chuẩn Đơn: ${standards.order}s`, position: 'insideTopRight', fill: '#1C4E6B', fontSize: 10 }} />
+                  <ReferenceLine y={standards.drink} stroke="#0284C7" strokeDasharray="4 4" label={{ value: `Chuẩn Làm nước: ${standards.drink}s`, position: 'insideTopRight', fill: '#0284C7', fontSize: 10 }} />
+                  <ReferenceLine y={standards.order} stroke="#1C4E6B" strokeDasharray="4 4" label={{ value: `Chuẩn SOS Đơn: ${standards.order}s`, position: 'insideTopRight', fill: '#1C4E6B', fontSize: 10 }} />
                   
-                  <Line type="monotone" dataKey="TB Nước (s)" stroke="#0284C7" strokeWidth={2.5} dot={{ r: 4 }} connectNulls />
-                  <Line type="monotone" dataKey="TB Bánh (s)" stroke="#D97706" strokeWidth={2.5} dot={{ r: 4 }} connectNulls />
-                  <Line type="monotone" dataKey="TB Đơn (s)" stroke="#1C4E6B" strokeWidth={2.5} dot={{ r: 4 }} connectNulls />
+                  <Line type="monotone" dataKey="TB Làm nước (s)" stroke="#0284C7" strokeWidth={2.5} dot={{ r: 4 }} connectNulls />
+                  <Line type="monotone" dataKey="TB Nướng bánh (s)" stroke="#D97706" strokeWidth={2.5} dot={{ r: 4 }} connectNulls />
+                  <Line type="monotone" dataKey="TB SOS Đơn (s)" stroke="#1C4E6B" strokeWidth={2.5} dot={{ r: 4 }} connectNulls />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
@@ -463,7 +463,7 @@ export default function PerformanceOverviewPage() {
                 Sản Lượng Đo Lường Theo Ngày
               </h3>
               <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                Tổng số ly nước, bánh và đơn hàng đã được đo trong các ca
+                Tổng số ly làm nước, nướng bánh và SOS đơn hàng đã được đo trong các ca
               </p>
             </div>
           </div>
@@ -477,9 +477,9 @@ export default function PerformanceOverviewPage() {
                   <YAxis tick={{ fontSize: 11 }} />
                   <Tooltip />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="Số ly Nước" fill="#0284C7" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Số Bánh" fill="#D97706" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Số Đơn hàng" fill="#1C4E6B" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Số ly Làm nước" fill="#0284C7" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Số Nướng bánh" fill="#D97706" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Số SOS Đơn" fill="#1C4E6B" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -521,9 +521,9 @@ export default function PerformanceOverviewPage() {
                 <tr style={{ borderBottom: '1px solid var(--border)', textAlign: 'left', color: 'var(--text-secondary)' }}>
                   <th style={{ padding: '8px 12px' }}>Thời gian ca</th>
                   <th style={{ padding: '8px 12px' }}>Quản lý đứng ca</th>
-                  <th style={{ padding: '8px 12px' }}>Nước (TB/ly)</th>
-                  <th style={{ padding: '8px 12px' }}>Bánh (TB/bánh)</th>
-                  <th style={{ padding: '8px 12px' }}>Đơn (TB/đơn)</th>
+                  <th style={{ padding: '8px 12px' }}>Làm nước (TB/ly)</th>
+                  <th style={{ padding: '8px 12px' }}>Nướng bánh (TB/bánh)</th>
+                  <th style={{ padding: '8px 12px' }}>SOS đơn (TB/đơn)</th>
                   <th style={{ padding: '8px 12px' }}>Sự cố</th>
                   <th style={{ padding: '8px 12px', textAlign: 'right' }}>Thao tác</th>
                 </tr>

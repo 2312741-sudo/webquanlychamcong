@@ -225,8 +225,8 @@ export default function PerformanceLeaderboardPage() {
               background: 'white',
             }}
           >
-            <option value="drink_speed">Tốc độ pha Nước (Nhanh nhất)</option>
-            <option value="drink_qty">Sản lượng pha chế (Nhiều nhất)</option>
+            <option value="drink_speed">Tốc độ Làm nước (Nhanh nhất)</option>
+            <option value="drink_qty">Sản lượng Làm nước (Nhiều nhất)</option>
             <option value="compliance">Tỷ lệ đạt chuẩn (%)</option>
             <option value="sessions">Số ca tham gia</option>
           </select>
@@ -343,10 +343,10 @@ export default function PerformanceLeaderboardPage() {
                 <th style={{ padding: '10px 16px' }}>Hạng</th>
                 <th style={{ padding: '10px 16px' }}>Nhân sự / Barista</th>
                 <th style={{ padding: '10px 16px' }}>Số ca tham gia</th>
-                <th style={{ padding: '10px 16px' }}>Tốc độ Nước TB</th>
-                <th style={{ padding: '10px 16px' }}>Sản lượng Nước</th>
-                <th style={{ padding: '10px 16px' }}>Tốc độ Bánh TB</th>
-                <th style={{ padding: '10px 16px' }}>Sản lượng Bánh</th>
+                <th style={{ padding: '10px 16px' }}>Tốc độ Làm nước TB</th>
+                <th style={{ padding: '10px 16px' }}>Sản lượng Làm nước</th>
+                <th style={{ padding: '10px 16px' }}>Tốc độ Nướng bánh TB</th>
+                <th style={{ padding: '10px 16px' }}>Sản lượng Nướng bánh</th>
                 <th style={{ padding: '10px 16px' }}>Tỷ lệ đạt chuẩn</th>
                 <th style={{ padding: '10px 16px' }}>Sự cố liên đới</th>
               </tr>

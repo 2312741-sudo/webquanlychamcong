@@ -176,7 +176,7 @@ export default function PerformanceSettingsPage() {
             {/* Drink */}
             <div style={{ border: '1px solid var(--border)', padding: 16, borderRadius: 10 }}>
               <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#0284C7', marginBottom: 6 }}>
-                🥤 Tiêu chuẩn Nước (giây / ly)
+                🥤 Tiêu chuẩn Làm nước (giây / ly)
               </label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <input
@@ -206,7 +206,7 @@ export default function PerformanceSettingsPage() {
             {/* Cake */}
             <div style={{ border: '1px solid var(--border)', padding: 16, borderRadius: 10 }}>
               <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#D97706', marginBottom: 6 }}>
-                🍰 Tiêu chuẩn Bánh (giây / bánh)
+                🍰 Tiêu chuẩn Nướng bánh (giây / bánh)
               </label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <input
@@ -236,7 +236,7 @@ export default function PerformanceSettingsPage() {
             {/* Order */}
             <div style={{ border: '1px solid var(--border)', padding: 16, borderRadius: 10 }}>
               <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#1C4E6B', marginBottom: 6 }}>
-                📦 Tiêu chuẩn Đơn hàng (giây / đơn)
+                📦 Tiêu chuẩn SOS đơn hàng (giây / đơn)
               </label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <input

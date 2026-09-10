@@ -249,9 +249,9 @@ function PerformanceReportsContent() {
                 <th style={{ padding: '12px 16px' }}>Thời gian ca</th>
                 <th style={{ padding: '12px 16px' }}>Quản lý đứng ca</th>
                 <th style={{ padding: '12px 16px' }}>Nhân viên trong ca</th>
-                <th style={{ padding: '12px 16px' }}>Nước (TB/ly)</th>
-                <th style={{ padding: '12px 16px' }}>Bánh (TB/bánh)</th>
-                <th style={{ padding: '12px 16px' }}>Đơn hàng (TB/đơn)</th>
+                <th style={{ padding: '12px 16px' }}>Làm nước (TB/ly)</th>
+                <th style={{ padding: '12px 16px' }}>Nướng bánh (TB/bánh)</th>
+                <th style={{ padding: '12px 16px' }}>SOS đơn hàng (TB/đơn)</th>
                 <th style={{ padding: '12px 16px' }}>Sự cố</th>
                 <th style={{ padding: '12px 16px' }}>Trạng thái</th>
                 <th style={{ padding: '12px 16px', textAlign: 'right' }}>Thao tác</th>
@@ -511,7 +511,7 @@ function PerformanceReportsContent() {
               {/* KPI Mini-cards */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
                 <div style={{ border: '1px solid #BAE6FD', background: '#F0F9FF', padding: 12, borderRadius: 10 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#0369A1' }}>🥤 PHA CHẾ NƯỚC</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#0369A1' }}>🥤 LÀM NƯỚC</div>
                   <div style={{ fontSize: 20, fontWeight: 800, color: '#0284C7', marginTop: 4 }}>
                     {selectedReport.drinkAverageSeconds ? `${selectedReport.drinkAverageSeconds}s` : '--'}
                   </div>
@@ -521,7 +521,7 @@ function PerformanceReportsContent() {
                 </div>
 
                 <div style={{ border: '1px solid #FDE68A', background: '#FFFBEB', padding: 12, borderRadius: 10 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#B45309' }}>🍰 CHẾ BIẾN BÁNH</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#B45309' }}>🍰 NƯỚNG BÁNH</div>
                   <div style={{ fontSize: 20, fontWeight: 800, color: '#D97706', marginTop: 4 }}>
                     {selectedReport.cakeAverageSeconds ? `${selectedReport.cakeAverageSeconds}s` : '--'}
                   </div>
@@ -531,7 +531,7 @@ function PerformanceReportsContent() {
                 </div>
 
                 <div style={{ border: '1px solid #CBD5E1', background: '#F8FAFC', padding: 12, borderRadius: 10 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#1C4E6B' }}>📦 XỬ LÝ ĐƠN HÀNG</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#1C4E6B' }}>📦 SOS ĐƠN HÀNG</div>
                   <div style={{ fontSize: 20, fontWeight: 800, color: '#1C4E6B', marginTop: 4 }}>
                     {selectedReport.orderAverageSeconds ? `${selectedReport.orderAverageSeconds}s` : '--'}
                   </div>
@@ -551,9 +551,9 @@ function PerformanceReportsContent() {
                   <div style={{ display: 'inline-flex', background: 'var(--surface)', padding: 2, borderRadius: 6, gap: 2 }}>
                     {[
                       { id: 'all', label: 'Tất cả' },
-                      { id: 'drink', label: 'Nước' },
-                      { id: 'cake', label: 'Bánh' },
-                      { id: 'order', label: 'Đơn' },
+                      { id: 'drink', label: 'Làm nước' },
+                      { id: 'cake', label: 'Nướng bánh' },
+                      { id: 'order', label: 'SOS đơn' },
                     ].map((cat) => (
                       <button
                         key={cat.id}

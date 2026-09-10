@@ -132,9 +132,9 @@ export function parseFirestoreTimestamp(val: any): Date {
 
 export function getCategoryLabel(cat: PerformanceCategory): string {
   switch (cat) {
-    case 'drink': return 'Nước';
-    case 'cake': return 'Bánh';
-    case 'order': return 'Đơn hàng';
+    case 'drink': return 'Làm nước';
+    case 'cake': return 'Nướng bánh';
+    case 'order': return 'SOS đơn hàng';
     default: return cat;
   }
 }

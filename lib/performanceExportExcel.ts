@@ -120,9 +120,9 @@ export async function exportSessionPerformanceExcel(
   const orderStatus = report.orderAverageSeconds <= orderStd ? 'Đạt chuẩn' : `Vượt +${report.orderAverageSeconds - orderStd}s`;
 
   const metricRows = [
-    ['🥤 Nước', `${report.drinkMeasurementCount} lượt (${report.drinkTotalQuantity} ly)`, `${formatSecondsToMMSS(report.drinkAverageSeconds)} / ly`, `${formatSecondsToMMSS(drinkStd)} / ly`, drinkStatus],
-    ['🍰 Bánh', `${report.cakeMeasurementCount} lượt (${report.cakeTotalQuantity} bánh)`, `${formatSecondsToMMSS(report.cakeAverageSeconds)} / bánh`, `${formatSecondsToMMSS(cakeStd)} / bánh`, cakeStatus],
-    ['📦 Đơn hàng', `${report.orderCount} đơn hàng`, `${formatSecondsToMMSS(report.orderAverageSeconds)} / đơn`, `${formatSecondsToMMSS(orderStd)} / đơn`, orderStatus],
+    ['🥤 Làm nước', `${report.drinkMeasurementCount} lượt (${report.drinkTotalQuantity} ly)`, `${formatSecondsToMMSS(report.drinkAverageSeconds)} / ly`, `${formatSecondsToMMSS(drinkStd)} / ly`, drinkStatus],
+    ['🍰 Nướng bánh', `${report.cakeMeasurementCount} lượt (${report.cakeTotalQuantity} bánh)`, `${formatSecondsToMMSS(report.cakeAverageSeconds)} / bánh`, `${formatSecondsToMMSS(cakeStd)} / bánh`, cakeStatus],
+    ['📦 SOS đơn hàng', `${report.orderCount} đơn hàng`, `${formatSecondsToMMSS(report.orderAverageSeconds)} / đơn`, `${formatSecondsToMMSS(orderStd)} / đơn`, orderStatus],
     ['⚠️ Sự cố trong ca', `${report.incidents?.length || 0} vụ việc`, '-', '-', (report.incidents?.length || 0) === 0 ? 'Tốt' : 'Cần lưu ý']
   ];
 
@@ -138,10 +138,10 @@ export async function exportSessionPerformanceExcel(
   });
 
   // ──────────────────────────────────────────
-  // Sheet 2: CHI TIẾT NƯỚC
+  // Sheet 2: CHI TIẾT LÀM NƯỚC
   // ──────────────────────────────────────────
   const drinkMeasurements = measurements.filter((m) => m.category === 'drink');
-  const wsDrinks = wb.addWorksheet('Chi Tiết Nước', { views: [{ showGridLines: true }] });
+  const wsDrinks = wb.addWorksheet('Chi Tiết Làm Nước', { views: [{ showGridLines: true }] });
   wsDrinks.columns = [
     { width: 6 },
     { header: 'STT', key: 'stt', width: 8 },
@@ -182,10 +182,10 @@ export async function exportSessionPerformanceExcel(
   });
 
   // ──────────────────────────────────────────
-  // Sheet 3: CHI TIẾT BÁNH
+  // Sheet 3: CHI TIẾT NƯỚNG BÁNH
   // ──────────────────────────────────────────
   const cakeMeasurements = measurements.filter((m) => m.category === 'cake');
-  const wsCakes = wb.addWorksheet('Chi Tiết Bánh', { views: [{ showGridLines: true }] });
+  const wsCakes = wb.addWorksheet('Chi Tiết Nướng Bánh', { views: [{ showGridLines: true }] });
   wsCakes.columns = [
     { width: 6 },
     { header: 'STT', key: 'stt', width: 8 },
@@ -226,10 +226,10 @@ export async function exportSessionPerformanceExcel(
   });
 
   // ──────────────────────────────────────────
-  // Sheet 4: CHI TIẾT ĐƠN HÀNG
+  // Sheet 4: CHI TIẾT SOS ĐƠN HÀNG
   // ──────────────────────────────────────────
   const orderMeasurements = measurements.filter((m) => m.category === 'order');
-  const wsOrders = wb.addWorksheet('Chi Tiết Đơn Hàng', { views: [{ showGridLines: true }] });
+  const wsOrders = wb.addWorksheet('Chi Tiết SOS Đơn Hàng', { views: [{ showGridLines: true }] });
   wsOrders.columns = [
     { width: 6 },
     { header: 'STT', key: 'stt', width: 8 },
@@ -370,12 +370,12 @@ export async function exportConsolidatedPerformanceReports(
     { header: 'Cửa hàng', width: 22 },
     { header: 'Quản lý đứng ca', width: 20 },
     { header: 'Nhân viên tham gia', width: 28 },
-    { header: 'Nước (Ly)', width: 12 },
-    { header: 'TB Nước (s)', width: 14 },
-    { header: 'Bánh (Cái)', width: 12 },
-    { header: 'TB Bánh (s)', width: 14 },
-    { header: 'Đơn hàng', width: 12 },
-    { header: 'TB Đơn (s)', width: 14 },
+    { header: 'Làm nước (Ly)', width: 14 },
+    { header: 'TB Làm nước (s)', width: 16 },
+    { header: 'Nướng bánh (Cái)', width: 14 },
+    { header: 'TB Nướng bánh (s)', width: 16 },
+    { header: 'SOS đơn hàng', width: 14 },
+    { header: 'TB SOS Đơn (s)', width: 16 },
     { header: 'Sự cố', width: 10 },
     { header: 'Trạng thái', width: 14 }
   ];
