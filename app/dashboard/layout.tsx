@@ -25,6 +25,7 @@ const NAV = [
   { href: '/dashboard/members', icon: '👥', label: 'Nhân viên' },
   { href: '/dashboard/schedule', icon: '🗓️', label: 'Lịch làm' },
   { href: '/dashboard/production', icon: '🏭', label: 'Sản xuất' },
+  { href: '/dashboard/performance', icon: '⚡', label: 'Đo hiệu năng' },
   { href: '/dashboard/settings', icon: '⚙️', label: 'Cài đặt' },
 ];
 
@@ -106,6 +107,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       }
     } else if (norm === 'manager1') {
       if (pathname !== '/dashboard/schedule' && pathname !== '/dashboard/members' && pathname !== '/dashboard/attendance') {
+        router.replace('/dashboard/schedule');
+      }
+    } else if (norm !== 'owner') {
+      if (pathname.startsWith('/dashboard/performance')) {
         router.replace('/dashboard/schedule');
       }
     }
