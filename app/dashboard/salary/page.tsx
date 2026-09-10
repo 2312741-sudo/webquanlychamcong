@@ -8,7 +8,8 @@ import ExportModal from '../components/ExportModal';
 import { auth } from '@/lib/firebase';
 
 export default function SalaryPage() {
-  const { storeId, store, members } = useApp();
+  const { storeId, store, members, currentMember, role, user } = useApp();
+  const currentUser = user || auth.currentUser;
   const [currentMonth, setCurrentMonth] = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -21,10 +22,8 @@ export default function SalaryPage() {
   const [advanceAmount, setAdvanceAmount] = useState('');
   const [advanceNote, setAdvanceNote] = useState('');
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const currentUser = auth.currentUser;
   
-  const currentMember = currentUser ? members.find(m => m.userId === currentUser.uid) : null;
-  const isOwner = normalizeRole(currentMember?.role) === 'owner';
+  const isOwner = normalizeRole(role) === 'owner';
 
   const activeMembers = members.filter(m => m.status === 'active');
 

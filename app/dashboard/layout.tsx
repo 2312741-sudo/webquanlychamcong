@@ -3,7 +3,7 @@ import { useEffect, useState, createContext, useContext, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { onAuthChanged, signOut, getUserCurrentStoreId } from '@/lib/auth';
-import { watchStore, watchMembers, getUserStoresData, switchStore, watchNotifications, markNotificationAsRead, markAllNotificationsAsRead } from '@/lib/firestore';
+import { watchStore, watchMembers, watchCurrentMember, getUserStoresData, switchStore, watchNotifications, markNotificationAsRead, markAllNotificationsAsRead } from '@/lib/firestore';
 import { Store, Member, UserRole, AppNotification, getRoleLabel, normalizeRole, canManageSchedule, canApproveMembers, canAccessWeb } from '@/lib/types';
 import { User } from 'firebase/auth';
 import { notificationDestination } from '@/lib/notifications';
@@ -37,6 +37,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [storeId, setStoreId] = useState<string | null>(null);
   const [store, setStore] = useState<Store | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
+  const [directMember, setDirectMember] = useState<Member | null>(null);
   const [userStores, setUserStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -69,19 +70,31 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     if (!storeId) return;
+    setDirectMember(null);
     const unsubStore = watchStore(storeId, s => setStore(s));
     const unsubMembers = watchMembers(storeId, m => setMembers(m));
-    return () => { unsubStore(); unsubMembers(); };
-  }, [storeId]);
+    const unsubDirect = user ? watchCurrentMember(storeId, user.uid, m => setDirectMember(m)) : () => {};
+    return () => { unsubStore(); unsubMembers(); unsubDirect(); };
+  }, [storeId, user]);
 
-  const currentMember = user ? members.find(m => m.userId === user.uid) || null : null;
-  // TRUTH RECONCILIATION: store.ownerId là nguồn chân lý tối cao cho quyền Chủ
+  const currentMember = directMember || (user ? members.find(m => m.userId === user.uid) || null : null);
   const isStoreOwner = store && user && store.ownerId === user.uid;
-  let resolvedRole = currentMember?.role;
-  if (isStoreOwner) {
+
+  let resolvedRole: UserRole | undefined;
+  if (currentMember?.role) {
+    const norm = normalizeRole(currentMember.role);
+    if (norm === 'owner') {
+      // Chỉ giữ quyền owner nếu store.ownerId đúng là user này
+      resolvedRole = isStoreOwner ? 'owner' : 'manager1';
+    } else {
+      // Vai trò rõ ràng (manager1, manager2, employee) trong document thành viên luôn được tôn trọng!
+      resolvedRole = currentMember.role;
+    }
+  } else if (isStoreOwner) {
+    // Document thành viên chưa tải kịp nhưng user là chủ tạo cửa hàng
     resolvedRole = 'owner';
-  } else if (!isStoreOwner && resolvedRole === 'owner') {
-    resolvedRole = 'manager1';
+  } else {
+    resolvedRole = 'employee';
   }
   const role = resolvedRole;
 

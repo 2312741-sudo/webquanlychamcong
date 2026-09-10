@@ -20,7 +20,7 @@ export default function PerformanceLayout({ children }: { children: React.ReactN
   const pathname = usePathname();
   const router = useRouter();
   const { role, user, store, storeId } = useApp();
-  const isOwner = user?.uid === store?.ownerId || normalizeRole(role) === 'owner';
+  const isOwner = normalizeRole(role) === 'owner';
 
   const [unviewedCount, setUnviewedCount] = useState(0);
 

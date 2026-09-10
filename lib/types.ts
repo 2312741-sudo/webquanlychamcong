@@ -5,9 +5,10 @@ export type CheckInMethod = 'wifi' | 'gps' | 'manual' | 'qr';
 
 export function normalizeRole(role?: UserRole | string | null): 'owner' | 'manager1' | 'manager2' | 'employee' {
   if (!role) return 'employee';
-  if (role === 'owner') return 'owner';
-  if (role === 'manager1' || role === 'manager_1' || role === 'manager') return 'manager1';
-  if (role === 'manager2' || role === 'manager_2') return 'manager2';
+  const r = role.toString().trim().toLowerCase();
+  if (r === 'owner' || r === 'chu') return 'owner';
+  if (r === 'manager1' || r === 'manager_1' || r === 'manager' || r === 'legacymanager' || r === 'ql1' || r === 'quan_ly_1') return 'manager1';
+  if (r === 'manager2' || r === 'manager_2' || r === 'ql2' || r === 'quan_ly_2') return 'manager2';
   return 'employee';
 }
 

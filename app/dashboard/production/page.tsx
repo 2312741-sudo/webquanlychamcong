@@ -15,7 +15,7 @@ const COMMON_UNIT_PRESETS = [
 
 export default function ProductionPage() {
   const { storeId, store, members, user, role } = useApp();
-  const isOwner = user?.uid === store?.ownerId || normalizeRole(role) === 'owner';
+  const isOwner = normalizeRole(role) === 'owner';
   const [activeTab, setActiveTab] = useState<'tasks' | 'reports'>('tasks');
 
   // — Task state —

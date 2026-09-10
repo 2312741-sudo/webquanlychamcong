@@ -133,14 +133,44 @@ export async function switchStore(uid: string, newStoreId: string): Promise<void
   });
 }
 
-export function watchMembers(storeId: string, cb: (members: Member[]) => void) {
-  const q = query(
-    collection(db, 'stores', storeId, 'members'),
-    where('status', 'in', ['active', 'pending'])
+export function watchMembers(storeId: string, cb: (members: Member[]) => void, onError?: (err: any) => void) {
+  const colRef = collection(db, 'stores', storeId, 'members');
+  return onSnapshot(
+    colRef,
+    snap => {
+      const list = snap.docs
+        .map(d => ({ userId: d.id, ...d.data() } as Member))
+        .filter(m => m.status !== 'kicked');
+      cb(list);
+    },
+    err => {
+      console.error('Error in watchMembers:', err);
+      if (onError) onError(err);
+    }
   );
-  return onSnapshot(q, snap => {
-    cb(snap.docs.map(d => ({ userId: d.id, ...d.data() } as Member)));
-  });
+}
+
+export function watchCurrentMember(
+  storeId: string,
+  uid: string,
+  cb: (member: Member | null) => void,
+  onError?: (err: any) => void
+) {
+  const memberDocRef = doc(db, 'stores', storeId, 'members', uid);
+  return onSnapshot(
+    memberDocRef,
+    snap => {
+      if (!snap.exists()) {
+        cb(null);
+        return;
+      }
+      cb({ userId: snap.id, ...snap.data() } as Member);
+    },
+    err => {
+      console.error('Error in watchCurrentMember:', err);
+      if (onError) onError(err);
+    }
+  );
 }
 
 export function watchStore(storeId: string, cb: (store: Store | null) => void) {
