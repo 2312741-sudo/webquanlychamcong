@@ -1,5 +1,6 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useApp } from '../layout';
 import { getWeekSchedule, watchWeekSchedule, saveWeekSchedule, updateMemberOrder, toggleHideMemberSchedule } from '@/lib/firestore';
 import { exportWeeklySchedule } from '@/lib/exportExcel';
@@ -26,6 +27,11 @@ const DAY_KEYS: (keyof DaySchedule)[] = ['monday','tuesday','wednesday','thursda
 const DAY_LABELS = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN'];
 
 export default function SchedulePage() {
+  return <Suspense fallback={<p>Đang tải lịch...</p>}><ScheduleContent /></Suspense>;
+}
+
+function ScheduleContent() {
+  const searchParams = useSearchParams();
   const { storeId, store, members, user, role } = useApp();
   const currentMember = members.find(m => m.userId === user?.uid);
   const canEditSchedule = canManageSchedule(role); // Owner, Manager 1
@@ -33,6 +39,10 @@ export default function SchedulePage() {
   const canInteract = canEditSchedule || canEditDelivery;
   const isOwner = normalizeRole(role) === 'owner';
   const [currentWeek, setCurrentWeek] = useState(() => getMondayOfWeek(new Date()));
+  useEffect(() => {
+    const week = searchParams.get('weekStart');
+    if (week && /^\d{4}-\d{2}-\d{2}$/.test(week) && !Number.isNaN(Date.parse(week))) setCurrentWeek(week);
+  }, [searchParams]);
   const [shifts, setShifts] = useState<Record<string, DaySchedule>>({});
   const [scheduleData, setScheduleData] = useState<ScheduleModel | null>(null);
   const [loading, setLoading] = useState(false);

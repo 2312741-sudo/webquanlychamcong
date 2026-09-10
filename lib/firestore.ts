@@ -1,3 +1,4 @@
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db } from './firebase';
 import {
   collection, doc, query, where, getDocs, getDoc,
@@ -369,14 +370,7 @@ export async function saveWeekSchedule(
   shifts: Record<string, DaySchedule>,
   updatedBy?: string
 ): Promise<void> {
-  const scheduleRef = doc(db, 'stores', storeId, 'schedules', weekStart);
-  await setDoc(scheduleRef, {
-    storeId,
-    weekStart,
-    shifts,
-    updatedAt: Timestamp.now(),
-    ...(updatedBy ? { updatedBy } : {}),
-  }, { merge: true });
+  await httpsCallable(getFunctions(), 'saveNotificationSchedule')({ storeId, weekStart, shifts });
 }
 
 export async function updateStore(storeId: string, data: Record<string, any>) {
@@ -541,96 +535,4 @@ export async function deleteProductionReport(
   await deleteDoc(doc(db, 'stores', storeId, 'production_reports', reportId));
 }
 
-// ─── Real-time Notifications ────────────────────────────────────────────────
-
-export function watchNotifications(
-  storeId: string,
-  userId: string | null | undefined,
-  role: string | null | undefined,
-  cb: (notifs: import('./types').AppNotification[]) => void
-) {
-  if (!storeId) {
-    cb([]);
-    return () => {};
-  }
-
-  const q = query(
-    collection(db, 'stores', storeId, 'notifications'),
-    orderBy('createdAt', 'desc'),
-    limit(50)
-  );
-  return onSnapshot(q, (snapshot) => {
-    const list: import('./types').AppNotification[] = [];
-    snapshot.forEach(docSnap => {
-      const data = docSnap.data();
-      const notif: import('./types').AppNotification = {
-        id: docSnap.id,
-        storeId: data.storeId || storeId,
-        title: data.title || '',
-        body: data.body || '',
-        type: data.type || 'general',
-        createdAt: data.createdAt,
-        targetUserId: data.targetUserId,
-        targetRoles: data.targetRoles,
-        readBy: Array.isArray(data.readBy) ? data.readBy : [],
-        routePath: data.routePath,
-        routeExtra: data.routeExtra,
-      };
-
-      // Filter relevance
-      let isRelevant = true;
-      if (notif.targetUserId) {
-        isRelevant = notif.targetUserId === userId;
-      } else if (notif.targetRoles && notif.targetRoles.length > 0) {
-        const userNorm = normalizeRole(role);
-        isRelevant = notif.targetRoles.some((tr: string) => normalizeRole(tr) === userNorm);
-      }
-
-      if (isRelevant) {
-        list.push(notif);
-      }
-    });
-
-    // Sort newest first
-    list.sort((a, b) => {
-      const tA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt || 0).getTime();
-      const tB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt || 0).getTime();
-      return tB - tA;
-    });
-
-    cb(list);
-  }, (err) => {
-    console.error('Error in watchNotifications:', err);
-    cb([]);
-  });
-}
-
-export async function markNotificationAsRead(storeId: string, notifId: string, userId: string): Promise<void> {
-  if (!storeId || !notifId || !userId) return;
-  try {
-    const notifRef = doc(db, 'stores', storeId, 'notifications', notifId);
-    const snap = await getDoc(notifRef);
-    if (snap.exists()) {
-      const currentReadBy: string[] = snap.data()?.readBy || [];
-      if (!currentReadBy.includes(userId)) {
-        await updateDoc(notifRef, {
-          readBy: [...currentReadBy, userId]
-        });
-      }
-    }
-  } catch (err) {
-    console.error('Error in markNotificationAsRead:', err);
-  }
-}
-
-export async function markAllNotificationsAsRead(storeId: string, userId: string, notifs: import('./types').AppNotification[]): Promise<void> {
-  if (!storeId || !userId || notifs.length === 0) return;
-  try {
-    const unread = notifs.filter(n => !n.readBy.includes(userId));
-    await Promise.all(
-      unread.map(n => markNotificationAsRead(storeId, n.id, userId))
-    );
-  } catch (err) {
-    console.error('Error in markAllNotificationsAsRead:', err);
-  }
-}
+export { watchNotifications, markNotificationAsRead, markAllNotificationsAsRead } from './notifications';

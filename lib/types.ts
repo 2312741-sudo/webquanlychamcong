@@ -254,6 +254,7 @@ export type AppNotificationType =
   | 'general';
 
 export interface AppNotification {
+  scope?: string;
   id: string;
   storeId: string;
   title: string;

@@ -6,6 +6,7 @@ import { onAuthChanged, signOut, getUserCurrentStoreId } from '@/lib/auth';
 import { watchStore, watchMembers, getUserStoresData, switchStore, watchNotifications, markNotificationAsRead, markAllNotificationsAsRead } from '@/lib/firestore';
 import { Store, Member, UserRole, AppNotification, getRoleLabel, normalizeRole, canManageSchedule, canApproveMembers, canAccessWeb } from '@/lib/types';
 import { User } from 'firebase/auth';
+import { notificationDestination } from '@/lib/notifications';
 
 interface AppCtx {
   user: User | null;
@@ -43,6 +44,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // Notification state
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notificationError, setNotificationError] = useState<string | null>(null);
+  const [notificationLimit, setNotificationLimit] = useState(50);
   const [showNotifications, setShowNotifications] = useState(false);
   const notifDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -71,16 +75,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [storeId]);
 
   const currentMember = user ? members.find(m => m.userId === user.uid) || null : null;
-  const role = currentMember?.role;
+  // TRUTH RECONCILIATION: store.ownerId là nguồn chân lý tối cao cho quyền Chủ
+  const isStoreOwner = store && user && store.ownerId === user.uid;
+  let resolvedRole = currentMember?.role;
+  if (isStoreOwner) {
+    resolvedRole = 'owner';
+  } else if (!isStoreOwner && resolvedRole === 'owner') {
+    resolvedRole = 'manager1';
+  }
+  const role = resolvedRole;
+
 
   // Real-time notifications listener
   useEffect(() => {
-    if (!storeId || !user) return;
-    const unsubNotifs = watchNotifications(storeId, user.uid, role, notifs => {
-      setNotifications(notifs);
-    });
-    return () => unsubNotifs();
-  }, [storeId, user, role]);
+    setNotifications([]); setUnreadCount(0); setNotificationError(null);
+    if (!user) return;
+    const unsubNotifs = watchNotifications(storeId || '', user.uid,
+      currentMember?.status === 'active' ? role : null,
+      notifs => { setNotifications(notifs); setNotificationError(null); },
+      () => setNotificationError('Không thể tải thông báo. Vui lòng thử lại.'),
+      notificationLimit, setUnreadCount);
+    return unsubNotifs;
+  }, [storeId, user, role, currentMember?.status, notificationLimit]);
 
   // Click outside to close notification dropdown
   useEffect(() => {
@@ -168,25 +184,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return true; // owner has full access
   });
 
-  const unreadCount = user ? notifications.filter(n => !n.readBy.includes(user.uid)).length : 0;
 
   const handleNotificationClick = async (notif: AppNotification) => {
-    if (user && storeId) {
-      await markNotificationAsRead(storeId, notif.id, user.uid);
-    }
-    setShowNotifications(false);
-    if (notif.routePath) {
-      if (notif.routePath === '/schedule') router.push('/dashboard/schedule');
-      else if (notif.routePath === '/pending-members' || notif.routePath === '/members') router.push('/dashboard/members');
-      else if (notif.routePath === '/manage-advances' || notif.routePath === '/salary') router.push('/dashboard/salary');
-      else router.push(notif.routePath);
+    try {
+      const destination = await notificationDestination(notif);
+      if (user) await markNotificationAsRead(notif.storeId, notif.id, user.uid, notif.scope === 'account');
+      if (destination) {
+        if (user && notif.storeId !== storeId) {
+          await switchStore(user.uid, notif.storeId);
+          setStoreId(notif.storeId);
+        }
+        setShowNotifications(false);
+        router.push(destination);
+      }
+    } catch (error) {
+      setNotificationError(error instanceof Error ? error.message : 'Không thể mở thông báo.');
     }
   };
 
   const handleMarkAllRead = async () => {
-    if (user && storeId) {
-      await markAllNotificationsAsRead(storeId, user.uid, notifications);
-    }
+    if (!user) return;
+    try { await markAllNotificationsAsRead(storeId || '', user.uid, role); }
+    catch { setNotificationError('Không thể cập nhật trạng thái đã đọc. Vui lòng thử lại.'); }
   };
 
   const getNotificationIcon = (type: string) => {
@@ -390,7 +409,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   </div>
 
                   <div style={{ maxHeight: 360, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-                    {notifications.length === 0 ? (
+                    {notificationError && <p role="alert" style={{ padding: 12, color: 'var(--danger)' }}>{notificationError}</p>}
+                    {notifications.length >= notificationLimit && <button onClick={() => setNotificationLimit(value => value + 50)}>Xem thông báo cũ hơn</button>}
+                    {notifications.length === 0 && !notificationError ? (
                       <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-secondary)' }}>
                         <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
                         <p style={{ fontSize: 13, margin: 0 }}>Không có thông báo nào</p>
