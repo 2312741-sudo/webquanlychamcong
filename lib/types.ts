@@ -113,6 +113,7 @@ export interface StoreLocation {
 }
 
 export interface Store {
+  status?: string;
   id: string;
   name: string;
   code: string;

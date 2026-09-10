@@ -91,12 +91,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     setNotifications([]); setUnreadCount(0); setNotificationError(null);
     if (!user) return;
     const unsubNotifs = watchNotifications(storeId || '', user.uid,
-      currentMember?.status === 'active' ? role : null,
+      currentMember?.status === 'active' && store?.id === storeId && store?.status !== 'deleted' ? role : null,
       notifs => { setNotifications(notifs); setNotificationError(null); },
       () => setNotificationError('Không thể tải thông báo. Vui lòng thử lại.'),
       notificationLimit, setUnreadCount);
     return unsubNotifs;
-  }, [storeId, user, role, currentMember?.status, notificationLimit]);
+  }, [storeId, user, role, currentMember?.status, store?.id, store?.status, notificationLimit]);
 
   // Click outside to close notification dropdown
   useEffect(() => {
@@ -155,6 +155,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           - <b>Cửa hàng tìm thấy:</b> {userStores.length}<br/>
         </div>
 
+        {notifications.length > 0 && <div style={{ maxWidth: 420, marginTop: 16 }}>
+          <h3>Thông báo tài khoản</h3>
+          {notifications.map(item => <button key={item.id} style={{ display: 'block', textAlign: 'left', padding: 12, marginBottom: 8 }}
+            onClick={async () => { if (user) { try { await markNotificationAsRead(item.storeId, item.id, user.uid, true); } catch { setNotificationError('Không thể cập nhật thông báo.'); } } }}>
+            <strong>{item.title}</strong><p>{item.body}</p>
+          </button>)}
+        </div>}
+        {notificationError && <p role="alert">{notificationError}</p>}
         <button 
           onClick={() => signOut().then(() => router.replace('/login'))}
           style={{ marginTop: '20px', padding: '10px 20px', border: 'none', background: 'var(--primary)', color: 'white', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}
@@ -204,7 +212,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const handleMarkAllRead = async () => {
     if (!user) return;
-    try { await markAllNotificationsAsRead(storeId || '', user.uid, role); }
+    try { await markAllNotificationsAsRead(storeId || '', user.uid, store?.status !== 'deleted' && currentMember?.status === 'active' ? role : null); }
     catch { setNotificationError('Không thể cập nhật trạng thái đã đọc. Vui lòng thử lại.'); }
   };
 
