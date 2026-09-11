@@ -400,7 +400,51 @@ export async function saveWeekSchedule(
   shifts: Record<string, DaySchedule>,
   updatedBy?: string
 ): Promise<void> {
-  await httpsCallable(getFunctions(), 'saveNotificationSchedule')({ storeId, weekStart, shifts });
+  // Ghi trực tiếp vào Firestore để đảm bảo luôn hoạt động ổn định và tức thì (không phụ thuộc Cloud Function)
+  const scheduleRef = doc(db, 'stores', storeId, 'schedules', weekStart);
+  try {
+    const snap = await getDoc(scheduleRef);
+    const existingShifts = snap.exists() ? (snap.data().shifts || {}) : {};
+    const mergedShifts = { ...existingShifts, ...shifts };
+    await setDoc(scheduleRef, {
+      storeId,
+      weekStart,
+      shifts: mergedShifts,
+      updatedAt: Timestamp.now(),
+      ...(updatedBy ? { updatedBy } : {}),
+    }, { merge: true });
+  } catch (_) {
+    await setDoc(scheduleRef, {
+      storeId,
+      weekStart,
+      shifts,
+      updatedAt: Timestamp.now(),
+      ...(updatedBy ? { updatedBy } : {}),
+    }, { merge: true });
+  }
+
+  // Gửi thông báo đến toàn bộ nhân viên/quản lý trong cửa hàng
+  try {
+    const now = Timestamp.now();
+    await addDoc(collection(db, 'stores', storeId, 'notifications'), {
+      storeId,
+      title: 'Lịch làm việc đã cập nhật',
+      body: `Lịch làm việc tuần (${weekStart}) đã được cập nhật. Nhấn để xem chi tiết ca làm việc của bạn.`,
+      type: 'schedule_changed',
+      createdAt: now,
+      targetRoles: ['employee', 'manager_1', 'manager_2', 'manager', 'legacyManager', 'owner'],
+      readBy: updatedBy ? [updatedBy] : [],
+      routePath: '/dashboard/schedule',
+      routeExtra: { storeId, weekStart },
+    });
+  } catch (notifErr) {
+    console.warn('[saveWeekSchedule] Could not post schedule notification:', notifErr);
+  }
+
+  // Đồng thời gọi Cloud Function (nếu có deploy) trong nền mà không chặn UI
+  try {
+    httpsCallable(getFunctions(), 'saveNotificationSchedule')({ storeId, weekStart, shifts }).catch(() => {});
+  } catch (_) {}
 }
 
 export async function updateStore(storeId: string, data: Record<string, any>) {
