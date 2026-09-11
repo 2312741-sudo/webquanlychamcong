@@ -246,6 +246,138 @@ export default function PerformanceOverviewPage() {
     }).slice(0, 5);
   }, [filteredReports, standards]);
 
+  // Tổng hợp so sánh từng ngày trong tuần (Trạm vận hành 1 ca/ngày)
+  const dailyComparison = useMemo(() => {
+    const dayMap = new Map<string, {
+      dayKey: string;
+      dayOfWeek: string;
+      dateFormatted: string;
+      fullDate: string;
+      managerNames: Set<string>;
+      drinkSec: number;
+      drinkQty: number;
+      cakeSec: number;
+      cakeQty: number;
+      orderSec: number;
+      orderCount: number;
+      incidents: number;
+      sessionCount: number;
+    }>();
+
+    filteredReports.forEach((rep) => {
+      const d = parseFirestoreTimestamp(rep.startedAt || rep.createdAt);
+      const dayKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const dayNames = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+      const dayOfWeek = dayNames[d.getDay()];
+      const dateFormatted = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const fullDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+
+      if (!dayMap.has(dayKey)) {
+        dayMap.set(dayKey, {
+          dayKey,
+          dayOfWeek,
+          dateFormatted,
+          fullDate,
+          managerNames: new Set<string>(),
+          drinkSec: 0,
+          drinkQty: 0,
+          cakeSec: 0,
+          cakeQty: 0,
+          orderSec: 0,
+          orderCount: 0,
+          incidents: 0,
+          sessionCount: 0,
+        });
+      }
+
+      const cur = dayMap.get(dayKey)!;
+      cur.sessionCount++;
+      const mgr = rep.managerOnDutyName || rep.managerName;
+      if (mgr) cur.managerNames.add(mgr);
+      cur.drinkSec += rep.drinkTotalSeconds || 0;
+      cur.drinkQty += rep.drinkTotalQuantity || 0;
+      cur.cakeSec += rep.cakeTotalSeconds || 0;
+      cur.cakeQty += rep.cakeTotalQuantity || 0;
+      cur.orderSec += rep.orderTotalSeconds || 0;
+      cur.orderCount += rep.orderCount || 0;
+      cur.incidents += rep.incidents?.length || 0;
+    });
+
+    const list = Array.from(dayMap.values()).sort((a, b) => b.dayKey.localeCompare(a.dayKey));
+
+    return list.map((item) => {
+      const drinkAvg = item.drinkQty > 0 ? Math.round(item.drinkSec / item.drinkQty) : 0;
+      const cakeAvg = item.cakeQty > 0 ? Math.round(item.cakeSec / item.cakeQty) : 0;
+      const orderAvg = item.orderCount > 0 ? Math.round(item.orderSec / item.orderCount) : 0;
+
+      let tested = 0;
+      let passed = 0;
+      if (item.drinkQty > 0) {
+        tested++;
+        if (drinkAvg <= standards.drink) passed++;
+      }
+      if (item.cakeQty > 0) {
+        tested++;
+        if (cakeAvg <= standards.cake) passed++;
+      }
+      if (item.orderCount > 0) {
+        tested++;
+        if (orderAvg <= standards.order) passed++;
+      }
+      const complianceRate = tested > 0 ? Math.round((passed / tested) * 100) : 100;
+
+      let rating = '✅ Đạt chuẩn';
+      let ratingBg = '#E6F4EA';
+      let ratingColor = '#137333';
+      if (complianceRate === 100 && item.incidents === 0) {
+        rating = '🌟 Xuất sắc';
+        ratingBg = '#DEF7EC';
+        ratingColor = '#03543F';
+      } else if (complianceRate < 70 || item.incidents >= 2) {
+        rating = '⚠️ Cần cải thiện';
+        ratingBg = '#FDE8E8';
+        ratingColor = '#9B1C1C';
+      } else if (complianceRate < 100 || item.incidents > 0) {
+        rating = '⚡ Khá tốt';
+        ratingBg = '#FEF3C7';
+        ratingColor = '#92400E';
+      }
+
+      return {
+        ...item,
+        drinkAvg,
+        cakeAvg,
+        orderAvg,
+        complianceRate,
+        rating,
+        ratingBg,
+        ratingColor,
+        managers: Array.from(item.managerNames).join(', ') || 'Chưa phân công',
+        totalVolume: item.drinkQty + item.cakeQty + item.orderCount,
+      };
+    });
+  }, [filteredReports, standards]);
+
+  // Thẻ nổi bật theo ngày
+  const dayHighlights = useMemo(() => {
+    if (dailyComparison.length === 0) return null;
+
+    const bestDay = [...dailyComparison].sort((a, b) => {
+      if (b.complianceRate !== a.complianceRate) return b.complianceRate - a.complianceRate;
+      if (a.incidents !== b.incidents) return a.incidents - b.incidents;
+      return b.totalVolume - a.totalVolume;
+    })[0];
+
+    const peakDay = [...dailyComparison].sort((a, b) => b.totalVolume - a.totalVolume)[0];
+
+    const attentionDay = [...dailyComparison].sort((a, b) => {
+      if (b.incidents !== a.incidents) return b.incidents - a.incidents;
+      return a.complianceRate - b.complianceRate;
+    })[0];
+
+    return { bestDay, peakDay, attentionDay };
+  }, [dailyComparison]);
+
   return (
     <div>
       {/* Filter Toolbar */}
@@ -490,6 +622,259 @@ export default function PerformanceOverviewPage() {
           </div>
         </div>
       </div>
+
+      {/* Daily Performance Comparison & Highlights Section (Trạm 1 ca/ngày) */}
+      {dailyComparison.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          {/* Top 3 Summary Highlight Cards */}
+          {dayHighlights && (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                gap: 16,
+                marginBottom: 18,
+              }}
+            >
+              {/* Card 1: Ngày hiệu suất tốt nhất */}
+              <div
+                className="card"
+                style={{
+                  padding: '16px 20px',
+                  borderTop: '4px solid #059669',
+                  background: 'linear-gradient(180deg, #F0FDF4 0%, #FFFFFF 100%)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#047857' }}>🏆 NGÀY HIỆU SUẤT CAO NHẤT</span>
+                  <span style={{ fontSize: 11, background: '#DEF7EC', color: '#03543F', padding: '2px 8px', borderRadius: 8, fontWeight: 700 }}>
+                    SLA {dayHighlights.bestDay.complianceRate}%
+                  </span>
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: '#064E3B', marginBottom: 4 }}>
+                  {dayHighlights.bestDay.dayOfWeek}, {dayHighlights.bestDay.dateFormatted}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                  Phục vụ <strong>{dayHighlights.bestDay.totalVolume}</strong> món/đơn • Tốc độ TB: Nước {dayHighlights.bestDay.drinkAvg}s, Bánh {dayHighlights.bestDay.cakeAvg}s • QL: {dayHighlights.bestDay.managers}
+                </div>
+              </div>
+
+              {/* Card 2: Ngày cao điểm sản lượng */}
+              <div
+                className="card"
+                style={{
+                  padding: '16px 20px',
+                  borderTop: '4px solid #0284C7',
+                  background: 'linear-gradient(180deg, #F0F9FF 0%, #FFFFFF 100%)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#0369A1' }}>🚀 NGÀY CAO ĐIỂM SẢN LƯỢNG</span>
+                  <span style={{ fontSize: 11, background: '#E0F2FE', color: '#0284C7', padding: '2px 8px', borderRadius: 8, fontWeight: 700 }}>
+                    {dayHighlights.peakDay.totalVolume} món/đơn
+                  </span>
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: '#0C4A6E', marginBottom: 4 }}>
+                  {dayHighlights.peakDay.dayOfWeek}, {dayHighlights.peakDay.dateFormatted}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                  Đạt đỉnh khối lượng phục vụ: <strong>{dayHighlights.peakDay.drinkQty} ly nước</strong>, <strong>{dayHighlights.peakDay.cakeQty} bánh</strong>, <strong>{dayHighlights.peakDay.orderCount} SOS đơn</strong>
+                </div>
+              </div>
+
+              {/* Card 3: Ngày cần lưu ý */}
+              <div
+                className="card"
+                style={{
+                  padding: '16px 20px',
+                  borderTop: '4px solid #D97706',
+                  background: 'linear-gradient(180deg, #FFFBEB 0%, #FFFFFF 100%)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#B45309' }}>⚠️ NGÀY CẦN CHÚ Ý VẬN HÀNH</span>
+                  <span style={{ fontSize: 11, background: dayHighlights.attentionDay.incidents > 0 ? '#FEE2E2' : '#FEF3C7', color: dayHighlights.attentionDay.incidents > 0 ? '#B91C1C' : '#92400E', padding: '2px 8px', borderRadius: 8, fontWeight: 700 }}>
+                    {dayHighlights.attentionDay.incidents > 0 ? `${dayHighlights.attentionDay.incidents} sự cố` : `SLA ${dayHighlights.attentionDay.complianceRate}%`}
+                  </span>
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: '#78350F', marginBottom: 4 }}>
+                  {dayHighlights.attentionDay.dayOfWeek}, {dayHighlights.attentionDay.dateFormatted}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                  Tỷ lệ đạt chuẩn: <strong>{dayHighlights.attentionDay.complianceRate}%</strong> • {dayHighlights.attentionDay.incidents > 0 ? `Ghi nhận ${dayHighlights.attentionDay.incidents} sự cố trong ca` : 'Có một số hạng mục chậm hơn tiêu chuẩn'} • QL: {dayHighlights.attentionDay.managers}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Detailed Day-by-Day Table Card */}
+          <div className="card" style={{ padding: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <div>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--neutral)' }}>
+                  Bảng So Sánh & Đánh Giá Hiệu Năng Từng Ngày
+                </h3>
+                <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                  Theo dõi xu hướng tốc độ pha chế, sản lượng phục vụ và tỷ lệ đạt chuẩn SLA theo từng ngày (1 ca/ngày)
+                </p>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                Tổng cộng: <strong style={{ color: 'var(--primary)' }}>{dailyComparison.length} ngày</strong> có số liệu
+              </div>
+            </div>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border)', textAlign: 'left', color: 'var(--text-secondary)', background: 'var(--surface)' }}>
+                    <th style={{ padding: '10px 12px', borderRadius: '8px 0 0 8px' }}>Ngày & Thứ</th>
+                    <th style={{ padding: '10px 12px' }}>Quản lý đứng ca</th>
+                    <th style={{ padding: '10px 12px' }}>Làm nước (SL & TB/ly)</th>
+                    <th style={{ padding: '10px 12px' }}>Nướng bánh (SL & TB/bánh)</th>
+                    <th style={{ padding: '10px 12px' }}>SOS Đơn (SL & TB/đơn)</th>
+                    <th style={{ padding: '10px 12px' }}>Đạt chuẩn SLA</th>
+                    <th style={{ padding: '10px 12px' }}>Sự cố</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'right', borderRadius: '0 8px 8px 0' }}>Đánh giá ngày</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dailyComparison.map((day) => {
+                    const isDrinkOk = !day.drinkAvg || day.drinkAvg <= standards.drink;
+                    const isCakeOk = !day.cakeAvg || day.cakeAvg <= standards.cake;
+                    const isOrderOk = !day.orderAvg || day.orderAvg <= standards.order;
+
+                    return (
+                      <tr key={day.dayKey} style={{ borderBottom: '1px solid var(--divider)' }}>
+                        <td style={{ padding: '12px 12px', fontWeight: 700 }}>
+                          <div>{day.dayOfWeek}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 500 }}>{day.fullDate}</div>
+                        </td>
+                        <td style={{ padding: '12px 12px', color: 'var(--neutral)' }}>
+                          {day.managers}
+                        </td>
+                        <td style={{ padding: '12px 12px' }}>
+                          {day.drinkQty > 0 ? (
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <strong style={{ color: isDrinkOk ? '#0284C7' : '#DC2626' }}>{day.drinkAvg}s/ly</strong>
+                                <span style={{
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  padding: '1px 6px',
+                                  borderRadius: 6,
+                                  background: isDrinkOk ? '#E0F2FE' : '#FEE2E2',
+                                  color: isDrinkOk ? '#0369A1' : '#B91C1C',
+                                }}>
+                                  {isDrinkOk ? 'Đạt' : `+${day.drinkAvg - standards.drink}s`}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{day.drinkQty} ly</div>
+                            </div>
+                          ) : (
+                            <span style={{ color: 'var(--text-disabled)' }}>-</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '12px 12px' }}>
+                          {day.cakeQty > 0 ? (
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <strong style={{ color: isCakeOk ? '#D97706' : '#DC2626' }}>{day.cakeAvg}s/bánh</strong>
+                                <span style={{
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  padding: '1px 6px',
+                                  borderRadius: 6,
+                                  background: isCakeOk ? '#FEF3C7' : '#FEE2E2',
+                                  color: isCakeOk ? '#B45309' : '#B91C1C',
+                                }}>
+                                  {isCakeOk ? 'Đạt' : `+${day.cakeAvg - standards.cake}s`}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{day.cakeQty} bánh</div>
+                            </div>
+                          ) : (
+                            <span style={{ color: 'var(--text-disabled)' }}>-</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '12px 12px' }}>
+                          {day.orderCount > 0 ? (
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <strong style={{ color: isOrderOk ? '#1C4E6B' : '#DC2626' }}>{day.orderAvg}s/đơn</strong>
+                                <span style={{
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  padding: '1px 6px',
+                                  borderRadius: 6,
+                                  background: isOrderOk ? '#E3EEF5' : '#FEE2E2',
+                                  color: isOrderOk ? '#1C4E6B' : '#B91C1C',
+                                }}>
+                                  {isOrderOk ? 'Đạt' : `+${day.orderAvg - standards.order}s`}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{day.orderCount} đơn</div>
+                            </div>
+                          ) : (
+                            <span style={{ color: 'var(--text-disabled)' }}>-</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '12px 12px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ width: 48, height: 6, background: '#E5E7EB', borderRadius: 3, overflow: 'hidden' }}>
+                              <div
+                                style={{
+                                  width: `${day.complianceRate}%`,
+                                  height: '100%',
+                                  background: day.complianceRate >= 85 ? '#059669' : (day.complianceRate >= 70 ? '#D97706' : '#DC2626'),
+                                }}
+                              />
+                            </div>
+                            <strong style={{
+                              fontSize: 12,
+                              color: day.complianceRate >= 85 ? '#059669' : (day.complianceRate >= 70 ? '#D97706' : '#DC2626'),
+                            }}>
+                              {day.complianceRate}%
+                            </strong>
+                          </div>
+                        </td>
+                        <td style={{ padding: '12px 12px' }}>
+                          {day.incidents > 0 ? (
+                            <span style={{
+                              background: '#FEE2E2',
+                              color: '#B91C1C',
+                              padding: '2px 8px',
+                              borderRadius: 8,
+                              fontSize: 11,
+                              fontWeight: 700,
+                            }}>
+                              {day.incidents} sự cố
+                            </span>
+                          ) : (
+                            <span style={{ color: '#059669', fontSize: 12 }}>0</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '12px 12px', textAlign: 'right' }}>
+                          <span style={{
+                            padding: '3px 10px',
+                            borderRadius: 12,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            background: day.ratingBg,
+                            color: day.ratingColor,
+                            display: 'inline-block',
+                          }}>
+                            {day.rating}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Attention Sessions Section */}
       <div className="card" style={{ padding: 20 }}>
