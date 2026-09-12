@@ -4,7 +4,7 @@ import {
   collection, doc, query, where, getDocs, getDoc,
   updateDoc, addDoc, orderBy, Timestamp, onSnapshot,
   setDoc, limit, DocumentSnapshot, deleteDoc, collectionGroup,
-  arrayUnion, arrayRemove, writeBatch
+  arrayUnion, arrayRemove, writeBatch, serverTimestamp
 } from 'firebase/firestore';
 import { Member, AttendanceRecord, Store, ScheduleModel, DaySchedule, AdvanceRequest, ProductionTask, ProductionReport, ProductionTaskEntry, AppNotification, normalizeRole } from './types';
 
@@ -286,6 +286,52 @@ export async function setMemberStatus(storeId: string, userId: string, status: '
 
 export async function updateMemberRole(storeId: string, userId: string, role: string) {
   await updateDoc(doc(db, 'stores', storeId, 'members', userId), { role });
+}
+
+export async function transferStoreOwnershipOnWeb(
+  storeId: string,
+  newOwnerId: string,
+  currentOwnerId: string,
+  newOwnerName?: string
+): Promise<void> {
+  const batch = writeBatch(db);
+
+  // 1. Cập nhật stores/{storeId}.ownerId
+  const storeRef = doc(db, 'stores', storeId);
+  batch.update(storeRef, {
+    ownerId: newOwnerId,
+    updatedAt: serverTimestamp(),
+  });
+
+  // 2. Thăng cấp newOwnerId thành 'owner'
+  const newOwnerRef = doc(db, 'stores', storeId, 'members', newOwnerId);
+  batch.update(newOwnerRef, {
+    role: 'owner',
+    promotedAt: serverTimestamp(),
+    promotedReason: 'ownership_transfer_web',
+  });
+
+  // 3. Giáng cấp currentOwnerId thành 'manager_1' nếu khác newOwnerId
+  if (currentOwnerId && currentOwnerId !== newOwnerId) {
+    const currentOwnerRef = doc(db, 'stores', storeId, 'members', currentOwnerId);
+    batch.update(currentOwnerRef, {
+      role: 'manager_1',
+    });
+  }
+
+  // 4. Ghi vết kiểm toán (Audit Trail)
+  const auditRef = doc(collection(db, 'stores', storeId, 'audit_logs'));
+  batch.set(auditRef, {
+    action: 'ownership_transfer',
+    storeId,
+    previousOwnerId: currentOwnerId,
+    newOwnerId,
+    newOwnerName: newOwnerName || '',
+    source: 'web_dashboard',
+    timestamp: serverTimestamp(),
+  });
+
+  await batch.commit();
 }
 
 export async function updateMemberSalary(

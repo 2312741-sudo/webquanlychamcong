@@ -1,11 +1,11 @@
 'use client';
 import { useState } from 'react';
 import { useApp } from '../layout';
-import { setMemberStatus, updateMemberRole, updateMemberSalary, updateMemberInfo, updateMemberOrder, toggleHideMemberSchedule } from '@/lib/firestore';
+import { setMemberStatus, updateMemberRole, transferStoreOwnershipOnWeb, updateMemberSalary, updateMemberInfo, updateMemberOrder, toggleHideMemberSchedule } from '@/lib/firestore';
 import { Member, UserRole, getRoleLabel, normalizeRole, formatJoinedDate, canApproveMembers, sortMembersByOrder } from '@/lib/types';
 
 export default function MembersPage() {
-  const { storeId, store, members, role } = useApp();
+  const { user, storeId, store, members, role } = useApp();
   const [activeTab, setActiveTab] = useState<'active'|'pending'>('active');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [editingSalary, setEditingSalary] = useState<Member | null>(null);
@@ -40,6 +40,34 @@ export default function MembersPage() {
 
   const handleRoleChange = async (userId: string, newRole: string) => {
     if (!storeId || !isOwner) return;
+
+    if (userId === user?.uid) {
+      alert('Bạn đang là Chủ cửa hàng. Bạn không thể tự hạ quyền của chính mình tại đây.');
+      return;
+    }
+
+    if (newRole === 'owner') {
+      const target = members.find(m => m.userId === userId);
+      const targetName = target?.name || 'thành viên này';
+      const confirmed = window.confirm(
+        `XÁC NHẬN CHUYỂN QUYỀN CHỦ CỬA HÀNG:\n\n` +
+        `Bạn có chắc chắn muốn chuyển quyền Chủ cửa hàng cho "${targetName}"?\n\n` +
+        `- "${targetName}" sẽ trở thành Chủ cửa hàng mới.\n` +
+        `- Bạn sẽ trở thành Quản lý 1.\n\n` +
+        `Hành động này sẽ cập nhật quyền hạn ngay lập tức.`
+      );
+      if (!confirmed) return;
+
+      try {
+        await transferStoreOwnershipOnWeb(storeId, userId, user?.uid || '', targetName);
+        alert(`Đã chuyển giao quyền Chủ cửa hàng cho ${targetName} thành công.`);
+      } catch (e) {
+        console.error('Error transferring store ownership:', e);
+        alert('Lỗi khi chuyển quyền chủ cửa hàng. Vui lòng thử lại.');
+      }
+      return;
+    }
+
     try {
       const firestoreRole = newRole === 'manager1' ? 'manager_1' : newRole === 'manager2' ? 'manager_2' : newRole;
       await updateMemberRole(storeId, userId, firestoreRole);
@@ -278,7 +306,7 @@ export default function MembersPage() {
                       </div>
                     </td>
                     <td>
-                      {isOwner ? (
+                      {isOwner && m.userId !== user?.uid && m.userId !== store?.ownerId ? (
                         <select 
                           className="select" 
                           style={{ padding: '6px 10px', fontSize: 13, width: 'auto', fontWeight: 600 }}
@@ -288,14 +316,14 @@ export default function MembersPage() {
                           <option value="employee">Nhân viên</option>
                           <option value="manager1">Quản lý 1 (Xếp lịch & Duyệt NV)</option>
                           <option value="manager2">Quản lý 2 (Xem lịch)</option>
-                          <option value="owner">Chủ</option>
+                          <option value="owner">Chuyển quyền Chủ</option>
                         </select>
                       ) : (
                         <span style={{
                           padding: '4px 10px', borderRadius: 12, fontSize: 12, fontWeight: 700,
                           ...badgeStyle
                         }}>
-                          {getRoleLabel(m.role)}
+                          {getRoleLabel(m.role)} {m.userId === user?.uid && isOwner ? '(Bạn)' : ''}
                         </span>
                       )}
                     </td>
