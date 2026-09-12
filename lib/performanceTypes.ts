@@ -50,6 +50,8 @@ export interface Measurement {
   category: PerformanceCategory;
   quantity: number;
   orderCode?: string;
+  staffName?: string;
+  measuredByName?: string;
   durationSeconds: number;
   startedAt: any;
   pausedAt?: any;

@@ -113,6 +113,8 @@ export async function getSessionMeasurements(sessionId: string): Promise<Measure
         category: d.category || 'drink',
         quantity: d.quantity ?? 1,
         orderCode: d.orderCode,
+        staffName: d.staffName,
+        measuredByName: d.measuredByName,
         durationSeconds: d.durationSeconds || 0,
         startedAt: d.startedAt,
         pausedAt: d.pausedAt,

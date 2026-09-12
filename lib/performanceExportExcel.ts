@@ -151,7 +151,9 @@ export async function exportSessionPerformanceExcel(
     { header: 'Thời gian (MM:SS)', key: 'durationFormatted', width: 20 },
     { header: 'TB / 1 Ly (s)', key: 'avgSec', width: 16 },
     { header: 'Tiêu chuẩn', key: 'std', width: 15 },
-    { header: 'Kết quả', key: 'result', width: 18 }
+    { header: 'Kết quả', key: 'result', width: 18 },
+    { header: 'Nhân sự', key: 'staffName', width: 20 },
+    { header: 'Người đo', key: 'measuredByName', width: 20 }
   ];
 
   const drinkHeader = wsDrinks.getRow(1);
@@ -170,10 +172,12 @@ export async function exportSessionPerformanceExcel(
       formatSecondsToMMSS(m.durationSeconds),
       avgSec,
       `${drinkStd}s`,
-      isPass ? 'Đạt chuẩn' : `Vượt +${avgSec - drinkStd}s`
+      isPass ? 'Đạt chuẩn' : `Vượt +${avgSec - drinkStd}s`,
+      m.staffName || '--',
+      m.measuredByName || report.managerName || '--'
     ]);
     row.height = 22;
-    for (let c = 2; c <= 9; c++) {
+    for (let c = 2; c <= 11; c++) {
       applyCellBorders(row.getCell(c));
       if (c === 9) {
         row.getCell(c).font = { color: { argb: isPass ? '1A6B5A' : RED }, bold: true };
@@ -195,7 +199,9 @@ export async function exportSessionPerformanceExcel(
     { header: 'Thời gian (MM:SS)', key: 'durationFormatted', width: 20 },
     { header: 'TB / 1 Bánh (s)', key: 'avgSec', width: 16 },
     { header: 'Tiêu chuẩn', key: 'std', width: 15 },
-    { header: 'Kết quả', key: 'result', width: 18 }
+    { header: 'Kết quả', key: 'result', width: 18 },
+    { header: 'Nhân sự', key: 'staffName', width: 20 },
+    { header: 'Người đo', key: 'measuredByName', width: 20 }
   ];
 
   const cakeHeader = wsCakes.getRow(1);
@@ -214,10 +220,12 @@ export async function exportSessionPerformanceExcel(
       formatSecondsToMMSS(m.durationSeconds),
       avgSec,
       `${cakeStd}s`,
-      isPass ? 'Đạt chuẩn' : `Vượt +${avgSec - cakeStd}s`
+      isPass ? 'Đạt chuẩn' : `Vượt +${avgSec - cakeStd}s`,
+      m.staffName || '--',
+      m.measuredByName || report.managerName || '--'
     ]);
     row.height = 22;
-    for (let c = 2; c <= 9; c++) {
+    for (let c = 2; c <= 11; c++) {
       applyCellBorders(row.getCell(c));
       if (c === 9) {
         row.getCell(c).font = { color: { argb: isPass ? '1A6B5A' : RED }, bold: true };
@@ -238,7 +246,9 @@ export async function exportSessionPerformanceExcel(
     { header: 'Thời gian đo (s)', key: 'durationSec', width: 18 },
     { header: 'Thời gian (MM:SS)', key: 'durationFormatted', width: 20 },
     { header: 'Tiêu chuẩn', key: 'std', width: 15 },
-    { header: 'Kết quả', key: 'result', width: 18 }
+    { header: 'Kết quả', key: 'result', width: 18 },
+    { header: 'Nhân sự', key: 'staffName', width: 20 },
+    { header: 'Người đo', key: 'measuredByName', width: 20 }
   ];
 
   const orderHeader = wsOrders.getRow(1);
@@ -255,10 +265,12 @@ export async function exportSessionPerformanceExcel(
       m.durationSeconds,
       formatSecondsToMMSS(m.durationSeconds),
       `${orderStd}s`,
-      isPass ? 'Đạt chuẩn' : `Vượt +${m.durationSeconds - orderStd}s`
+      isPass ? 'Đạt chuẩn' : `Vượt +${m.durationSeconds - orderStd}s`,
+      m.staffName || '--',
+      m.measuredByName || report.managerName || '--'
     ]);
     row.height = 22;
-    for (let c = 2; c <= 8; c++) {
+    for (let c = 2; c <= 10; c++) {
       applyCellBorders(row.getCell(c));
       if (c === 8) {
         row.getCell(c).font = { color: { argb: isPass ? '1A6B5A' : RED }, bold: true };
