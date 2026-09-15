@@ -486,11 +486,6 @@ export async function saveWeekSchedule(
   } catch (notifErr) {
     console.warn('[saveWeekSchedule] Could not post schedule notification:', notifErr);
   }
-
-  // Đồng thời gọi Cloud Function (nếu có deploy) trong nền mà không chặn UI
-  try {
-    httpsCallable(getFunctions(), 'saveNotificationSchedule')({ storeId, weekStart, shifts }).catch(() => {});
-  } catch (_) {}
 }
 
 export async function updateStore(storeId: string, data: Record<string, any>) {
