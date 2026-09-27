@@ -245,7 +245,7 @@ function PerformanceReportsContent() {
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
-              <tr style={{ background: '#FAF7F2', borderBottom: '1px solid var(--border)', textAlign: 'left', color: 'var(--text-secondary)' }}>
+              <tr style={{ background: '#F6EFDF', borderBottom: '1px solid var(--border)', textAlign: 'left', color: 'var(--text-secondary)' }}>
                 <th style={{ padding: '12px 16px' }}>Thời gian ca</th>
                 <th style={{ padding: '12px 16px' }}>Quản lý đứng ca</th>
                 <th style={{ padding: '12px 16px' }}>Nhân viên trong ca</th>
@@ -314,7 +314,7 @@ function PerformanceReportsContent() {
                       </td>
 
                       <td style={{ padding: '12px 16px' }}>
-                        <div style={{ fontWeight: 600, color: '#0284C7' }}>
+                        <div style={{ fontWeight: 600, color: '#2D2A4A' }}>
                           {rep.drinkAverageSeconds ? `${rep.drinkAverageSeconds}s` : '--'}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
@@ -323,7 +323,7 @@ function PerformanceReportsContent() {
                       </td>
 
                       <td style={{ padding: '12px 16px' }}>
-                        <div style={{ fontWeight: 600, color: '#D97706' }}>
+                        <div style={{ fontWeight: 600, color: '#805214' }}>
                           {rep.cakeAverageSeconds ? `${rep.cakeAverageSeconds}s` : '--'}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
@@ -332,7 +332,7 @@ function PerformanceReportsContent() {
                       </td>
 
                       <td style={{ padding: '12px 16px' }}>
-                        <div style={{ fontWeight: 600, color: '#1C4E6B' }}>
+                        <div style={{ fontWeight: 600, color: '#2D2A4A' }}>
                           {rep.orderAverageSeconds ? `${rep.orderAverageSeconds}s` : '--'}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
@@ -346,7 +346,7 @@ function PerformanceReportsContent() {
                             {rep.incidents.length} sự cố
                           </span>
                         ) : (
-                          <span style={{ color: '#1A6B5A', fontSize: 12 }}>0</span>
+                          <span style={{ color: '#146A65', fontSize: 12 }}>0</span>
                         )}
                       </td>
 
@@ -356,7 +356,7 @@ function PerformanceReportsContent() {
                             Chưa xem
                           </span>
                         ) : (
-                          <span style={{ background: '#E6F2EF', color: '#1A6B5A', padding: '3px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>
+                          <span style={{ background: '#E4F2EC', color: '#146A65', padding: '3px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>
                             Đã xem
                           </span>
                         )}
@@ -414,7 +414,7 @@ function PerformanceReportsContent() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                background: '#FAF7F2',
+                background: '#F6EFDF',
               }}
             >
               <div>
@@ -427,7 +427,7 @@ function PerformanceReportsContent() {
                       Chưa xem
                     </span>
                   ) : (
-                    <span style={{ background: '#E6F2EF', color: '#1A6B5A', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600 }}>
+                    <span style={{ background: '#E4F2EC', color: '#146A65', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600 }}>
                       Đã xem
                     </span>
                   )}
@@ -510,9 +510,9 @@ function PerformanceReportsContent() {
 
               {/* KPI Mini-cards */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
-                <div style={{ border: '1px solid #BAE6FD', background: '#F0F9FF', padding: 12, borderRadius: 10 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#0369A1' }}>🥤 LÀM NƯỚC</div>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: '#0284C7', marginTop: 4 }}>
+                <div style={{ border: '1px solid #BAE6FD', background: '#E9E6ED', padding: 12, borderRadius: 10 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#2D2A4A' }}>🥤 LÀM NƯỚC</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#2D2A4A', marginTop: 4 }}>
                     {selectedReport.drinkAverageSeconds ? `${selectedReport.drinkAverageSeconds}s` : '--'}
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
@@ -520,9 +520,9 @@ function PerformanceReportsContent() {
                   </div>
                 </div>
 
-                <div style={{ border: '1px solid #FDE68A', background: '#FFFBEB', padding: 12, borderRadius: 10 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#B45309' }}>🍰 NƯỚNG BÁNH</div>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: '#D97706', marginTop: 4 }}>
+                <div style={{ border: '1px solid #FDE68A', background: '#FBEFD4', padding: 12, borderRadius: 10 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#805214' }}>🍰 NƯỚNG BÁNH</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#805214', marginTop: 4 }}>
                     {selectedReport.cakeAverageSeconds ? `${selectedReport.cakeAverageSeconds}s` : '--'}
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
@@ -530,9 +530,9 @@ function PerformanceReportsContent() {
                   </div>
                 </div>
 
-                <div style={{ border: '1px solid #CBD5E1', background: '#F8FAFC', padding: 12, borderRadius: 10 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#1C4E6B' }}>📦 SOS ĐƠN HÀNG</div>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: '#1C4E6B', marginTop: 4 }}>
+                <div style={{ border: '1px solid #CBD5E1', background: '#F6EFDF', padding: 12, borderRadius: 10 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#2D2A4A' }}>📦 SOS ĐƠN HÀNG</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#2D2A4A', marginTop: 4 }}>
                     {selectedReport.orderAverageSeconds ? `${selectedReport.orderAverageSeconds}s` : '--'}
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
@@ -585,7 +585,7 @@ function PerformanceReportsContent() {
                   <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                       <thead>
-                        <tr style={{ background: '#FAF7F2', borderBottom: '1px solid var(--border)', textAlign: 'left', color: 'var(--text-secondary)' }}>
+                        <tr style={{ background: '#F6EFDF', borderBottom: '1px solid var(--border)', textAlign: 'left', color: 'var(--text-secondary)' }}>
                           <th style={{ padding: '8px 12px' }}>#</th>
                           <th style={{ padding: '8px 12px' }}>Thời điểm</th>
                           <th style={{ padding: '8px 12px' }}>Hạng mục</th>
@@ -622,9 +622,9 @@ function PerformanceReportsContent() {
                               </td>
                               <td style={{ padding: '8px 12px' }}>
                                 {isPass ? (
-                                  <span style={{ color: '#1A6B5A', fontWeight: 600 }}>✅ Đạt</span>
+                                  <span style={{ color: '#146A65', fontWeight: 600 }}>✅ Đạt</span>
                                 ) : (
-                                  <span style={{ color: '#CB2D2E', fontWeight: 700 }}>+{avgSec - std}s</span>
+                                  <span style={{ color: '#7E2930', fontWeight: 700 }}>+{avgSec - std}s</span>
                                 )}
                               </td>
                             </tr>
@@ -642,7 +642,7 @@ function PerformanceReportsContent() {
                   Sự Cố Ghi Nhận ({selectedReport.incidents?.length || 0})
                 </h3>
                 {!selectedReport.incidents || selectedReport.incidents.length === 0 ? (
-                  <div style={{ padding: '12px 16px', background: '#F0FDF4', color: '#166534', borderRadius: 8, fontSize: 12 }}>
+                  <div style={{ padding: '12px 16px', background: '#E4F2EC', color: '#166534', borderRadius: 8, fontSize: 12 }}>
                     ✅ Ca làm việc diễn ra suôn sẻ, không có sự cố nào phát sinh.
                   </div>
                 ) : (

@@ -191,6 +191,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     : (user?.email?.[0] ?? 'U').toUpperCase();
 
   const normRole = normalizeRole(role);
+  const dashboardRoleClass = normRole === 'owner'
+    ? 'dashboard-role-owner'
+    : normRole === 'manager1' || normRole === 'manager2'
+      ? 'dashboard-role-manager'
+      : '';
 
   const filteredNav = NAV.filter(item => {
     if (normRole === 'manager2') {
@@ -256,7 +261,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <AppContext.Provider value={{ user, storeId, store, members, currentMember, role }}>
-      <div style={{ display:'flex', minHeight:'100vh' }}>
+      <div className={dashboardRoleClass} style={{ display:'flex', minHeight:'100vh', background:'var(--surface)' }}>
         {/* Mobile overlay */}
         {sidebarOpen && (
           <div onClick={() => setSidebarOpen(false)} style={{
@@ -267,7 +272,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Sidebar */}
         <aside style={{
           width: 'var(--sidebar-width)',
-          background: 'var(--neutral)',
+          background: 'var(--sidebar-bg)',
           color: 'white',
           display: 'flex',
           flexDirection: 'column',
@@ -311,8 +316,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   display:'flex', alignItems:'center', gap:10,
                   padding:'10px 12px',
                   borderRadius:10,
-                  background: active ? 'var(--primary)' : 'transparent',
-                  color: active ? 'white' : 'rgba(255,255,255,0.65)',
+                  background: active ? 'var(--sidebar-active)' : 'transparent',
+                  color: active ? 'var(--sidebar-active-text)' : 'rgba(255,255,255,0.65)',
                   fontWeight: active ? 700 : 500,
                   fontSize:14,
                   transition:'all 0.15s',
@@ -342,7 +347,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <div style={{ fontSize:13, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                   {user?.displayName || user?.email}
                 </div>
-                <div style={{ fontSize:11, opacity:0.7, color: normRole === 'owner' ? '#F5C842' : normRole === 'manager1' ? '#74C0FC' : normRole === 'manager2' ? '#63E6BE' : '#CED4DA' }}>
+                <div style={{ fontSize:11, color:'var(--sidebar-role)' }}>
                   {normRole === 'owner' ? '👑 Chủ cửa hàng' : normRole === 'manager1' ? '👔 Quản lý 1' : normRole === 'manager2' ? '👔 Quản lý 2' : '👤 Nhân viên'}
                 </div>
               </div>

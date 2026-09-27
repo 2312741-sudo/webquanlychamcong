@@ -191,8 +191,8 @@ export default function ProductionPage() {
             style={{
               padding: '10px 20px', border: 'none', background: 'none',
               fontWeight: activeTab === tab.key ? 700 : 400,
-              color: activeTab === tab.key ? '#C8102E' : '#666',
-              borderBottom: activeTab === tab.key ? '3px solid #C8102E' : '3px solid transparent',
+              color: activeTab === tab.key ? 'var(--primary)' : '#666',
+              borderBottom: activeTab === tab.key ? '3px solid var(--primary)' : '3px solid transparent',
               cursor: 'pointer', fontSize: '14px', marginBottom: '-2px',
               transition: 'all 0.2s',
             }}
@@ -215,7 +215,7 @@ export default function ProductionPage() {
               <button
                 onClick={openAddTask}
                 style={{
-                  background: '#C8102E', color: '#fff', border: 'none',
+                  background: 'var(--primary)', color: '#fff', border: 'none',
                   padding: '10px 20px', borderRadius: '8px', cursor: 'pointer',
                   fontWeight: 600, fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px',
                 }}
@@ -352,7 +352,7 @@ export default function ProductionPage() {
                               </button>
                               <button
                                 onClick={() => deleteTask(task)}
-                                style={{ background: '#fff5f5', color: '#C8102E', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}
+                                style={{ background: '#fff5f5', color: 'var(--danger)', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}
                               >
                                 🗑️ Xóa
                               </button>
@@ -433,7 +433,7 @@ export default function ProductionPage() {
           {!reportLoading && filteredReports.length > 0 && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '20px' }}>
               <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: '10px', padding: '16px', textAlign: 'center' }}>
-                <div style={{ fontSize: '28px', fontWeight: 700, color: '#C8102E' }}>{filteredReports.length}</div>
+                <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--primary)' }}>{filteredReports.length}</div>
                 <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>Tổng lượt báo cáo</div>
               </div>
               <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: '10px', padding: '16px', textAlign: 'center' }}>
@@ -476,7 +476,7 @@ export default function ProductionPage() {
             <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #eee', overflow: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: `${400 + activeTasks.length * 140}px` }}>
                 <thead>
-                  <tr style={{ background: '#C8102E' }}>
+                  <tr style={{ background: 'var(--primary)' }}>
                     {['Ngày', 'Tên NV', 'Ca làm', ...activeTasks.map(t => `${t.name}${t.unitLabel ? ` (${t.unitLabel})` : ''}`), 'Giờ out ca', 'Ghi chú', ''].map(h => (
                       <th key={h} style={{ padding: '12px 14px', textAlign: 'left', fontSize: '12px', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap' }}>
                         {h}
@@ -563,7 +563,7 @@ export default function ProductionPage() {
                   borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box',
                   outline: 'none',
                 }}
-                onFocus={e => e.target.style.borderColor = '#C8102E'}
+                onFocus={e => e.target.style.borderColor = 'var(--primary)'}
                 onBlur={e => e.target.style.borderColor = '#ddd'}
                 autoFocus
               />
@@ -582,7 +582,7 @@ export default function ProductionPage() {
                   type="checkbox"
                   checked={taskForm.hasUnit}
                   onChange={e => setTaskForm(f => ({ ...f, hasUnit: e.target.checked }))}
-                  style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#C8102E' }}
+                  style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--primary)' }}
                 />
                 Yêu cầu nhập số lượng / Khối lượng / Thời gian khi out ca
               </label>
@@ -607,9 +607,9 @@ export default function ProductionPage() {
                     onChange={e => setTaskForm(f => ({ ...f, unitLabel: e.target.value }))}
                     placeholder="Nhập đơn vị đo (VD: Kg, Gói, Thùng, Ly, Hộp, Mét, Bao...)"
                     style={{
-                      width: '100%', padding: '10px 14px', border: '1.5px solid #C8102E',
+                      width: '100%', padding: '10px 14px', border: '1.5px solid var(--primary)',
                       borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box',
-                      outline: 'none', fontWeight: 600, color: '#C8102E', background: '#fff9f9'
+                      outline: 'none', fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-light)'
                     }}
                   />
                 </div>
@@ -625,9 +625,9 @@ export default function ProductionPage() {
                         onClick={() => setTaskForm(f => ({ ...f, unitLabel: u }))}
                         style={{
                           padding: '5px 12px',
-                          border: `1px solid ${taskForm.unitLabel === u ? '#C8102E' : '#ddd'}`,
+                          border: `1px solid ${taskForm.unitLabel === u ? 'var(--primary)' : '#ddd'}`,
                           borderRadius: '16px',
-                          background: taskForm.unitLabel === u ? '#C8102E' : '#fff',
+                          background: taskForm.unitLabel === u ? 'var(--primary)' : '#fff',
                           color: taskForm.unitLabel === u ? '#fff' : '#444',
                           fontSize: '12px',
                           fontWeight: taskForm.unitLabel === u ? 700 : 500,
@@ -654,7 +654,7 @@ export default function ProductionPage() {
                 onClick={saveTask}
                 disabled={taskSaving || !taskForm.name.trim() || (taskForm.hasUnit && !taskForm.unitLabel.trim())}
                 style={{
-                  padding: '10px 24px', background: '#C8102E', color: '#fff',
+                  padding: '10px 24px', background: 'var(--primary)', color: '#fff',
                   border: 'none', borderRadius: '8px', cursor: 'pointer',
                   fontWeight: 600, fontSize: '14px',
                   opacity: (taskSaving || !taskForm.name.trim() || (taskForm.hasUnit && !taskForm.unitLabel.trim())) ? 0.6 : 1,

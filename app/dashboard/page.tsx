@@ -83,12 +83,12 @@ export default function DashboardPage() {
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:16 }}>
         <StatCard icon="👥" label="Nhân viên hoạt động" value={activeMembers.length} sub={`${pendingMembers.length} chờ duyệt`} color="#1A6B5A" />
         <StatCard icon="✅" label="Đang làm hôm nay" value={inProgressToday.length} sub={`${doneToday.length} đã ra ca`} color="#1565C0" />
-        <StatCard icon="⏱️" label="Tổng giờ tháng này" value={`${totalMonthHours.toFixed(1)}h`} sub="Toàn bộ nhân viên" color="#CB2D2E" />
+        <StatCard icon="⏱️" label="Tổng giờ tháng này" value={`${totalMonthHours.toFixed(1)}h`} sub="Toàn bộ nhân viên" />
         <StatCard icon="📋" label="Số ca hôm nay" value={todayAtts.length} sub="Tổng lượt chấm công" color="#EB9B28" />
       </div>
 
       {/* Chart + Today */}
-      <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr', gap:16 }}>
+      <div className="dashboard-overview-grid" style={{ display:'grid', gap:16 }}>
         {/* Chart */}
         <div className="card">
           <h3 style={{ fontSize:15, fontWeight:700, marginBottom:16 }}>Tổng giờ công 14 ngày gần nhất</h3>

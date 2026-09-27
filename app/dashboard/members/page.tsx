@@ -137,11 +137,11 @@ export default function MembersPage() {
     const norm = normalizeRole(memberRole);
     switch (norm) {
       case 'owner':
-        return { background: '#FFF5F5', color: '#C8102E', border: '1px solid #FFC9C9' };
+        return { background: '#EDEBE6', color: '#171717', border: '1px solid #D7D7D2' };
       case 'manager1':
-        return { background: '#E7F5FF', color: '#1C7ED6', border: '1px solid #A5D8FF' };
+        return { background: '#E8F3FE', color: '#126CC3', border: '1px solid #D4E3F2' };
       case 'manager2':
-        return { background: '#E6FCF5', color: '#0CA678', border: '1px solid #96F2D7' };
+        return { background: '#E8F3FE', color: '#126CC3', border: '1px solid #D4E3F2' };
       case 'employee':
       default:
         return { background: '#F8F9FA', color: '#495057', border: '1px solid #CED4DA' };

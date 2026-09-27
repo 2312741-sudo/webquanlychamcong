@@ -331,7 +331,7 @@ export default function PerformanceOverviewPage() {
       let ratingColor = '#137333';
       if (complianceRate === 100 && item.incidents === 0) {
         rating = '🌟 Xuất sắc';
-        ratingBg = '#DEF7EC';
+        ratingBg = '#E4F2EC';
         ratingColor = '#03543F';
       } else if (complianceRate < 70 || item.incidents >= 2) {
         rating = '⚠️ Cần cải thiện';
@@ -339,7 +339,7 @@ export default function PerformanceOverviewPage() {
         ratingColor = '#9B1C1C';
       } else if (complianceRate < 100 || item.incidents > 0) {
         rating = '⚡ Khá tốt';
-        ratingBg = '#FEF3C7';
+        ratingBg = '#FBEFD4';
         ratingColor = '#92400E';
       }
 
@@ -457,14 +457,14 @@ export default function PerformanceOverviewPage() {
         }}
       >
         {/* NƯỚC */}
-        <div className="card" style={{ borderLeft: '4px solid #0284C7', padding: '16px 20px' }}>
+        <div className="card" style={{ borderLeft: '4px solid #2D2A4A', padding: '16px 20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>🥤 LÀM NƯỚC</span>
-            <span style={{ fontSize: 11, background: '#E0F2FE', color: '#0369A1', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
+            <span style={{ fontSize: 11, background: '#E9E6ED', color: '#2D2A4A', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
               Chuẩn: {standards.drink}s
             </span>
           </div>
-          <div style={{ fontSize: 26, fontWeight: 800, color: '#0284C7' }}>
+          <div style={{ fontSize: 26, fontWeight: 800, color: '#2D2A4A' }}>
             {stats.avgDrinkSec > 0 ? `${stats.avgDrinkSec}s` : '--'}
             <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)', marginLeft: 6 }}>
               ({formatSecondsToMMSS(stats.avgDrinkSec)}/ly)
@@ -476,14 +476,14 @@ export default function PerformanceOverviewPage() {
         </div>
 
         {/* BÁNH */}
-        <div className="card" style={{ borderLeft: '4px solid #D97706', padding: '16px 20px' }}>
+        <div className="card" style={{ borderLeft: '4px solid #805214', padding: '16px 20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>🍰 NƯỚNG BÁNH</span>
-            <span style={{ fontSize: 11, background: '#FEF3C7', color: '#B45309', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
+            <span style={{ fontSize: 11, background: '#FBEFD4', color: '#805214', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
               Chuẩn: {standards.cake}s
             </span>
           </div>
-          <div style={{ fontSize: 26, fontWeight: 800, color: '#D97706' }}>
+          <div style={{ fontSize: 26, fontWeight: 800, color: '#805214' }}>
             {stats.avgCakeSec > 0 ? `${stats.avgCakeSec}s` : '--'}
             <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)', marginLeft: 6 }}>
               ({formatSecondsToMMSS(stats.avgCakeSec)}/bánh)
@@ -495,14 +495,14 @@ export default function PerformanceOverviewPage() {
         </div>
 
         {/* ĐƠN HÀNG */}
-        <div className="card" style={{ borderLeft: '4px solid #1C4E6B', padding: '16px 20px' }}>
+        <div className="card" style={{ borderLeft: '4px solid #2D2A4A', padding: '16px 20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>📦 SOS ĐƠN HÀNG</span>
-            <span style={{ fontSize: 11, background: '#E3EEF5', color: '#1C4E6B', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
+            <span style={{ fontSize: 11, background: '#E9E6ED', color: '#2D2A4A', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
               Chuẩn: {standards.order}s
             </span>
           </div>
-          <div style={{ fontSize: 26, fontWeight: 800, color: '#1C4E6B' }}>
+          <div style={{ fontSize: 26, fontWeight: 800, color: '#2D2A4A' }}>
             {stats.avgOrderSec > 0 ? `${stats.avgOrderSec}s` : '--'}
             <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)', marginLeft: 6 }}>
               ({formatSecondsToMMSS(stats.avgOrderSec)}/đơn)
@@ -514,14 +514,14 @@ export default function PerformanceOverviewPage() {
         </div>
 
         {/* TỶ LỆ ĐẠT CHUẨN */}
-        <div className="card" style={{ borderLeft: '4px solid #1A6B5A', padding: '16px 20px' }}>
+        <div className="card" style={{ borderLeft: '4px solid #146A65', padding: '16px 20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>🎯 ĐẠT TIÊU CHUẨN</span>
-            <span style={{ fontSize: 11, background: '#E6F2EF', color: '#1A6B5A', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
+            <span style={{ fontSize: 11, background: '#E4F2EC', color: '#146A65', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
               Mục tiêu &ge; 85%
             </span>
           </div>
-          <div style={{ fontSize: 26, fontWeight: 800, color: stats.complianceRate >= 85 ? '#1A6B5A' : '#C05621' }}>
+          <div style={{ fontSize: 26, fontWeight: 800, color: stats.complianceRate >= 85 ? '#146A65' : '#C05621' }}>
             {stats.complianceRate}%
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 6 }}>
@@ -530,14 +530,14 @@ export default function PerformanceOverviewPage() {
         </div>
 
         {/* SỰ CỐ */}
-        <div className="card" style={{ borderLeft: '4px solid #CB2D2E', padding: '16px 20px' }}>
+        <div className="card" style={{ borderLeft: '4px solid #7E2930', padding: '16px 20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>⚠️ SỰ CỐ PHÁT SINH</span>
             <span style={{ fontSize: 11, background: '#FEE2E2', color: '#B91C1C', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
               Trong ca
             </span>
           </div>
-          <div style={{ fontSize: 26, fontWeight: 800, color: stats.totalIncidents > 0 ? '#CB2D2E' : '#1A6B5A' }}>
+          <div style={{ fontSize: 26, fontWeight: 800, color: stats.totalIncidents > 0 ? '#7E2930' : '#146A65' }}>
             {stats.totalIncidents}
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 6 }}>
@@ -565,18 +565,18 @@ export default function PerformanceOverviewPage() {
             {mounted && chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#F0ECE6" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E9E1CF" />
                   <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 11 }} unit="s" />
                   <Tooltip formatter={(val: any) => [`${val} giây (${formatSecondsToMMSS(val)})`]} />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
                   {/* Đường tiêu chuẩn */}
-                  <ReferenceLine y={standards.drink} stroke="#0284C7" strokeDasharray="4 4" label={{ value: `Chuẩn Làm nước: ${standards.drink}s`, position: 'insideTopRight', fill: '#0284C7', fontSize: 10 }} />
-                  <ReferenceLine y={standards.order} stroke="#1C4E6B" strokeDasharray="4 4" label={{ value: `Chuẩn SOS Đơn: ${standards.order}s`, position: 'insideTopRight', fill: '#1C4E6B', fontSize: 10 }} />
+                  <ReferenceLine y={standards.drink} stroke="#2D2A4A" strokeDasharray="4 4" label={{ value: `Chuẩn Làm nước: ${standards.drink}s`, position: 'insideTopRight', fill: '#2D2A4A', fontSize: 10 }} />
+                  <ReferenceLine y={standards.order} stroke="#2D2A4A" strokeDasharray="4 4" label={{ value: `Chuẩn SOS Đơn: ${standards.order}s`, position: 'insideTopRight', fill: '#2D2A4A', fontSize: 10 }} />
                   
-                  <Line type="monotone" dataKey="TB Làm nước (s)" stroke="#0284C7" strokeWidth={2.5} dot={{ r: 4 }} connectNulls />
-                  <Line type="monotone" dataKey="TB Nướng bánh (s)" stroke="#D97706" strokeWidth={2.5} dot={{ r: 4 }} connectNulls />
-                  <Line type="monotone" dataKey="TB SOS Đơn (s)" stroke="#1C4E6B" strokeWidth={2.5} dot={{ r: 4 }} connectNulls />
+                  <Line type="monotone" dataKey="TB Làm nước (s)" stroke="#2D2A4A" strokeWidth={2.5} dot={{ r: 4 }} connectNulls />
+                  <Line type="monotone" dataKey="TB Nướng bánh (s)" stroke="#805214" strokeWidth={2.5} dot={{ r: 4 }} connectNulls />
+                  <Line type="monotone" dataKey="TB SOS Đơn (s)" stroke="#2D2A4A" strokeWidth={2.5} dot={{ r: 4 }} connectNulls />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
@@ -604,14 +604,14 @@ export default function PerformanceOverviewPage() {
             {mounted && chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#F0ECE6" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E9E1CF" />
                   <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 11 }} />
                   <Tooltip />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="Số ly Làm nước" fill="#0284C7" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Số Nướng bánh" fill="#D97706" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Số SOS Đơn" fill="#1C4E6B" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Số ly Làm nước" fill="#2D2A4A" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Số Nướng bánh" fill="#805214" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Số SOS Đơn" fill="#2D2A4A" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -641,13 +641,13 @@ export default function PerformanceOverviewPage() {
                 className="card"
                 style={{
                   padding: '16px 20px',
-                  borderTop: '4px solid #059669',
-                  background: 'linear-gradient(180deg, #F0FDF4 0%, #FFFFFF 100%)',
+                  borderTop: '4px solid #146A65',
+                  background: 'linear-gradient(180deg, #E4F2EC 0%, #FFFFFF 100%)',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                   <span style={{ fontSize: 12, fontWeight: 700, color: '#047857' }}>🏆 NGÀY HIỆU SUẤT CAO NHẤT</span>
-                  <span style={{ fontSize: 11, background: '#DEF7EC', color: '#03543F', padding: '2px 8px', borderRadius: 8, fontWeight: 700 }}>
+                  <span style={{ fontSize: 11, background: '#E4F2EC', color: '#03543F', padding: '2px 8px', borderRadius: 8, fontWeight: 700 }}>
                     SLA {dayHighlights.bestDay.complianceRate}%
                   </span>
                 </div>
@@ -664,13 +664,13 @@ export default function PerformanceOverviewPage() {
                 className="card"
                 style={{
                   padding: '16px 20px',
-                  borderTop: '4px solid #0284C7',
-                  background: 'linear-gradient(180deg, #F0F9FF 0%, #FFFFFF 100%)',
+                  borderTop: '4px solid #2D2A4A',
+                  background: 'linear-gradient(180deg, #E9E6ED 0%, #FFFFFF 100%)',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#0369A1' }}>🚀 NGÀY CAO ĐIỂM SẢN LƯỢNG</span>
-                  <span style={{ fontSize: 11, background: '#E0F2FE', color: '#0284C7', padding: '2px 8px', borderRadius: 8, fontWeight: 700 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#2D2A4A' }}>🚀 NGÀY CAO ĐIỂM SẢN LƯỢNG</span>
+                  <span style={{ fontSize: 11, background: '#E9E6ED', color: '#2D2A4A', padding: '2px 8px', borderRadius: 8, fontWeight: 700 }}>
                     {dayHighlights.peakDay.totalVolume} món/đơn
                   </span>
                 </div>
@@ -687,13 +687,13 @@ export default function PerformanceOverviewPage() {
                 className="card"
                 style={{
                   padding: '16px 20px',
-                  borderTop: '4px solid #D97706',
-                  background: 'linear-gradient(180deg, #FFFBEB 0%, #FFFFFF 100%)',
+                  borderTop: '4px solid #805214',
+                  background: 'linear-gradient(180deg, #FBEFD4 0%, #FFFFFF 100%)',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#B45309' }}>⚠️ NGÀY CẦN CHÚ Ý VẬN HÀNH</span>
-                  <span style={{ fontSize: 11, background: dayHighlights.attentionDay.incidents > 0 ? '#FEE2E2' : '#FEF3C7', color: dayHighlights.attentionDay.incidents > 0 ? '#B91C1C' : '#92400E', padding: '2px 8px', borderRadius: 8, fontWeight: 700 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#805214' }}>⚠️ NGÀY CẦN CHÚ Ý VẬN HÀNH</span>
+                  <span style={{ fontSize: 11, background: dayHighlights.attentionDay.incidents > 0 ? '#FEE2E2' : '#FBEFD4', color: dayHighlights.attentionDay.incidents > 0 ? '#B91C1C' : '#92400E', padding: '2px 8px', borderRadius: 8, fontWeight: 700 }}>
                     {dayHighlights.attentionDay.incidents > 0 ? `${dayHighlights.attentionDay.incidents} sự cố` : `SLA ${dayHighlights.attentionDay.complianceRate}%`}
                   </span>
                 </div>
@@ -756,14 +756,14 @@ export default function PerformanceOverviewPage() {
                           {day.drinkQty > 0 ? (
                             <div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <strong style={{ color: isDrinkOk ? '#0284C7' : '#DC2626' }}>{day.drinkAvg}s/ly</strong>
+                                <strong style={{ color: isDrinkOk ? '#2D2A4A' : '#DC2626' }}>{day.drinkAvg}s/ly</strong>
                                 <span style={{
                                   fontSize: 10,
                                   fontWeight: 700,
                                   padding: '1px 6px',
                                   borderRadius: 6,
-                                  background: isDrinkOk ? '#E0F2FE' : '#FEE2E2',
-                                  color: isDrinkOk ? '#0369A1' : '#B91C1C',
+                                  background: isDrinkOk ? '#E9E6ED' : '#FEE2E2',
+                                  color: isDrinkOk ? '#2D2A4A' : '#B91C1C',
                                 }}>
                                   {isDrinkOk ? 'Đạt' : `+${day.drinkAvg - standards.drink}s`}
                                 </span>
@@ -778,14 +778,14 @@ export default function PerformanceOverviewPage() {
                           {day.cakeQty > 0 ? (
                             <div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <strong style={{ color: isCakeOk ? '#D97706' : '#DC2626' }}>{day.cakeAvg}s/bánh</strong>
+                                <strong style={{ color: isCakeOk ? '#805214' : '#DC2626' }}>{day.cakeAvg}s/bánh</strong>
                                 <span style={{
                                   fontSize: 10,
                                   fontWeight: 700,
                                   padding: '1px 6px',
                                   borderRadius: 6,
-                                  background: isCakeOk ? '#FEF3C7' : '#FEE2E2',
-                                  color: isCakeOk ? '#B45309' : '#B91C1C',
+                                  background: isCakeOk ? '#FBEFD4' : '#FEE2E2',
+                                  color: isCakeOk ? '#805214' : '#B91C1C',
                                 }}>
                                   {isCakeOk ? 'Đạt' : `+${day.cakeAvg - standards.cake}s`}
                                 </span>
@@ -800,14 +800,14 @@ export default function PerformanceOverviewPage() {
                           {day.orderCount > 0 ? (
                             <div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <strong style={{ color: isOrderOk ? '#1C4E6B' : '#DC2626' }}>{day.orderAvg}s/đơn</strong>
+                                <strong style={{ color: isOrderOk ? '#2D2A4A' : '#DC2626' }}>{day.orderAvg}s/đơn</strong>
                                 <span style={{
                                   fontSize: 10,
                                   fontWeight: 700,
                                   padding: '1px 6px',
                                   borderRadius: 6,
-                                  background: isOrderOk ? '#E3EEF5' : '#FEE2E2',
-                                  color: isOrderOk ? '#1C4E6B' : '#B91C1C',
+                                  background: isOrderOk ? '#E9E6ED' : '#FEE2E2',
+                                  color: isOrderOk ? '#2D2A4A' : '#B91C1C',
                                 }}>
                                   {isOrderOk ? 'Đạt' : `+${day.orderAvg - standards.order}s`}
                                 </span>
@@ -825,13 +825,13 @@ export default function PerformanceOverviewPage() {
                                 style={{
                                   width: `${day.complianceRate}%`,
                                   height: '100%',
-                                  background: day.complianceRate >= 85 ? '#059669' : (day.complianceRate >= 70 ? '#D97706' : '#DC2626'),
+                                  background: day.complianceRate >= 85 ? '#146A65' : (day.complianceRate >= 70 ? '#805214' : '#DC2626'),
                                 }}
                               />
                             </div>
                             <strong style={{
                               fontSize: 12,
-                              color: day.complianceRate >= 85 ? '#059669' : (day.complianceRate >= 70 ? '#D97706' : '#DC2626'),
+                              color: day.complianceRate >= 85 ? '#146A65' : (day.complianceRate >= 70 ? '#805214' : '#DC2626'),
                             }}>
                               {day.complianceRate}%
                             </strong>
@@ -850,7 +850,7 @@ export default function PerformanceOverviewPage() {
                               {day.incidents} sự cố
                             </span>
                           ) : (
-                            <span style={{ color: '#059669', fontSize: 12 }}>0</span>
+                            <span style={{ color: '#146A65', fontSize: 12 }}>0</span>
                           )}
                         </td>
                         <td style={{ padding: '12px 12px', textAlign: 'right' }}>
@@ -896,7 +896,7 @@ export default function PerformanceOverviewPage() {
         </div>
 
         {attentionSessions.length === 0 ? (
-          <div style={{ padding: '24px 0', textAlign: 'center', color: '#1A6B5A', fontSize: 13 }}>
+          <div style={{ padding: '24px 0', textAlign: 'center', color: '#146A65', fontSize: 13 }}>
             🎉 Tất cả các ca đo trong kỳ đều đạt chuẩn tốt và không phát sinh sự cố!
           </div>
         ) : (

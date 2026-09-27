@@ -175,7 +175,7 @@ export default function PerformanceSettingsPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 20, marginBottom: 20 }}>
             {/* Drink */}
             <div style={{ border: '1px solid var(--border)', padding: 16, borderRadius: 10 }}>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#0284C7', marginBottom: 6 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#2D2A4A', marginBottom: 6 }}>
                 🥤 Tiêu chuẩn Làm nước (giây / ly)
               </label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -205,7 +205,7 @@ export default function PerformanceSettingsPage() {
 
             {/* Cake */}
             <div style={{ border: '1px solid var(--border)', padding: 16, borderRadius: 10 }}>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#D97706', marginBottom: 6 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#805214', marginBottom: 6 }}>
                 🍰 Tiêu chuẩn Nướng bánh (giây / bánh)
               </label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -235,7 +235,7 @@ export default function PerformanceSettingsPage() {
 
             {/* Order */}
             <div style={{ border: '1px solid var(--border)', padding: 16, borderRadius: 10 }}>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#1C4E6B', marginBottom: 6 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#2D2A4A', marginBottom: 6 }}>
                 📦 Tiêu chuẩn SOS đơn hàng (giây / đơn)
               </label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -269,7 +269,7 @@ export default function PerformanceSettingsPage() {
               {savingStandards ? 'Đang lưu...' : 'Lưu Thay Đổi Tiêu Chuẩn'}
             </button>
             {standardsMsg && (
-              <span style={{ fontSize: 13, color: standardsMsg.type === 'success' ? '#1A6B5A' : '#CB2D2E', fontWeight: 600 }}>
+              <span style={{ fontSize: 13, color: standardsMsg.type === 'success' ? '#146A65' : '#7E2930', fontWeight: 600 }}>
                 {standardsMsg.text}
               </span>
             )}
@@ -319,7 +319,7 @@ export default function PerformanceSettingsPage() {
                   <button
                     type="button"
                     onClick={() => handleRemoveCriterion(item.id)}
-                    style={{ background: 'none', border: 'none', color: '#CB2D2E', cursor: 'pointer', fontSize: 14 }}
+                    style={{ background: 'none', border: 'none', color: '#7E2930', cursor: 'pointer', fontSize: 14 }}
                   >
                     Xóa
                   </button>
@@ -381,7 +381,7 @@ export default function PerformanceSettingsPage() {
             {savingCriteria ? 'Đang lưu...' : 'Lưu Danh Sách Tiêu Chí'}
           </button>
           {criteriaMsg && (
-            <span style={{ fontSize: 13, color: criteriaMsg.type === 'success' ? '#1A6B5A' : '#CB2D2E', fontWeight: 600 }}>
+            <span style={{ fontSize: 13, color: criteriaMsg.type === 'success' ? '#146A65' : '#7E2930', fontWeight: 600 }}>
               {criteriaMsg.text}
             </span>
           )}
@@ -420,13 +420,13 @@ export default function PerformanceSettingsPage() {
                 style={{
                   padding: '12px 14px',
                   borderRadius: 8,
-                  border: deleteMode === m.id ? '2px solid #CB2D2E' : '1px solid var(--border)',
+                  border: deleteMode === m.id ? '2px solid #7E2930' : '1px solid var(--border)',
                   background: deleteMode === m.id ? '#FFF1F2' : 'white',
                   cursor: 'pointer',
                   transition: 'all 0.15s',
                 }}
               >
-                <div style={{ fontWeight: 700, fontSize: 13, color: deleteMode === m.id ? '#CB2D2E' : 'var(--neutral)' }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: deleteMode === m.id ? '#7E2930' : 'var(--neutral)' }}>
                   {m.label}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
@@ -510,7 +510,7 @@ export default function PerformanceSettingsPage() {
                 <h3 style={{ fontSize: 18, fontWeight: 800, color: '#166534', marginBottom: 8 }}>
                   Dọn Dẹp Dữ Liệu Thành Công!
                 </h3>
-                <div style={{ background: '#F0FDF4', padding: 14, borderRadius: 8, fontSize: 13, color: '#166534', marginBottom: 20, textAlign: 'left' }}>
+                <div style={{ background: '#E4F2EC', padding: 14, borderRadius: 8, fontSize: 13, color: '#166534', marginBottom: 20, textAlign: 'left' }}>
                   - Số phiên đo (`sessions`) đã xóa: <strong>{deleteResult.sessions}</strong><br />
                   - Số lượt bấm giờ (`measurements`) đã xóa: <strong>{deleteResult.measurements}</strong><br />
                   - Số báo cáo (`reports`) đã xóa: <strong>{deleteResult.reports}</strong>

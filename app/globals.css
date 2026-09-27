@@ -2,29 +2,73 @@
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
 
 :root {
-  --primary: #CB2D2E;
-  --primary-dark: #A82425;
-  --primary-light: #F5E6E6;
-  --success: #1A6B5A;
-  --success-light: #E6F2EF;
-  --accent: #EB9B28;
-  --accent-light: #FDF3E3;
+  --primary: #7E2930;
+  --primary-dark: #5C1F24;
+  --primary-light: #F4E8E5;
+  --success: #146A65;
+  --success-light: #E4F2EC;
+  --accent: #805214;
+  --accent-light: #FBEFD4;
   --info: #1C4E6B;
   --info-light: #E3EEF5;
-  --surface: #F8F4EE;
+  --surface: #F6EFDF;
   --white: #FFFFFF;
-  --neutral: #1A1A1A;
-  --text-primary: #1A1A1A;
-  --text-secondary: #6B6B6B;
+  --neutral: #1C1A2D;
+  --text-primary: #1C1A2D;
+  --text-secondary: #5D5B63;
   --text-disabled: #AAAAAA;
-  --border: #E0DAD4;
-  --divider: #ECE8E2;
+  --border: #D8CFBD;
+  --divider: #E9E1CF;
+  --danger: #B4232C;
+  --warning: #805214;
+  --owner-accent: #171717;
+  --manager-accent: #126CC3;
+  --sidebar-bg: #1C1A2D;
+  --sidebar-active: #7E2930;
+  --sidebar-active-text: #FFFFFF;
+  --sidebar-role: #F4E8E5;
   --shadow: rgba(0,0,0,0.06);
   --sidebar-width: 240px;
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-xl: 20px;
+}
+
+/* Dashboard colors follow the current store role; business status colors stay semantic. */
+.dashboard-role-owner {
+  --primary: #171717;
+  --primary-dark: #050505;
+  --primary-light: #EDEBE6;
+  --surface: #F7F7F5;
+  --neutral: #171717;
+  --text-primary: #202020;
+  --border: #D7D7D2;
+  --divider: #E8E8E3;
+  --sidebar-bg: #171717;
+  --sidebar-active: #383838;
+  --sidebar-active-text: #FFFFFF;
+  --sidebar-role: #F1F1EE;
+}
+
+.dashboard-role-manager {
+  --primary: #126CC3;
+  --primary-dark: #095AA8;
+  --primary-light: #E8F3FE;
+  --surface: #F7FAFE;
+  --neutral: #17324A;
+  --text-primary: #1E2933;
+  --border: #D4E3F2;
+  --divider: #E3ECF5;
+  --sidebar-bg: #095AA8;
+  --sidebar-active: #E8F3FE;
+  --sidebar-active-text: #095AA8;
+  --sidebar-role: #E8F3FE;
+}
+
+.dashboard-overview-grid { grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); }
+@media (max-width: 850px) {
+  .dashboard-overview-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -125,8 +169,8 @@ input, select, textarea { font-family: inherit; }
   font-size: 11px;
   font-weight: 600;
 }
-.badge-owner { background: var(--primary-light); color: var(--primary); }
-.badge-manager { background: var(--info-light); color: var(--info); }
+.badge-owner { background: #EDEBE6; color: var(--owner-accent); }
+.badge-manager { background: #E8F3FE; color: var(--manager-accent); }
 .badge-employee { background: var(--surface); color: var(--text-secondary); border: 1px solid var(--border); }
 .badge-active { background: var(--success-light); color: var(--success); }
 .badge-pending { background: var(--accent-light); color: var(--accent); }
@@ -261,7 +305,7 @@ input, select, textarea { font-family: inherit; }
   animation: slideInRight 0.25s ease;
 }
 .toast-success { background: var(--success); }
-.toast-error { background: var(--primary); }
+.toast-error { background: var(--danger); }
 
 /* ── Animations ─────────────────────────────── */
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }

@@ -8,12 +8,13 @@ export { useApp };
 import { normalizeRole } from '@/lib/types';
 import { watchPerformanceReports } from '@/lib/performance';
 import { PerformanceReport } from '@/lib/performanceTypes';
+import './performance.css';
 
 const TABS = [
-  { href: '/dashboard/performance', label: 'Tổng quan', icon: '📊', exact: true },
-  { href: '/dashboard/performance/reports', label: 'Báo cáo ca', icon: '📋', exact: false },
-  { href: '/dashboard/performance/leaderboard', label: 'Bảng xếp hạng', icon: '🏆', exact: false },
-  { href: '/dashboard/performance/settings', label: 'Tiêu chuẩn & Dữ liệu', icon: '⚙️', exact: false },
+  { href: '/dashboard/performance', label: 'Tổng quan', icon: 'monitoring', exact: true },
+  { href: '/dashboard/performance/reports', label: 'Báo cáo ca', icon: 'assignment', exact: false },
+  { href: '/dashboard/performance/leaderboard', label: 'Bảng xếp hạng', icon: 'emoji_events', exact: false },
+  { href: '/dashboard/performance/settings', label: 'Tiêu chuẩn & Dữ liệu', icon: 'tune', exact: false },
 ];
 
 export default function PerformanceLayout({ children }: { children: React.ReactNode }) {
@@ -35,7 +36,7 @@ export default function PerformanceLayout({ children }: { children: React.ReactN
 
   if (!isOwner) {
     return (
-      <div style={{ padding: 40, textAlign: 'center' }}>
+      <div className="performance-shell performance-restricted" style={{ padding: 40, textAlign: 'center' }}>
         <div className="card" style={{ maxWidth: 480, margin: '60px auto', padding: 32 }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
           <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8, color: 'var(--neutral)' }}>
@@ -57,25 +58,25 @@ export default function PerformanceLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <div style={{ padding: '24px 32px', maxWidth: 1400, margin: '0 auto', minHeight: '100%' }}>
+    <div className="performance-shell">
       {/* Top Header */}
-      <div style={{ marginBottom: 20 }}>
+      <div className="performance-header" style={{ marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 26 }}>⚡</span>
+              <span className="performance-header-icon material-icons" aria-hidden="true">monitoring</span>
               <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--neutral)' }}>
                 Đo Hiệu Năng Vận Hành
               </h1>
               <span
                 style={{
-                  background: '#FDF3E3',
-                  color: '#C05621',
+                  background: 'var(--accent-light)',
+                  color: '#805214',
                   fontSize: 12,
                   fontWeight: 700,
                   padding: '3px 10px',
                   borderRadius: 12,
-                  border: '1px solid #FEEBC8',
+                  border: '1px solid var(--accent)',
                 }}
               >
                 Chủ cửa hàng
@@ -89,6 +90,7 @@ export default function PerformanceLayout({ children }: { children: React.ReactN
 
         {/* Sub Navigation Tabs */}
         <div
+          className="performance-tabs"
           style={{
             display: 'flex',
             gap: 8,
@@ -105,6 +107,7 @@ export default function PerformanceLayout({ children }: { children: React.ReactN
               <Link
                 key={tab.href}
                 href={tab.href}
+                aria-current={active ? 'page' : undefined}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -119,7 +122,7 @@ export default function PerformanceLayout({ children }: { children: React.ReactN
                   whiteSpace: 'nowrap',
                 }}
               >
-                <span style={{ fontSize: 16 }}>{tab.icon}</span>
+                <span className="performance-tab-icon material-icons" aria-hidden="true">{tab.icon}</span>
                 {tab.label}
                 {isReportTab && unviewedCount > 0 && (
                   <span

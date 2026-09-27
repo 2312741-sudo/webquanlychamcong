@@ -248,7 +248,7 @@ export default function PerformanceLeaderboardPage() {
             <div
               className="card"
               style={{
-                background: 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)',
+                background: 'linear-gradient(135deg, #FBEFD4 0%, #FBEFD4 100%)',
                 border: '2px solid #F59E0B',
                 position: 'relative',
                 overflow: 'hidden',
@@ -257,13 +257,13 @@ export default function PerformanceLeaderboardPage() {
               }}
             >
               <div style={{ fontSize: 32, marginBottom: 4 }}>👑 🥇</div>
-              <div style={{ fontSize: 11, fontWeight: 800, color: '#B45309', letterSpacing: 1 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#805214', letterSpacing: 1 }}>
                 QUÁN QUÂN HIỆU NĂNG
               </div>
               <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--neutral)', marginTop: 4 }}>
                 {top1.name}
               </div>
-              <div style={{ fontSize: 24, fontWeight: 800, color: '#B45309', marginTop: 10 }}>
+              <div style={{ fontSize: 24, fontWeight: 800, color: '#805214', marginTop: 10 }}>
                 {top1.avgDrinkSec > 0 ? `${top1.avgDrinkSec}s / ly` : '--'}
               </div>
               <div style={{ fontSize: 12, color: '#92400E', marginTop: 4 }}>
@@ -277,7 +277,7 @@ export default function PerformanceLeaderboardPage() {
             <div
               className="card"
               style={{
-                background: 'linear-gradient(135deg, #F8FAFC 0%, #E2E8F0 100%)',
+                background: 'linear-gradient(135deg, #F6EFDF 0%, #E2E8F0 100%)',
                 border: '1px solid #94A3B8',
                 textAlign: 'center',
                 padding: '24px 20px',
@@ -330,7 +330,7 @@ export default function PerformanceLeaderboardPage() {
 
       {/* Full Leaderboard Table */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', background: '#FAF7F2' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', background: '#F6EFDF' }}>
           <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--neutral)' }}>
             Bảng Xếp Hạng Chi Tiết ({staffStats.length} nhân sự)
           </h3>
@@ -381,7 +381,7 @@ export default function PerformanceLeaderboardPage() {
                       <td style={{ padding: '12px 16px' }}>
                         {staff.sessionCount} ca
                       </td>
-                      <td style={{ padding: '12px 16px', fontWeight: 700, color: isDrinkPass ? '#1A6B5A' : '#CB2D2E' }}>
+                      <td style={{ padding: '12px 16px', fontWeight: 700, color: isDrinkPass ? '#146A65' : '#7E2930' }}>
                         {staff.avgDrinkSec > 0 ? `${staff.avgDrinkSec}s (${formatSecondsToMMSS(staff.avgDrinkSec)})` : '--'}
                       </td>
                       <td style={{ padding: '12px 16px' }}>
@@ -395,16 +395,16 @@ export default function PerformanceLeaderboardPage() {
                       </td>
                       <td style={{ padding: '12px 16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ fontWeight: 700, color: staff.complianceRate >= 85 ? '#1A6B5A' : '#C05621' }}>
+                          <span style={{ fontWeight: 700, color: staff.complianceRate >= 85 ? '#146A65' : '#C05621' }}>
                             {staff.complianceRate}%
                           </span>
                         </div>
                       </td>
                       <td style={{ padding: '12px 16px' }}>
                         {staff.incidentCount > 0 ? (
-                          <span style={{ color: '#CB2D2E', fontWeight: 600 }}>{staff.incidentCount} vụ</span>
+                          <span style={{ color: '#7E2930', fontWeight: 600 }}>{staff.incidentCount} vụ</span>
                         ) : (
-                          <span style={{ color: '#1A6B5A' }}>0</span>
+                          <span style={{ color: '#146A65' }}>0</span>
                         )}
                       </td>
                     </tr>
