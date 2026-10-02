@@ -17,6 +17,42 @@ function getMondayOfWeek(date: Date): string {
   return `${y}-${m}-${dayStr}`;
 }
 
+export function getScheduleDeadline(weekStart: string): Date {
+  const [y, m, d] = weekStart.split('-').map(Number);
+  const monday = new Date(y, m - 1, d, 0, 0, 0, 0);
+  const prevFriday = new Date(monday.getTime() - 3 * 24 * 60 * 60 * 1000);
+  prevFriday.setHours(23, 59, 59, 999);
+  return prevFriday;
+}
+
+export function isPastScheduleDeadline(weekStart: string): boolean {
+  const deadline = getScheduleDeadline(weekStart);
+  return Date.now() > deadline.getTime();
+}
+
+export function formatDeadline(weekStart: string): string {
+  const deadline = getScheduleDeadline(weekStart);
+  const d = String(deadline.getDate()).padStart(2, '0');
+  const m = String(deadline.getMonth() + 1).padStart(2, '0');
+  const y = deadline.getFullYear();
+  return `23:59 Thứ 6 (${d}/${m}/${y})`;
+}
+
+export function getWeekNumber(weekStart: string): number {
+  const [y, m, d] = weekStart.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  const firstJan = new Date(date.getFullYear(), 0, 1);
+  const diffDays = Math.floor((date.getTime() - firstJan.getTime()) / (24 * 60 * 60 * 1000));
+  return Math.ceil(diffDays / 7) + 1;
+}
+
+function cleanDayShifts(shifts: string[] | undefined): string[] {
+  if (!shifts || !Array.isArray(shifts)) return [];
+  const hasNormal = shifts.some(id => id !== 'delivery' && id !== 'giaohang');
+  if (!hasNormal) return [];
+  return [...shifts];
+}
+
 const DEFAULT_SHIFTS: ShiftDefinition[] = [
   { id: 'morning', name: 'Ca sáng', startHour: 6, startMinute: 0, endHour: 14, endMinute: 0 },
   { id: 'afternoon', name: 'Ca chiều', startHour: 14, startMinute: 0, endHour: 22, endMinute: 0 },
@@ -44,12 +80,19 @@ function ScheduleContent() {
     monday: [], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: []
   });
   const [registerSaving, setRegisterSaving] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+  const [loadedWeek, setLoadedWeek] = useState<string | null>(null);
 
   const [currentWeek, setCurrentWeek] = useState(() => getMondayOfWeek(new Date()));
   useEffect(() => {
     const week = searchParams.get('weekStart');
     if (week && /^\d{4}-\d{2}-\d{2}$/.test(week) && !Number.isNaN(Date.parse(week))) setCurrentWeek(week);
   }, [searchParams]);
+
+  const pastDeadline = isPastScheduleDeadline(currentWeek);
+  const isBlocked = pastDeadline && !canEditSchedule;
+  const isThisWeek = currentWeek === getMondayOfWeek(new Date());
+
   const [shifts, setShifts] = useState<Record<string, DaySchedule>>({});
   const [scheduleData, setScheduleData] = useState<ScheduleModel | null>(null);
   const [loading, setLoading] = useState(false);
@@ -59,6 +102,9 @@ function ScheduleContent() {
   // Sync user's draft schedule for registration tab
   useEffect(() => {
     if (!user) return;
+    // Don't overwrite if user has unsaved edits in current week
+    if (isDirty && loadedWeek === currentWeek) return;
+
     const userSchedule = shifts[user.uid];
     if (userSchedule) {
       setRegisterDraft({
@@ -75,27 +121,100 @@ function ScheduleContent() {
         monday: [], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: []
       });
     }
+    setLoadedWeek(currentWeek);
+    setIsDirty(false);
   }, [user, shifts, currentWeek]);
 
   const toggleRegisterShift = (dayKey: keyof DaySchedule, shiftId: string) => {
+    if (isBlocked) {
+      showToast(`Đã qua hạn đăng ký (${formatDeadline(currentWeek)}). Vui lòng liên hệ Quản lý.`);
+      return;
+    }
+    setIsDirty(true);
     setRegisterDraft(prev => {
       const current = prev[dayKey] || [];
-      const exists = current.includes(shiftId);
-      const next = exists ? current.filter(id => id !== shiftId) : [...current, shiftId];
+      const existingEntry = current.find(s => s === shiftId || s.startsWith(`${shiftId}|`));
+      let next: string[];
+      if (existingEntry) {
+        next = current.filter(s => s !== existingEntry);
+        // Strip delivery & giaohang if no regular working shifts left
+        const hasNormal = next.some(id => id !== 'delivery' && id !== 'giaohang');
+        if (!hasNormal) {
+          next = next.filter(id => id !== 'delivery' && id !== 'giaohang');
+        }
+      } else {
+        next = [...current, shiftId];
+      }
+      return { ...prev, [dayKey]: next };
+    });
+  };
+
+  const setRegisterShiftDepartment = (dayKey: keyof DaySchedule, shiftId: string, deptId: string) => {
+    if (isBlocked) {
+      showToast(`Đã qua hạn đăng ký (${formatDeadline(currentWeek)}). Vui lòng liên hệ Quản lý.`);
+      return;
+    }
+    setIsDirty(true);
+    setRegisterDraft(prev => {
+      const current = prev[dayKey] || [];
+      const existingEntry = current.find(s => s === shiftId || s.startsWith(`${shiftId}|`));
+      if (!existingEntry) return prev;
+      const newEntry = deptId ? `${shiftId}|${deptId}` : shiftId;
+      const next = current.map(s => s === existingEntry ? newEntry : s);
+      return { ...prev, [dayKey]: next };
+    });
+  };
+
+  const toggleRegisterSpecial = (dayKey: keyof DaySchedule, specialType: 'delivery' | 'giaohang') => {
+    if (isBlocked) {
+      showToast(`Đã qua hạn đăng ký (${formatDeadline(currentWeek)}). Vui lòng liên hệ Quản lý.`);
+      return;
+    }
+    const current = registerDraft[dayKey] || [];
+    const hasNormal = current.some(id => id !== 'delivery' && id !== 'giaohang');
+    if (!hasNormal) {
+      showToast('Cần chọn ít nhất 1 ca làm việc trong ngày trước khi tích Chở hàng / Giao hàng.');
+      return;
+    }
+    setIsDirty(true);
+    setRegisterDraft(prev => {
+      const c = prev[dayKey] || [];
+      const exists = c.includes(specialType);
+      const next = exists ? c.filter(id => id !== specialType) : [...c, specialType];
       return { ...prev, [dayKey]: next };
     });
   };
 
   const clearRegisterDay = (dayKey: keyof DaySchedule) => {
+    if (isBlocked) {
+      showToast(`Đã qua hạn đăng ký (${formatDeadline(currentWeek)}). Vui lòng liên hệ Quản lý.`);
+      return;
+    }
+    setIsDirty(true);
     setRegisterDraft(prev => ({ ...prev, [dayKey]: [] }));
   };
 
   const handleSaveUserRegistration = async () => {
     if (!storeId || !user) return;
+    if (isBlocked) {
+      showToast(`Đã quá hạn đăng ký lịch làm tuần này (${formatDeadline(currentWeek)}). Vui lòng liên hệ Quản lý!`);
+      return;
+    }
     setRegisterSaving(true);
     try {
+      const cleanedDraft: DaySchedule = {
+        monday: cleanDayShifts(registerDraft.monday),
+        tuesday: cleanDayShifts(registerDraft.tuesday),
+        wednesday: cleanDayShifts(registerDraft.wednesday),
+        thursday: cleanDayShifts(registerDraft.thursday),
+        friday: cleanDayShifts(registerDraft.friday),
+        saturday: cleanDayShifts(registerDraft.saturday),
+        sunday: cleanDayShifts(registerDraft.sunday),
+      };
+
       const memberName = currentMember?.name || user.displayName || user.email?.split('@')[0] || 'Nhân viên';
-      await saveUserSchedule(storeId, user.uid, currentWeek, registerDraft, memberName);
+      await saveUserSchedule(storeId, user.uid, currentWeek, cleanedDraft, memberName);
+      setIsDirty(false);
       showToast('Đã lưu đăng ký lịch làm việc thành công!');
     } catch (err: any) {
       showToast('Lỗi khi lưu đăng ký: ' + (err.message || err));
@@ -193,14 +312,36 @@ function ScheduleContent() {
   }, [storeId, currentWeek]);
 
   const changeWeek = (offset: number) => {
+    if (isDirty) {
+      if (!window.confirm('Bạn có thay đổi lịch làm chưa lưu. Bạn có chắc muốn chuyển tuần mà không lưu không?')) {
+        return;
+      }
+    }
     const [y, m, d] = currentWeek.split('-').map(Number);
     const dateObj = new Date(y, m - 1, d);
     dateObj.setDate(dateObj.getDate() + offset * 7);
     setCurrentWeek(getMondayOfWeek(dateObj));
+    setIsDirty(false);
   };
 
   const goToCurrentWeek = () => {
+    if (isDirty) {
+      if (!window.confirm('Bạn có thay đổi lịch làm chưa lưu. Bạn có chắc muốn chuyển tuần mà không lưu không?')) {
+        return;
+      }
+    }
     setCurrentWeek(getMondayOfWeek(new Date()));
+    setIsDirty(false);
+  };
+
+  const handleTabSwitch = (tab: 'register' | 'store') => {
+    if (isDirty) {
+      if (!window.confirm('Bạn có thay đổi lịch làm chưa lưu. Bạn có chắc muốn chuyển tab mà không lưu không?')) {
+        return;
+      }
+    }
+    setIsDirty(false);
+    setActiveTab(tab);
   };
 
   const handleExport = () => {
@@ -215,6 +356,11 @@ function ScheduleContent() {
   };
 
   const openModal = (userId: string, dayKey: keyof DaySchedule, memberName: string, dateLabel: string) => {
+    const isSelf = user?.uid === userId;
+    if (isSelf && !canEditSchedule && pastDeadline) {
+      showToast(`Đã qua hạn đăng ký (${formatDeadline(currentWeek)}). Vui lòng liên hệ Quản lý.`);
+      return;
+    }
     setEditingCell({ userId, dayKey, memberName, dateLabel });
     setModalOpen(true);
   };
@@ -267,6 +413,11 @@ function ScheduleContent() {
     setSaving(true);
     try {
       if (!canEditSchedule && !canEditDelivery) {
+        if (pastDeadline) {
+          showToast(`Đã qua hạn đăng ký (${formatDeadline(currentWeek)}). Vui lòng liên hệ Quản lý!`);
+          setSaving(false);
+          return;
+        }
         // Employee saving their own shifts
         const mySchedule = shifts[user.uid] || { monday:[], tuesday:[], wednesday:[], thursday:[], friday:[], saturday:[], sunday:[] };
         const memberName = currentMember?.name || user.displayName || user.email?.split('@')[0] || 'Nhân viên';
@@ -402,6 +553,8 @@ function ScheduleContent() {
 
   const grandTotalHours = visibleMembers.reduce((sum, m) => sum + (memberHoursTotals[m.userId] || 0), 0);
   const grandTotalDelivery = visibleMembers.reduce((sum, m) => sum + (memberDeliveryTotals[m.userId] || 0), 0);
+  const deliveryAllowance = Number(store?.deliveryAllowance || 0);
+  const giaoHangAllowance = Number(store?.giaoHangAllowance || 0);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -417,7 +570,7 @@ function ScheduleContent() {
         <div style={{ display: 'flex', width: '100%', maxWidth: 420, background: 'var(--surface)', padding: 4, borderRadius: 12, border: '1px solid var(--border)' }}>
           <button
             type="button"
-            onClick={() => setActiveTab('register')}
+            onClick={() => handleTabSwitch('register')}
             style={{
               flex: 1,
               justifyContent: 'center',
@@ -437,11 +590,12 @@ function ScheduleContent() {
           >
             <span>✏️</span>
             <span>Đăng ký lịch</span>
+            {isDirty && <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ff6b6b' }} />}
           </button>
 
           <button
             type="button"
-            onClick={() => setActiveTab('store')}
+            onClick={() => handleTabSwitch('store')}
             style={{
               flex: 1,
               justifyContent: 'center',
@@ -473,14 +627,23 @@ function ScheduleContent() {
               📥 Xuất Excel
             </button>
           )}
-          {activeTab === 'store' && (canInteract || true) && (
-            <button onClick={saveChanges} className="btn btn-primary btn-sm" disabled={saving || loading}>
+          {activeTab === 'store' && (canInteract || !pastDeadline) && (
+            <button onClick={saveChanges} className="btn btn-primary btn-sm" disabled={saving || loading || (!canInteract && pastDeadline)}>
               {saving ? 'Đang lưu...' : '💾 Lưu lịch'}
             </button>
           )}
           {activeTab === 'register' && (
-            <button onClick={handleSaveUserRegistration} className="btn btn-primary btn-sm" disabled={registerSaving || loading}>
-              {registerSaving ? 'Đang lưu...' : '💾 Lưu đăng ký'}
+            <button
+              onClick={handleSaveUserRegistration}
+              className="btn btn-primary btn-sm"
+              disabled={registerSaving || loading || isBlocked}
+              title={isBlocked ? `Đã quá hạn đăng ký (${formatDeadline(currentWeek)})` : ''}
+              style={{
+                opacity: isBlocked ? 0.6 : 1,
+                cursor: isBlocked ? 'not-allowed' : 'pointer'
+              }}
+            >
+              {registerSaving ? 'Đang lưu...' : (isBlocked ? '🔒 Hết hạn' : (isDirty ? '💾 Lưu đăng ký *' : '💾 Lưu đăng ký'))}
             </button>
           )}
         </div>
@@ -492,15 +655,98 @@ function ScheduleContent() {
             <span className="hide-on-mobile">← Tuần trước</span>
             <span className="hide-on-desktop">← Trước</span>
           </button>
-          <div style={{ fontWeight: 700, fontSize: 14, textAlign: 'center' }}>
-            <span className="hide-on-mobile">Tuần: {datesInWeek[0]} - {datesInWeek[6]} ({currentWeek})</span>
-            <span className="hide-on-desktop">Tuần {datesInWeek[0]?.slice(5)} - {datesInWeek[6]?.slice(5)}</span>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--neutral)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <span>Tuần {getWeekNumber(currentWeek)}</span>
+              {isThisWeek ? (
+                <span style={{ fontSize: 11, background: '#E6FCF5', color: '#0CA678', padding: '2px 8px', borderRadius: 10, fontWeight: 700, border: '1px solid #96F2D7' }}>
+                  Tuần hiện tại
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={goToCurrentWeek}
+                  style={{
+                    fontSize: 11,
+                    background: 'var(--surface)',
+                    color: 'var(--primary)',
+                    padding: '2px 8px',
+                    borderRadius: 10,
+                    fontWeight: 700,
+                    border: '1px solid var(--border)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  📅 Về tuần này
+                </button>
+              )}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
+              {datesInWeek[0]} → {datesInWeek[6]} ({currentWeek})
+            </div>
           </div>
           <button className="btn btn-ghost btn-sm" onClick={() => changeWeek(1)}>
             <span className="hide-on-mobile">Tuần sau →</span>
             <span className="hide-on-desktop">Sau →</span>
           </button>
         </div>
+
+        {/* Deadline Warning Banners */}
+        {activeTab === 'register' && (
+          isBlocked ? (
+            <div style={{
+              background: '#FFF4E6',
+              borderBottom: '1px solid #FFE066',
+              padding: '12px 18px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              color: '#D9480F'
+            }}>
+              <span style={{ fontSize: 20 }}>⚠️</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: 13.5 }}>
+                  Đã qua hạn đăng ký ({formatDeadline(currentWeek)}). Vui lòng liên hệ quản lý.
+                </div>
+                <div style={{ fontSize: 12, color: '#C92A2A', marginTop: 2 }}>
+                  Theo quy định, nhân viên chốt ca trước 23:59 Thứ 6 của tuần trước. Bạn chỉ có thể xem lịch đã đăng ký.
+                </div>
+              </div>
+            </div>
+          ) : pastDeadline && canEditSchedule ? (
+            <div style={{
+              background: '#E7F5FF',
+              borderBottom: '1px solid #A5D8FF',
+              padding: '10px 18px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              color: '#1971C2',
+              fontSize: 13
+            }}>
+              <span>ℹ️</span>
+              <div>
+                <strong>Chế độ Quản lý:</strong> Đã qua hạn đăng ký thông thường của nhân viên ({formatDeadline(currentWeek)}). Bạn có quyền điều chỉnh và lưu lịch bất kỳ lúc nào.
+              </div>
+            </div>
+          ) : (
+            <div style={{
+              background: '#E6FCF5',
+              borderBottom: '1px solid #96F2D7',
+              padding: '10px 18px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              color: '#0CA678',
+              fontSize: 13
+            }}>
+              <span>⏰</span>
+              <div>
+                Hạn chót đăng ký tuần này: <strong>{formatDeadline(currentWeek)}</strong> (Thứ 6 tuần trước khi bắt đầu tuần làm).
+              </div>
+            </div>
+          )
+        )}
 
         {loading ? (
           <div style={{ padding: 60, textAlign: 'center' }}><span className="spinner spinner-primary" /></div>
@@ -519,29 +765,43 @@ function ScheduleContent() {
               gap: 12
             }}>
               <div>
-                <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--primary)' }}>
-                  Đăng ký lịch làm: {currentMember?.name || user?.displayName || user?.email}
+                <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span>Đăng ký lịch làm: {currentMember?.name || user?.displayName || user?.email}</span>
+                  {isDirty && (
+                    <span style={{ fontSize: 11, background: '#FFE066', color: '#D9480F', padding: '2px 8px', borderRadius: 6, fontWeight: 700 }}>
+                      Có thay đổi chưa lưu
+                    </span>
+                  )}
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
-                  Chọn các ca làm việc mong muốn cho từng ngày trong tuần ({currentWeek}). Bấm vào ca để chọn hoặc bỏ chọn.
+                  Chọn các ca làm việc mong muốn cho từng ngày trong tuần. Nhấn vào ca để chọn / bỏ chọn.
                 </div>
               </div>
               <button
                 onClick={handleSaveUserRegistration}
-                disabled={registerSaving}
+                disabled={registerSaving || isBlocked}
                 className="btn btn-primary"
-                style={{ padding: '8px 20px', fontSize: 14 }}
+                style={{
+                  padding: '8px 20px',
+                  fontSize: 14,
+                  opacity: isBlocked ? 0.6 : 1,
+                  cursor: isBlocked ? 'not-allowed' : 'pointer'
+                }}
               >
-                {registerSaving ? 'Đang lưu...' : '💾 Lưu đăng ký của bạn'}
+                {registerSaving ? 'Đang lưu...' : (isBlocked ? '🔒 Hết hạn đăng ký' : (isDirty ? '💾 Lưu đăng ký *' : '💾 Lưu đăng ký của bạn'))}
               </button>
             </div>
 
             {/* 7 Days Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
               {DAY_KEYS.map((dayKey, i) => {
                 const dayLabel = DAY_LABELS[i];
                 const dateStr = datesInWeek[i];
                 const selectedShifts = registerDraft[dayKey] || [];
+                const normalShifts = selectedShifts.filter(s => s !== 'delivery' && s !== 'giaohang');
+                const hasNormal = normalShifts.length > 0;
+                const hasDelivery = selectedShifts.includes('delivery');
+                const hasGiaoHang = selectedShifts.includes('giaohang');
                 const isOff = selectedShifts.length === 0;
 
                 return (
@@ -555,7 +815,8 @@ function ScheduleContent() {
                       display: 'flex',
                       flexDirection: 'column',
                       gap: 12,
-                      transition: 'all 0.15s'
+                      transition: 'all 0.15s',
+                      opacity: isBlocked ? 0.88 : 1
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -566,16 +827,17 @@ function ScheduleContent() {
                       {!isOff && (
                         <button
                           type="button"
+                          disabled={isBlocked}
                           onClick={() => clearRegisterDay(dayKey)}
                           style={{
                             border: 'none',
-                            background: '#ffebee',
-                            color: '#c62828',
+                            background: isBlocked ? '#f1f3f5' : '#ffebee',
+                            color: isBlocked ? '#868e96' : '#c62828',
                             fontSize: 11,
                             fontWeight: 600,
                             padding: '3px 8px',
                             borderRadius: 6,
-                            cursor: 'pointer'
+                            cursor: isBlocked ? 'not-allowed' : 'pointer'
                           }}
                         >
                           Nghỉ
@@ -586,7 +848,9 @@ function ScheduleContent() {
                     {/* Shift options */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       {customShifts.map((shift) => {
-                        const isSelected = selectedShifts.includes(shift.id) || selectedShifts.some(s => s === shift.id || s.startsWith(`${shift.id}|`));
+                        const shiftEntry = selectedShifts.find(s => s === shift.id || s.startsWith(`${shift.id}|`));
+                        const isSelected = !!shiftEntry;
+                        const selectedDeptId = (isSelected && shiftEntry.includes('|')) ? shiftEntry.split('|')[1] : '';
                         const sh = String(shift.startHour).padStart(2, '0');
                         const sm = String(shift.startMinute).padStart(2, '0');
                         const eh = String(shift.endHour).padStart(2, '0');
@@ -594,43 +858,148 @@ function ScheduleContent() {
                         const timeStr = `${sh}:${sm} - ${eh}:${em}`;
 
                         return (
-                          <button
-                            key={shift.id}
-                            type="button"
-                            onClick={() => toggleRegisterShift(dayKey, shift.id)}
-                            style={{
-                              padding: '10px 14px',
-                              borderRadius: 10,
-                              border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border)',
-                              background: isSelected ? 'var(--primary)' : 'white',
-                              color: isSelected ? 'white' : 'var(--neutral)',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              textAlign: 'left',
-                              fontWeight: 600,
-                              fontSize: 13,
-                              transition: 'all 0.15s'
-                            }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <span style={{
-                                width: 18, height: 18, borderRadius: '50%',
-                                border: isSelected ? '2px solid white' : '2px solid #ccc',
-                                background: isSelected ? 'white' : 'transparent',
-                                color: 'var(--primary)',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                fontSize: 11, fontWeight: 800
-                              }}>
-                                {isSelected ? '✓' : ''}
-                              </span>
-                              <span>{shift.name}</span>
-                            </div>
-                            <span style={{ fontSize: 11, opacity: isSelected ? 0.9 : 0.6 }}>{timeStr}</span>
-                          </button>
+                          <div key={shift.id} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <button
+                              type="button"
+                              disabled={isBlocked}
+                              onClick={() => toggleRegisterShift(dayKey, shift.id)}
+                              style={{
+                                padding: '10px 14px',
+                                borderRadius: 10,
+                                border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border)',
+                                background: isSelected ? 'var(--primary)' : 'white',
+                                color: isSelected ? 'white' : 'var(--neutral)',
+                                cursor: isBlocked ? 'not-allowed' : 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                textAlign: 'left',
+                                fontWeight: 600,
+                                fontSize: 13,
+                                transition: 'all 0.15s',
+                                opacity: isBlocked && !isSelected ? 0.6 : 1
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{
+                                  width: 18, height: 18, borderRadius: '50%',
+                                  border: isSelected ? '2px solid white' : '2px solid #ccc',
+                                  background: isSelected ? 'white' : 'transparent',
+                                  color: 'var(--primary)',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  fontSize: 11, fontWeight: 800
+                                }}>
+                                  {isSelected ? '✓' : ''}
+                                </span>
+                                <span>{shift.name}</span>
+                              </div>
+                              <span style={{ fontSize: 11, opacity: isSelected ? 0.9 : 0.6 }}>{timeStr}</span>
+                            </button>
+
+                            {/* Department selector when shift is selected */}
+                            {isSelected && store?.departments && store.departments.length > 0 && (isOwner || store.departmentSelectionEnabled !== false) && (
+                              <div style={{ padding: '4px 8px', background: 'var(--surface)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                                <div style={{ fontSize: 10.5, color: 'var(--text-secondary)', marginBottom: 2, fontWeight: 600 }}>Bộ phận cho ca này:</div>
+                                <select
+                                  value={selectedDeptId}
+                                  disabled={isBlocked}
+                                  onChange={(e) => setRegisterShiftDepartment(dayKey, shift.id, e.target.value)}
+                                  style={{
+                                    width: '100%',
+                                    padding: '4px 8px',
+                                    borderRadius: 6,
+                                    border: '1px solid var(--border)',
+                                    fontSize: 12,
+                                    cursor: isBlocked ? 'not-allowed' : 'pointer'
+                                  }}
+                                >
+                                  <option value="">-- Mặc định --</option>
+                                  {store.departments.map(d => (
+                                    <option key={d.id} value={d.id}>{d.name} ({d.shortName})</option>
+                                  ))}
+                                </select>
+                              </div>
+                            )}
+                          </div>
                         );
                       })}
+                    </div>
+
+                    {/* Special Shifts / Allowances (Chở hàng / Giao hàng) */}
+                    <div style={{
+                      marginTop: 4,
+                      paddingTop: 8,
+                      borderTop: '1px dashed var(--border)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 6
+                    }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 0.3 }}>
+                        Phụ cấp & Ca đặc biệt
+                      </div>
+                      <label style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '6px 10px',
+                        borderRadius: 8,
+                        border: hasDelivery ? '1px solid #FFE066' : '1px solid var(--border)',
+                        background: hasDelivery ? '#FFF9DB' : 'white',
+                        cursor: (hasNormal && !isBlocked) ? 'pointer' : 'not-allowed',
+                        opacity: hasNormal ? 1 : 0.5,
+                        transition: 'all 0.15s'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <input
+                            type="checkbox"
+                            disabled={!hasNormal || isBlocked}
+                            checked={hasDelivery}
+                            onChange={() => toggleRegisterSpecial(dayKey, 'delivery')}
+                            style={{ transform: 'scale(1.1)', cursor: (hasNormal && !isBlocked) ? 'pointer' : 'not-allowed' }}
+                          />
+                          <span style={{ fontSize: 12.5, fontWeight: 600, color: hasDelivery ? '#D9480F' : 'var(--neutral)' }}>
+                            📦 Chở hàng
+                          </span>
+                        </div>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: '#D9480F' }}>
+                          +{deliveryAllowance.toLocaleString()}đ
+                        </span>
+                      </label>
+
+                      <label style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '6px 10px',
+                        borderRadius: 8,
+                        border: hasGiaoHang ? '1px solid #FFE066' : '1px solid var(--border)',
+                        background: hasGiaoHang ? '#FFF9DB' : 'white',
+                        cursor: (hasNormal && !isBlocked) ? 'pointer' : 'not-allowed',
+                        opacity: hasNormal ? 1 : 0.5,
+                        transition: 'all 0.15s'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <input
+                            type="checkbox"
+                            disabled={!hasNormal || isBlocked}
+                            checked={hasGiaoHang}
+                            onChange={() => toggleRegisterSpecial(dayKey, 'giaohang')}
+                            style={{ transform: 'scale(1.1)', cursor: (hasNormal && !isBlocked) ? 'pointer' : 'not-allowed' }}
+                          />
+                          <span style={{ fontSize: 12.5, fontWeight: 600, color: hasGiaoHang ? '#D9480F' : 'var(--neutral)' }}>
+                            🛵 Giao hàng
+                          </span>
+                        </div>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: '#D9480F' }}>
+                          +{giaoHangAllowance.toLocaleString()}đ
+                        </span>
+                      </label>
+
+                      {!hasNormal && (
+                        <div style={{ fontSize: 10.5, color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                          * Cần chọn ít nhất 1 ca làm để chọn phụ cấp
+                        </div>
+                      )}
                     </div>
 
                     {/* Status footer for this day */}
@@ -641,11 +1010,16 @@ function ScheduleContent() {
                       borderTop: '1px solid var(--border)',
                       display: 'flex',
                       justifyContent: 'space-between',
+                      alignItems: 'center',
                       color: isOff ? 'var(--text-secondary)' : 'var(--primary)'
                     }}>
-                      <span>{isOff ? '💤 Nghỉ' : `Đã chọn: ${selectedShifts.length} ca`}</span>
+                      <span>{isOff ? '💤 Nghỉ' : `Đã chọn: ${normalShifts.length} ca`}</span>
                       {!isOff && (
-                        <span>⏱️ {calculateDayHours(selectedShifts)}h</span>
+                        <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+                          {hasDelivery && <span style={{ fontSize: 10, background: '#FFF9DB', color: '#D9480F', padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>📦 Chở</span>}
+                          {hasGiaoHang && <span style={{ fontSize: 10, background: '#FFF9DB', color: '#D9480F', padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>🛵 Giao</span>}
+                          <span>⏱️ {calculateDayHours(selectedShifts)}h</span>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -666,11 +1040,11 @@ function ScheduleContent() {
               flexWrap: 'wrap',
               gap: 16
             }}>
-              <div style={{ display: 'flex', gap: 24 }}>
+              <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'center' }}>
                 <div>
                   <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Tổng ca đăng ký: </span>
                   <strong style={{ fontSize: 16, color: 'var(--neutral)' }}>
-                    {DAY_KEYS.reduce((sum, k) => sum + (registerDraft[k]?.length || 0), 0)} ca
+                    {DAY_KEYS.reduce((sum, k) => sum + (registerDraft[k]?.filter(s => s !== 'delivery' && s !== 'giaohang').length || 0), 0)} ca
                   </strong>
                 </div>
                 <div>
@@ -679,15 +1053,36 @@ function ScheduleContent() {
                     {DAY_KEYS.reduce((sum, k) => sum + calculateDayHours(registerDraft[k]), 0).toFixed(1)}h
                   </strong>
                 </div>
+                {DAY_KEYS.some(k => registerDraft[k]?.includes('delivery')) && (
+                  <div style={{ fontSize: 12, color: '#D9480F', fontWeight: 600 }}>
+                    📦 {DAY_KEYS.filter(k => registerDraft[k]?.includes('delivery')).length} ca chở
+                  </div>
+                )}
+                {DAY_KEYS.some(k => registerDraft[k]?.includes('giaohang')) && (
+                  <div style={{ fontSize: 12, color: '#D9480F', fontWeight: 600 }}>
+                    🛵 {DAY_KEYS.filter(k => registerDraft[k]?.includes('giaohang')).length} ca giao
+                  </div>
+                )}
+                {isDirty && (
+                  <span style={{ fontSize: 12, background: '#FFF3BF', color: '#D9480F', padding: '3px 8px', borderRadius: 6, fontWeight: 700 }}>
+                    ⚠️ Có thay đổi chưa lưu
+                  </span>
+                )}
               </div>
 
               <button
                 onClick={handleSaveUserRegistration}
-                disabled={registerSaving}
+                disabled={registerSaving || isBlocked}
                 className="btn btn-primary"
-                style={{ padding: '12px 32px', fontSize: 15, fontWeight: 700 }}
+                style={{
+                  padding: '12px 32px',
+                  fontSize: 15,
+                  fontWeight: 700,
+                  opacity: isBlocked ? 0.6 : 1,
+                  cursor: isBlocked ? 'not-allowed' : 'pointer'
+                }}
               >
-                {registerSaving ? 'Đang lưu...' : '💾 LƯU ĐĂNG KÝ LỊCH LÀM'}
+                {registerSaving ? 'Đang lưu...' : (isBlocked ? '🔒 ĐÃ HẾT HẠN ĐĂNG KÝ' : (isDirty ? '💾 LƯU ĐĂNG KÝ (CÓ THAY ĐỔI CHƯA LƯU)' : '💾 LƯU ĐĂNG KÝ LỊCH LÀM'))}
               </button>
             </div>
           </div>
@@ -924,7 +1319,15 @@ function ScheduleContent() {
                       return (
                         <td key={dayKey} style={{ padding: 4 }}>
                           <div
-                            onClick={() => (canInteract || m.userId === user?.uid) && openModal(m.userId, dayKey, m.name, `${DAY_LABELS[i]} ${datesInWeek[i]}`)}
+                            onClick={() => {
+                              const isSelf = m.userId === user?.uid;
+                              if (!canInteract && !isSelf) return;
+                              if (isSelf && !canEditSchedule && pastDeadline) {
+                                showToast(`Đã qua hạn đăng ký (${formatDeadline(currentWeek)}). Vui lòng liên hệ Quản lý.`);
+                                return;
+                              }
+                              openModal(m.userId, dayKey, m.name, `${DAY_LABELS[i]} ${datesInWeek[i]}`);
+                            }}
                             style={{
                               width: '100%',
                               minHeight: 48,
@@ -939,7 +1342,7 @@ function ScheduleContent() {
                               color: textColor,
                               fontSize: 12,
                               fontWeight: 600,
-                              cursor: (canInteract || m.userId === user?.uid) ? 'pointer' : 'default',
+                              cursor: (canInteract || (m.userId === user?.uid && !pastDeadline)) ? 'pointer' : 'default',
                               transition: 'all 0.2s',
                               wordBreak: 'break-word'
                             }}
@@ -1025,10 +1428,17 @@ function ScheduleContent() {
 
             {(() => {
               const isSelf = user?.uid === editingCell.userId;
-              const canEditShift = canEditSchedule || isSelf;
+              const canEditShift = canEditSchedule || (isSelf && !pastDeadline);
 
               return (
                 <>
+                  {isSelf && !canEditSchedule && pastDeadline && (
+                    <div style={{ fontSize: 12, color: '#C92A2A', background: '#FFF5F5', padding: '8px 12px', borderRadius: 8, marginBottom: 14, fontWeight: 600, border: '1px solid #FFC9C9', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span>🔒</span>
+                      <span>Đã qua hạn đăng ký ({formatDeadline(currentWeek)}). Bạn chỉ có thể xem ca làm việc này.</span>
+                    </div>
+                  )}
+
                   {!canEditSchedule && canEditDelivery && !isSelf && (
                     <div style={{ fontSize: 12, color: '#D9480F', background: '#FFF4E6', padding: '8px 12px', borderRadius: 8, marginBottom: 14, fontWeight: 600, border: '1px solid #FFE066', display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span>ℹ️</span>
