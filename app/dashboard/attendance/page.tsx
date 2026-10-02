@@ -274,66 +274,141 @@ export default function AttendancePage() {
           {loading ? (
             <div style={{ padding: 40, textAlign: 'center' }}><span className="spinner spinner-primary" /></div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table className="table" style={{ width: '100%', fontSize: 13 }}>
-                <thead>
-                  <tr>
-                    <th>Ngày</th>
-                    <th>Trạng thái</th>
-                    <th>Giờ vào</th>
-                    <th>Giờ ra</th>
-                    <th>Phương thức</th>
-                    <th style={{ textAlign: 'right' }}>Số giờ</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {daysArray.map(dateStr => {
-                    const dayAtts = myAtts.filter(a => a.date === dateStr);
-                    const d = new Date(dateStr);
+            <>
+              {/* Desktop Table View */}
+              <div className="hide-on-mobile touch-scroll" style={{ overflowX: 'auto' }}>
+                <table className="table" style={{ width: '100%', fontSize: 13 }}>
+                  <thead>
+                    <tr>
+                      <th>Ngày</th>
+                      <th>Trạng thái</th>
+                      <th>Giờ vào</th>
+                      <th>Giờ ra</th>
+                      <th>Phương thức</th>
+                      <th style={{ textAlign: 'right' }}>Số giờ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {daysArray.map(dateStr => {
+                      const dayAtts = myAtts.filter(a => a.date === dateStr);
+                      const d = new Date(dateStr);
+                      const dayName = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'][d.getDay()];
+
+                      if (dayAtts.length === 0) {
+                        return (
+                          <tr key={dateStr} style={{ opacity: 0.6 }}>
+                            <td>{dateStr} ({dayName})</td>
+                            <td style={{ color: 'var(--text-secondary)' }}>Nghỉ</td>
+                            <td>--:--</td>
+                            <td>--:--</td>
+                            <td>--</td>
+                            <td style={{ textAlign: 'right' }}>0.0h</td>
+                          </tr>
+                        );
+                      }
+
+                      return dayAtts.map((att, aIdx) => {
+                        const ci = att.checkIn ? (att.checkIn.toDate ? att.checkIn.toDate() : new Date(att.checkIn.seconds * 1000)) : null;
+                        const co = att.checkOut ? (att.checkOut.toDate ? att.checkOut.toDate() : new Date(att.checkOut.seconds * 1000)) : null;
+                        const inStr = ci ? ci.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+                        const outStr = co ? co.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : (att.checkOut === null ? 'Đang làm việc...' : '--:--');
+
+                        return (
+                          <tr key={att.id} style={{ background: !att.checkOut ? 'var(--primary-light)' : undefined }}>
+                            <td style={{ fontWeight: 600 }}>{dateStr} ({dayName}) {dayAtts.length > 1 ? `(Ca ${aIdx + 1})` : ''}</td>
+                            <td>
+                              {!att.checkOut ? (
+                                <span style={{ color: 'var(--primary)', fontWeight: 700 }}>🟢 Đang làm</span>
+                              ) : (
+                                <span style={{ color: 'var(--success)', fontWeight: 600 }}>✓ Hoàn thành</span>
+                              )}
+                            </td>
+                            <td>{inStr}</td>
+                            <td>{outStr}</td>
+                            <td>{att.checkInMethod === 'wifi' ? '📶 WiFi' : att.checkInMethod === 'gps' ? '📍 GPS' : att.checkInMethod === 'manual' ? '✏️ Thủ công' : att.checkInMethod}</td>
+                            <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--primary)' }}>
+                              {(att.totalHours || 0).toFixed(2)}h
+                            </td>
+                          </tr>
+                        );
+                      });
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Phone Card List View */}
+              <div className="hide-on-desktop" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {myAtts.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--text-secondary)' }}>
+                    <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>Chưa có lượt chấm công nào trong tháng {currentMonth}</div>
+                    <Link
+                      href="/dashboard/checkin"
+                      className="btn btn-primary btn-sm"
+                      style={{ marginTop: 12, display: 'inline-flex' }}
+                    >
+                      ⏰ Vào ca chấm công ngay
+                    </Link>
+                  </div>
+                ) : (
+                  myAtts.map((att) => {
+                    const ci = att.checkIn ? (att.checkIn.toDate ? att.checkIn.toDate() : new Date(att.checkIn.seconds * 1000)) : null;
+                    const co = att.checkOut ? (att.checkOut.toDate ? att.checkOut.toDate() : new Date(att.checkOut.seconds * 1000)) : null;
+                    const inStr = ci ? ci.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+                    const outStr = co ? co.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : (att.checkOut === null ? 'Đang làm...' : '--:--');
+                    const d = new Date(att.date);
                     const dayName = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'][d.getDay()];
 
-                    if (dayAtts.length === 0) {
-                      return (
-                        <tr key={dateStr} style={{ opacity: 0.6 }}>
-                          <td>{dateStr} ({dayName})</td>
-                          <td style={{ color: 'var(--text-secondary)' }}>Nghỉ</td>
-                          <td>--:--</td>
-                          <td>--:--</td>
-                          <td>--</td>
-                          <td style={{ textAlign: 'right' }}>0.0h</td>
-                        </tr>
-                      );
-                    }
+                    return (
+                      <div
+                        key={att.id}
+                        style={{
+                          background: !att.checkOut ? 'var(--primary-light)' : 'var(--surface)',
+                          border: !att.checkOut ? '1.5px solid var(--primary)' : '1px solid var(--border)',
+                          borderRadius: 12,
+                          padding: '12px 14px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 8,
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--neutral)' }}>
+                            {att.date} <span style={{ fontWeight: 500, fontSize: 12, color: 'var(--text-secondary)' }}>({dayName})</span>
+                          </div>
+                          {!att.checkOut ? (
+                            <span style={{ background: '#e8f5e9', color: '#2e7d32', padding: '3px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700 }}>
+                              🟢 Đang làm
+                            </span>
+                          ) : (
+                            <span style={{ background: '#e0f2fe', color: '#0369a1', padding: '3px 8px', borderRadius: 12, fontSize: 11, fontWeight: 600 }}>
+                              ✓ Hoàn thành
+                            </span>
+                          )}
+                        </div>
 
-                    return dayAtts.map((att, aIdx) => {
-                      const ci = att.checkIn ? (att.checkIn.toDate ? att.checkIn.toDate() : new Date(att.checkIn.seconds * 1000)) : null;
-                      const co = att.checkOut ? (att.checkOut.toDate ? att.checkOut.toDate() : new Date(att.checkOut.seconds * 1000)) : null;
-                      const inStr = ci ? ci.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '--:--';
-                      const outStr = co ? co.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : (att.checkOut === null ? 'Đang làm việc...' : '--:--');
-
-                      return (
-                        <tr key={att.id} style={{ background: !att.checkOut ? 'var(--primary-light)' : undefined }}>
-                          <td style={{ fontWeight: 600 }}>{dateStr} ({dayName}) {dayAtts.length > 1 ? `(Ca ${aIdx + 1})` : ''}</td>
-                          <td>
-                            {!att.checkOut ? (
-                              <span style={{ color: 'var(--primary)', fontWeight: 700 }}>🟢 Đang làm</span>
-                            ) : (
-                              <span style={{ color: 'var(--success)', fontWeight: 600 }}>✓ Hoàn thành</span>
-                            )}
-                          </td>
-                          <td>{inStr}</td>
-                          <td>{outStr}</td>
-                          <td>{att.checkInMethod === 'wifi' ? '📶 WiFi' : att.checkInMethod === 'gps' ? '📍 GPS' : att.checkInMethod === 'manual' ? '✏️ Thủ công' : att.checkInMethod}</td>
-                          <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--primary)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13 }}>
+                          <div>
+                            <span>Vào: <strong>{inStr}</strong></span>
+                            <span style={{ margin: '0 6px', color: 'var(--text-secondary)' }}>➔</span>
+                            <span>Ra: <strong>{outStr}</strong></span>
+                          </div>
+                          <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--primary)' }}>
                             {(att.totalHours || 0).toFixed(2)}h
-                          </td>
-                        </tr>
-                      );
-                    });
-                  })}
-                </tbody>
-              </table>
-            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: 6 }}>
+                          <span>PT: {att.checkInMethod === 'wifi' ? '📶 WiFi' : att.checkInMethod === 'gps' ? '📍 GPS' : '✏️ Thủ công'}</span>
+                          {att.editNote && <span style={{ fontStyle: 'italic' }}>Ghi chú: {att.editNote}</span>}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -373,7 +448,7 @@ export default function AttendancePage() {
         {loading ? (
           <div style={{ padding: 40, textAlign: 'center' }}><span className="spinner spinner-primary" /></div>
         ) : (
-          <div style={{ overflowX: 'auto', maxHeight: 'calc(100vh - 200px)' }}>
+          <div className="touch-scroll" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxHeight: 'calc(100vh - 200px)' }}>
             <table className="table" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
               <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--background)' }}>
                 <tr>

@@ -1,12 +1,21 @@
 // lib/performanceExportExcel.ts
-import * as ExcelJS from 'exceljs';
-import { saveAs } from 'file-saver';
+import type * as ExcelJS from 'exceljs';
 import {
   PerformanceReport,
   Measurement,
   formatSecondsToMMSS,
   parseFirestoreTimestamp
 } from './performanceTypes';
+
+async function getExcelEngine(): Promise<{ ExcelJS: typeof import('exceljs'); saveAs: (data: Blob | string, filename?: string) => void }> {
+  const [excelModule, fileSaverModule] = await Promise.all([
+    import('exceljs'),
+    import('file-saver'),
+  ]);
+  const ExcelJS = ((excelModule as any).default || excelModule) as typeof import('exceljs');
+  const saveAs = ((fileSaverModule as any).saveAs || (fileSaverModule as any).default || fileSaverModule) as (data: Blob | string, filename?: string) => void;
+  return { ExcelJS, saveAs };
+}
 
 const NAVY = '1C4E6B';
 const RED = 'CB2D2E';
@@ -40,6 +49,7 @@ export async function exportSessionPerformanceExcel(
   report: PerformanceReport,
   measurements: Measurement[]
 ) {
+  const { ExcelJS, saveAs } = await getExcelEngine();
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Trạm - Đo Hiệu Năng';
   wb.created = new Date();
@@ -369,6 +379,7 @@ export async function exportConsolidatedPerformanceReports(
   storeLabel: string,
   dateRangeLabel: string
 ) {
+  const { ExcelJS, saveAs } = await getExcelEngine();
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Trạm - Đo Hiệu Năng';
   wb.created = new Date();

@@ -314,9 +314,9 @@ export default function CheckInPage() {
       )}
 
       {/* Main Check-In / Check-Out Action Card */}
-      <div className="card" style={{ padding: 28, position: 'relative', overflow: 'hidden' }}>
+      <div className="card" style={{ position: 'relative', overflow: 'hidden' }}>
         {/* User bar */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: 16, marginBottom: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: 16, marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {currentMember?.avatarUrl || user?.photoURL ? (
               <img
@@ -378,7 +378,7 @@ export default function CheckInPage() {
               Thời gian đã làm việc trong ca:
             </div>
             <div style={{
-              fontSize: 48,
+              fontSize: 'clamp(36px, 9vw, 48px)',
               fontWeight: 800,
               fontFamily: 'monospace',
               color: 'var(--primary)',
@@ -391,13 +391,16 @@ export default function CheckInPage() {
             <div style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 16,
+              justifyContent: 'center',
+              flexWrap: 'wrap',
+              gap: 12,
               background: 'var(--surface)',
-              padding: '10px 20px',
+              padding: '10px 16px',
               borderRadius: 12,
               fontSize: 13,
               color: 'var(--neutral)',
-              marginBottom: 28
+              marginBottom: 24,
+              maxWidth: '100%'
             }}>
               <div>
                 <span style={{ color: 'var(--text-secondary)' }}>Giờ vào ca: </span>
@@ -410,7 +413,7 @@ export default function CheckInPage() {
               </div>
             </div>
 
-            <div>
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
               <button
                 onClick={() => setShowCheckOutConfirm(true)}
                 disabled={loading}
@@ -418,7 +421,7 @@ export default function CheckInPage() {
                   background: 'linear-gradient(135deg, #d32f2f 0%, #b71c1c 100%)',
                   color: 'white',
                   border: 'none',
-                  padding: '16px 48px',
+                  padding: '16px 32px',
                   borderRadius: 16,
                   fontSize: 18,
                   fontWeight: 700,
@@ -427,7 +430,10 @@ export default function CheckInPage() {
                   transition: 'all 0.2s',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: 10
+                  justifyContent: 'center',
+                  gap: 10,
+                  width: '100%',
+                  maxWidth: 360
                 }}
               >
                 {loading ? <span className="spinner spinner-white" /> : '🛑 RA CA (KẾT THÚC CA)'}
@@ -441,77 +447,77 @@ export default function CheckInPage() {
               <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: 'var(--neutral)', marginBottom: 10 }}>
                 Chọn phương thức chấm công:
               </label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(95px, 1fr))', gap: 10 }}>
                 <button
                   type="button"
                   onClick={() => setMethod('wifi')}
                   style={{
-                    padding: '14px 16px',
+                    padding: '12px 8px',
                     borderRadius: 12,
                     border: method === 'wifi' ? '2px solid var(--primary)' : '1px solid var(--border)',
                     background: method === 'wifi' ? 'var(--primary-light)' : 'white',
                     color: method === 'wifi' ? 'var(--primary)' : 'var(--neutral)',
                     fontWeight: 700,
-                    fontSize: 14,
+                    fontSize: 13,
                     cursor: 'pointer',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
-                    gap: 6,
+                    gap: 4,
                     transition: 'all 0.15s'
                   }}
                 >
-                  <span style={{ fontSize: 24 }}>📶</span>
+                  <span style={{ fontSize: 22 }}>📶</span>
                   <span>WiFi / Web</span>
-                  <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.7 }}>Chấm trực tuyến tiện lợi</span>
+                  <span className="hide-on-mobile" style={{ fontSize: 11, fontWeight: 400, opacity: 0.7 }}>Trực tuyến tiện lợi</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setMethod('gps')}
                   style={{
-                    padding: '14px 16px',
+                    padding: '12px 8px',
                     borderRadius: 12,
                     border: method === 'gps' ? '2px solid var(--primary)' : '1px solid var(--border)',
                     background: method === 'gps' ? 'var(--primary-light)' : 'white',
                     color: method === 'gps' ? 'var(--primary)' : 'var(--neutral)',
                     fontWeight: 700,
-                    fontSize: 14,
+                    fontSize: 13,
                     cursor: 'pointer',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
-                    gap: 6,
+                    gap: 4,
                     transition: 'all 0.15s'
                   }}
                 >
-                  <span style={{ fontSize: 24 }}>📍</span>
+                  <span style={{ fontSize: 22 }}>📍</span>
                   <span>Định vị GPS</span>
-                  <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.7 }}>Xác thực vị trí làm việc</span>
+                  <span className="hide-on-mobile" style={{ fontSize: 11, fontWeight: 400, opacity: 0.7 }}>Xác thực vị trí</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setMethod('manual')}
                   style={{
-                    padding: '14px 16px',
+                    padding: '12px 8px',
                     borderRadius: 12,
                     border: method === 'manual' ? '2px solid var(--primary)' : '1px solid var(--border)',
                     background: method === 'manual' ? 'var(--primary-light)' : 'white',
                     color: method === 'manual' ? 'var(--primary)' : 'var(--neutral)',
                     fontWeight: 700,
-                    fontSize: 14,
+                    fontSize: 13,
                     cursor: 'pointer',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
-                    gap: 6,
+                    gap: 4,
                     transition: 'all 0.15s'
                   }}
                 >
-                  <span style={{ fontSize: 24 }}>✏️</span>
+                  <span style={{ fontSize: 22 }}>✏️</span>
                   <span>Thủ công</span>
-                  <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.7 }}>Ghi nhận ca nhanh</span>
+                  <span className="hide-on-mobile" style={{ fontSize: 11, fontWeight: 400, opacity: 0.7 }}>Ghi nhận ca nhanh</span>
                 </button>
               </div>
 
@@ -526,7 +532,7 @@ export default function CheckInPage() {
             </div>
 
             {/* Check-In Button */}
-            <div style={{ textAlign: 'center', marginTop: 32 }}>
+            <div style={{ textAlign: 'center', marginTop: 28, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
               <button
                 onClick={handleCheckIn}
                 disabled={loading || (method === 'gps' && gpsLoading)}
@@ -534,17 +540,20 @@ export default function CheckInPage() {
                   background: 'linear-gradient(135deg, var(--primary) 0%, #15803d 100%)',
                   color: 'white',
                   border: 'none',
-                  padding: '18px 56px',
-                  borderRadius: 18,
-                  fontSize: 20,
+                  padding: '16px 32px',
+                  borderRadius: 16,
+                  fontSize: 18,
                   fontWeight: 800,
-                  letterSpacing: 1,
+                  letterSpacing: 0.5,
                   cursor: loading ? 'not-allowed' : 'pointer',
-                  boxShadow: '0 10px 30px rgba(26, 107, 90, 0.35)',
+                  boxShadow: '0 8px 24px rgba(26, 107, 90, 0.35)',
                   transition: 'all 0.2s',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: 12
+                  justifyContent: 'center',
+                  gap: 10,
+                  width: '100%',
+                  maxWidth: 360
                 }}
               >
                 {loading ? <span className="spinner spinner-white" /> : '🟢 VÀO CA NGAY'}

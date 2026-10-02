@@ -1,6 +1,15 @@
-import * as ExcelJS from 'exceljs';
-import { saveAs } from 'file-saver';
+import type * as ExcelJS from 'exceljs';
 import { Member, AttendanceRecord, ScheduleModel, Store, ShiftDefinition, DaySchedule, AdvanceRequest, ProductionReport, ProductionTask, sortMembersByOrder } from './types';
+
+async function getExcelEngine(): Promise<{ ExcelJS: typeof import('exceljs'); saveAs: (data: Blob | string, filename?: string) => void }> {
+  const [excelModule, fileSaverModule] = await Promise.all([
+    import('exceljs'),
+    import('file-saver'),
+  ]);
+  const ExcelJS = ((excelModule as any).default || excelModule) as typeof import('exceljs');
+  const saveAs = ((fileSaverModule as any).saveAs || (fileSaverModule as any).default || fileSaverModule) as (data: Blob | string, filename?: string) => void;
+  return { ExcelJS, saveAs };
+}
 
 const DAY_KEYS = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
 
@@ -115,6 +124,7 @@ export async function exportMonthlyAttendance(
     ...daysArray.map(d => d.label)
   ];
 
+  const { ExcelJS, saveAs } = await getExcelEngine();
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Bảng Công');
 
@@ -255,6 +265,7 @@ export async function exportDetailedInOut(
     }
   });
 
+  const { ExcelJS, saveAs } = await getExcelEngine();
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Chi Tiết IN-OUT');
 
@@ -326,6 +337,7 @@ export async function exportMonthlySalary(
     'TỔNG GIỜ', 'GIỜ CHUẨN', 'LƯƠNG CƠ BẢN', 'SỐ CA CHỞ HÀNG', 'PHỤ CẤP CHỞ', 'SỐ CA GIAO', 'PHỤ CẤP GIAO', 'ĐÃ TẠM ỨNG', 'LƯƠNG THỰC NHẬN',
   ];
 
+  const { ExcelJS, saveAs } = await getExcelEngine();
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Lương Tháng');
 
@@ -566,6 +578,7 @@ export async function exportWeeklySchedule(
     : DEFAULT_SHIFTS;
   const themeColor = (store.themeColor || '#C8102E').replace('#', '');
 
+  const { ExcelJS, saveAs } = await getExcelEngine();
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Lịch Làm');
 
@@ -883,6 +896,7 @@ export async function exportProductionReport(
   storeName: string,
   month: string // YYYY-MM
 ) {
+  const { ExcelJS, saveAs } = await getExcelEngine();
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Báo cáo sản xuất');
 

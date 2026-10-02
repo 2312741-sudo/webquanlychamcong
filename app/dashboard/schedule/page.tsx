@@ -414,12 +414,14 @@ function ScheduleContent() {
         </div>
 
         {/* Tab switchers */}
-        <div style={{ display: 'flex', background: 'var(--surface)', padding: 4, borderRadius: 14, border: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', width: '100%', maxWidth: 420, background: 'var(--surface)', padding: 4, borderRadius: 12, border: '1px solid var(--border)' }}>
           <button
             type="button"
             onClick={() => setActiveTab('register')}
             style={{
-              padding: '8px 18px',
+              flex: 1,
+              justifyContent: 'center',
+              padding: '8px 12px',
               borderRadius: 10,
               border: 'none',
               background: activeTab === 'register' ? 'var(--primary)' : 'transparent',
@@ -434,14 +436,16 @@ function ScheduleContent() {
             }}
           >
             <span>✏️</span>
-            <span>Đăng ký lịch làm</span>
+            <span>Đăng ký lịch</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('store')}
             style={{
-              padding: '8px 18px',
+              flex: 1,
+              justifyContent: 'center',
+              padding: '8px 12px',
               borderRadius: 10,
               border: 'none',
               background: activeTab === 'store' ? 'var(--primary)' : 'transparent',
@@ -456,26 +460,26 @@ function ScheduleContent() {
             }}
           >
             <span>🏪</span>
-            <span>Lịch toàn cửa hàng</span>
+            <span>Lịch cửa hàng</span>
           </button>
         </div>
 
-        <div className="flex gap-3">
-          <button onClick={goToCurrentWeek} className="btn btn-secondary">
+        <div className="flex gap-2 flex-wrap">
+          <button onClick={goToCurrentWeek} className="btn btn-secondary btn-sm">
             📅 Tuần này
           </button>
           {activeTab === 'store' && (
-            <button onClick={handleExport} className="btn btn-primary" style={{ background: 'var(--success)' }}>
+            <button onClick={handleExport} className="btn btn-primary btn-sm" style={{ background: 'var(--success)' }}>
               📥 Xuất Excel
             </button>
           )}
           {activeTab === 'store' && (canInteract || true) && (
-            <button onClick={saveChanges} className="btn btn-primary" disabled={saving || loading}>
+            <button onClick={saveChanges} className="btn btn-primary btn-sm" disabled={saving || loading}>
               {saving ? 'Đang lưu...' : '💾 Lưu lịch'}
             </button>
           )}
           {activeTab === 'register' && (
-            <button onClick={handleSaveUserRegistration} className="btn btn-primary" disabled={registerSaving || loading}>
+            <button onClick={handleSaveUserRegistration} className="btn btn-primary btn-sm" disabled={registerSaving || loading}>
               {registerSaving ? 'Đang lưu...' : '💾 Lưu đăng ký'}
             </button>
           )}
@@ -483,12 +487,19 @@ function ScheduleContent() {
       </div>
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ padding: 16, borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <button className="btn btn-ghost" onClick={() => changeWeek(-1)}>← Tuần trước</button>
-          <div style={{ fontWeight: 700, fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span>Tuần: {datesInWeek[0]} - {datesInWeek[6]} ({currentWeek})</span>
+        <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+          <button className="btn btn-ghost btn-sm" onClick={() => changeWeek(-1)}>
+            <span className="hide-on-mobile">← Tuần trước</span>
+            <span className="hide-on-desktop">← Trước</span>
+          </button>
+          <div style={{ fontWeight: 700, fontSize: 14, textAlign: 'center' }}>
+            <span className="hide-on-mobile">Tuần: {datesInWeek[0]} - {datesInWeek[6]} ({currentWeek})</span>
+            <span className="hide-on-desktop">Tuần {datesInWeek[0]?.slice(5)} - {datesInWeek[6]?.slice(5)}</span>
           </div>
-          <button className="btn btn-ghost" onClick={() => changeWeek(1)}>Tuần sau →</button>
+          <button className="btn btn-ghost btn-sm" onClick={() => changeWeek(1)}>
+            <span className="hide-on-mobile">Tuần sau →</span>
+            <span className="hide-on-desktop">Sau →</span>
+          </button>
         </div>
 
         {loading ? (
@@ -681,11 +692,11 @@ function ScheduleContent() {
             </div>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table className="table" style={{ minWidth: 1240, borderCollapse: 'separate', borderSpacing: '0 4px' }}>
+          <div className="touch-scroll" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <table className="table" style={{ minWidth: 1100, borderCollapse: 'separate', borderSpacing: '0 4px' }}>
               <thead>
                 <tr>
-                  <th style={{ width: 200, paddingLeft: 16 }}>Nhân viên</th>
+                  <th style={{ width: 190, paddingLeft: 16, position: 'sticky', left: 0, zIndex: 10, background: 'var(--surface)', boxShadow: '2px 0 6px rgba(0,0,0,0.06)' }}>Nhân viên</th>
                   {DAY_LABELS.map((d, i) => (
                     <th key={d} style={{ textAlign: 'center', width: 120 }}>
                       <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{d}</div>
@@ -710,7 +721,7 @@ function ScheduleContent() {
                     boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
                   }}
                 >
-                  <td style={{ padding: '10px 14px', borderRadius: '8px 0 0 8px', minWidth: 200 }}>
+                  <td style={{ padding: '10px 14px', borderRadius: '8px 0 0 8px', minWidth: 190, position: 'sticky', left: 0, zIndex: 8, background: '#F8F9FA', boxShadow: '2px 0 6px rgba(0,0,0,0.06)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ fontSize: 15 }}>📊</span>
                       <div>
@@ -816,7 +827,16 @@ function ScheduleContent() {
                       transition: 'background 0.2s'
                     }}
                   >
-                    <td style={{ padding: '10px 14px', borderRadius: '8px 0 0 8px', minWidth: 220 }}>
+                    <td style={{
+                      padding: '10px 14px',
+                      borderRadius: '8px 0 0 8px',
+                      minWidth: 200,
+                      position: 'sticky',
+                      left: 0,
+                      zIndex: 6,
+                      background: m.userId === user?.uid ? '#f0fdf4' : 'white',
+                      boxShadow: '2px 0 6px rgba(0,0,0,0.06)'
+                    }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           {isOwner && (

@@ -1,6 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800&display=swap');
-@import url('https://fonts.googleapis.com/icon?family=Material+Icons');
-
 :root {
   --primary: #7E2930;
   --primary-dark: #5C1F24;
@@ -73,12 +70,18 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  touch-action: manipulation;
+}
+
 body {
-  font-family: 'Be Vietnam Pro', -apple-system, sans-serif;
+  font-family: var(--font-be-vietnam-pro), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background: var(--surface);
   color: var(--text-primary);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
 }
 
 a { text-decoration: none; color: inherit; }
@@ -369,3 +372,148 @@ input, select, textarea { font-family: inherit; }
 .empty-state-icon { font-size: 48px; }
 .empty-state-text { font-size: 15px; font-weight: 500; }
 .empty-state-sub { font-size: 13px; }
+
+/* ── Mobile Touch, Ergonomics & Performance ────────────── */
+@media (max-width: 768px) {
+  .card {
+    padding: 16px;
+    border-radius: var(--radius-md);
+    box-shadow: 0 1px 8px var(--shadow);
+  }
+
+  /* Prevent iOS zoom on input focus by ensuring at least 16px font-size */
+  .input, .select, textarea {
+    font-size: 16px !important;
+    min-height: 44px;
+    padding: 10px 14px;
+  }
+
+  .btn {
+    min-height: 44px;
+    padding: 10px 16px;
+    font-size: 14px;
+  }
+
+  .btn-sm {
+    min-height: 34px;
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .table th, .table td {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  .modal {
+    padding: 20px 16px;
+    width: 95%;
+    max-height: 90vh;
+    border-radius: var(--radius-lg);
+  }
+}
+
+/* Momentum scrolling for tables and containers on iOS */
+.touch-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+/* Sticky first column for wide tables on mobile */
+.sticky-first-col th:first-child,
+.sticky-first-col td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: inherit;
+  box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+}
+
+/* Utility to hide/show on mobile/desktop */
+@media (max-width: 767px) {
+  .hide-on-mobile { display: none !important; }
+}
+@media (min-width: 768px) {
+  .hide-on-desktop { display: none !important; }
+}
+
+/* ── Mobile Bottom Navigation Bar ──────────────────────── */
+.mobile-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 45;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)) 8px;
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.05);
+}
+
+.mobile-bottom-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 6px 4px;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 600;
+  transition: all 0.15s ease;
+  min-width: 0;
+  cursor: pointer;
+  border: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-bottom-nav-item.active {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.mobile-bottom-nav-icon {
+  font-size: 20px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease;
+}
+
+.mobile-bottom-nav-item:active .mobile-bottom-nav-icon {
+  transform: scale(0.9);
+}
+
+.mobile-bottom-nav-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* Responsive main content padding */
+.dashboard-main-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 24px;
+}
+
+@media (max-width: 768px) {
+  .dashboard-main-content {
+    padding: 14px 14px calc(76px + env(safe-area-inset-bottom, 0px)) 14px;
+  }
+}
+
+

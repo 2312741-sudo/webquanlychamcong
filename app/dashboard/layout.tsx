@@ -218,6 +218,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return true; // owner has full access
   });
 
+  const bottomNavItems = (normRole === 'employee' || normRole === 'manager2')
+    ? [
+        { href: '/dashboard/checkin', icon: '⏰', label: 'Chấm công' },
+        { href: '/dashboard/schedule', icon: '🗓️', label: 'Lịch làm' },
+        { href: '/dashboard/attendance', icon: '📅', label: 'Bảng công' },
+      ]
+    : [
+        { href: '/dashboard', icon: '📊', label: 'Tổng quan' },
+        { href: '/dashboard/checkin', icon: '⏰', label: 'Chấm công' },
+        { href: '/dashboard/schedule', icon: '🗓️', label: 'Lịch làm' },
+        { href: '/dashboard/attendance', icon: '📅', label: 'Bảng công' },
+      ];
+
 
   const handleNotificationClick = async (notif: AppNotification) => {
     try {
@@ -373,21 +386,51 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <header style={{
             background:'white',
             borderBottom:'1px solid var(--divider)',
-            padding:'0 24px',
-            height:60,
+            padding:'0 16px',
+            minHeight:56,
+            height:56,
             display:'flex',
             alignItems:'center',
-            gap:16,
+            gap:10,
             position:'sticky', top:0, zIndex:30,
           }}>
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              style={{ background:'var(--surface)', border:'none', width:38, height:38, borderRadius:10, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, flexShrink:0 }}
+              style={{ background:'var(--surface)', border:'none', width:40, height:40, borderRadius:10, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, flexShrink:0 }}
+              title="Menu"
             >☰</button>
-            <div style={{ flex:1 }}>
-              <span style={{ fontSize:13, color:'var(--text-secondary)' }}>
+            <div style={{ flex:1, minWidth:0, display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ fontSize:14, fontWeight:700, color:'var(--neutral)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
                 {filteredNav.find(n => pathname === n.href || (n.href !== '/dashboard' && pathname.startsWith(n.href)))?.label ?? 'Dashboard'}
               </span>
+              {store && (
+                <button
+                  type="button"
+                  onClick={() => setShowStoreSwitcher(true)}
+                  style={{
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    padding: '3px 8px',
+                    borderRadius: 14,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    cursor: 'pointer',
+                    maxWidth: 150,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    color: 'var(--neutral)'
+                  }}
+                  title="Chuyển cửa hàng"
+                >
+                  <span>🏪</span>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{store.name}</span>
+                  <span style={{ fontSize: 9, opacity: 0.6 }}>▾</span>
+                </button>
+              )}
             </div>
 
             {/* Notification Bell */}
@@ -497,7 +540,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </header>
 
           {/* Content */}
-          <main style={{ flex:1, padding:24, overflow:'auto' }}>
+          <main className="dashboard-main-content">
             {!storeId ? (
               <div className="empty-state">
                 <div className="empty-state-icon">🏪</div>
@@ -507,6 +550,32 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             ) : children}
           </main>
         </div>
+
+        {/* Mobile Bottom Navigation Bar */}
+        <nav className="mobile-bottom-nav hide-on-desktop">
+          {bottomNavItems.map(item => {
+            const active = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`mobile-bottom-nav-item ${active ? 'active' : ''}`}
+              >
+                <span className="mobile-bottom-nav-icon">{item.icon}</span>
+                <span className="mobile-bottom-nav-label">{item.label}</span>
+              </Link>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(true)}
+            className="mobile-bottom-nav-item"
+            title="Mở menu"
+          >
+            <span className="mobile-bottom-nav-icon">☰</span>
+            <span className="mobile-bottom-nav-label">Menu</span>
+          </button>
+        </nav>
 
         {/* Store Switcher Modal */}
         {showStoreSwitcher && (
