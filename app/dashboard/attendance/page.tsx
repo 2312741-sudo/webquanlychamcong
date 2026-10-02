@@ -2,7 +2,17 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useApp } from '../layout';
-import { getMonthAttendances, getMemberMonthAttendances, editAttendance, createManualAttendance, getSchedulesInRange, getAttendancesInRange } from '@/lib/firestore';
+import {
+  getMonthAttendances,
+  getMemberMonthAttendances,
+  editAttendance,
+  createManualAttendance,
+  getSchedulesInRange,
+  getAttendancesInRange,
+  watchActiveAttendances,
+  watchUserActiveAttendance,
+  getVietnamDateString
+} from '@/lib/firestore';
 import { exportMonthlyAttendance, exportDetailedInOut } from '@/lib/exportExcel';
 import { AttendanceRecord, ScheduleModel, canViewAllAttendance, canEditAttendance } from '@/lib/types';
 import ExportModal from '../components/ExportModal';
@@ -16,8 +26,10 @@ export default function AttendancePage() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
   const [attendances, setAttendances] = useState<AttendanceRecord[]>([]);
+  const [activeAttendances, setActiveAttendances] = useState<AttendanceRecord[]>([]);
   const [schedules, setSchedules] = useState<ScheduleModel[]>([]);
   const [loading, setLoading] = useState(false);
+  const todayStr = getVietnamDateString();
 
   const [editingCell, setEditingCell] = useState<{
     userId: string;
@@ -37,6 +49,15 @@ export default function AttendancePage() {
   });
 
   const activeMembers = members.filter(m => m.status === 'active');
+
+  // Watch real-time active attendances across midnight
+  useEffect(() => {
+    if (!storeId) return;
+    const unsub = canView
+      ? watchActiveAttendances(storeId, setActiveAttendances)
+      : (user ? watchUserActiveAttendance(storeId, user.uid, att => setActiveAttendances(att ? [att] : [])) : () => {});
+    return () => unsub();
+  }, [storeId, canView, user]);
 
   useEffect(() => {
     if (!storeId || !currentMonth) return;
@@ -60,6 +81,14 @@ export default function AttendancePage() {
       setSchedules(scheds);
     }).finally(() => setLoading(false));
   }, [storeId, currentMonth, canView, user]);
+
+  // Combine loaded month attendances with live active attendances
+  const combinedAttendances = (() => {
+    const map = new Map<string, AttendanceRecord>();
+    attendances.forEach(a => map.set(a.id, a));
+    activeAttendances.forEach(a => map.set(a.id, a));
+    return Array.from(map.values());
+  })();
 
   const [year, mon] = currentMonth.split('-').map(Number);
   const daysInMonth = new Date(year, mon, 0).getDate();
@@ -186,7 +215,7 @@ export default function AttendancePage() {
   };
 
   if (!canView) {
-    const myAtts = attendances;
+    const myAtts = combinedAttendances;
     const totalHours = myAtts.reduce((sum, a) => sum + (a.totalHours || 0), 0);
     const completedShifts = myAtts.filter(a => a.checkOut).length;
 
@@ -464,8 +493,9 @@ export default function AttendancePage() {
               </thead>
               <tbody>
                 {activeMembers.map(m => {
-                  const memberAtts = attendances.filter(a => a.userId === m.userId);
+                  const memberAtts = combinedAttendances.filter(a => a.userId === m.userId);
                   const totalHours = memberAtts.reduce((sum, a) => sum + (a.totalHours || 0), 0);
+                  const activeShift = activeAttendances.find(a => a.userId === m.userId && !a.checkOut);
                   
                   return (
                     <tr key={m.userId}>
@@ -476,12 +506,19 @@ export default function AttendancePage() {
                         </div>
                       </td>
                       <td style={{ textAlign: 'center', fontWeight: 700, color: 'var(--primary)', background: 'var(--primary-light)' }}>
-                        {totalHours.toFixed(1)}h
+                        <div>{totalHours.toFixed(1)}h</div>
+                        {activeShift && (
+                          <div style={{ fontSize: 10, color: '#2e7d32', fontWeight: 700, marginTop: 2 }}>🟢 Đang làm</div>
+                        )}
                       </td>
                       {daysArray.map(dateStr => {
                         const att = memberAtts.find(a => a.date === dateStr);
                         const isEdited = att?.isEdited;
                         const hasHours = att && att.totalHours > 0;
+                        const isWorkingOnDate = activeShift && (
+                          activeShift.date === dateStr ||
+                          (dateStr === todayStr && activeShift.date < dateStr)
+                        );
                         
                         return (
                           <td 
@@ -489,13 +526,21 @@ export default function AttendancePage() {
                             style={{ 
                               textAlign: 'center', 
                               padding: 4,
-                              background: hasHours ? 'var(--success-light)' : 'transparent',
+                              background: isWorkingOnDate ? '#e8f5e9' : (hasHours ? 'var(--success-light)' : 'transparent'),
                               cursor: 'pointer'
                             }}
-                            onClick={() => openEditModal(m.userId, dateStr, att)}
-                            title={isEdited ? `Đã sửa bởi: ${att.editedBy}` : ''}
+                            onClick={() => openEditModal(m.userId, dateStr, att || (isWorkingOnDate ? activeShift : undefined))}
+                            title={isWorkingOnDate ? `Đang làm việc (Vào: ${activeShift.checkInMethod || 'WiFi'})` : (isEdited ? `Đã sửa bởi: ${att?.editedBy}` : '')}
                           >
-                            {hasHours ? (
+                            {isWorkingOnDate ? (
+                              <div style={{ fontWeight: 700, color: '#2e7d32', fontSize: 11, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                                {hasHours && <span style={{ color: 'var(--success)', fontWeight: 600, fontSize: 12 }}>{att.totalHours.toFixed(1)}h</span>}
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: '#c8e6c9', color: '#1b5e20', padding: '1px 5px', borderRadius: 6, fontSize: 10, fontWeight: 800 }}>
+                                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#2e7d32', animation: 'pulse 1.5s infinite' }} />
+                                  Đang làm
+                                </span>
+                              </div>
+                            ) : hasHours ? (
                               <div style={{ fontWeight: 600, color: 'var(--success)', fontSize: 13 }}>
                                 {att.totalHours.toFixed(1)}h
                                 {isEdited && <span style={{ color: 'var(--accent)', marginLeft: 2 }}>*</span>}

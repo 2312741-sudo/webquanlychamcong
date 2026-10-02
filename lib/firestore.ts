@@ -225,25 +225,60 @@ export async function getMemberMonthAttendances(storeId: string, userId: string,
   return snap.docs.map(d => ({ id: d.id, ...d.data() } as AttendanceRecord));
 }
 
-export function watchActiveAttendances(storeId: string, cb: (records: AttendanceRecord[]) => void) {
+export function getVietnamDateString(d: Date = new Date()): string {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(d);
+  } catch {
+    const vnTime = new Date(d.getTime() + (7 * 60 + d.getTimezoneOffset()) * 60000);
+    return `${vnTime.getFullYear()}-${String(vnTime.getMonth() + 1).padStart(2, '0')}-${String(vnTime.getDate()).padStart(2, '0')}`;
+  }
+}
+
+export function watchActiveAttendances(
+  storeId: string,
+  cb: (records: AttendanceRecord[]) => void,
+  onError?: (err: any) => void
+) {
   const q = query(
     collection(db, 'stores', storeId, 'attendances'),
     where('checkOut', '==', null)
   );
   return onSnapshot(q, snap => {
-    cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as AttendanceRecord)));
+    const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as AttendanceRecord));
+    list.sort((a, b) => {
+      const tA = a.checkIn?.seconds ? a.checkIn.seconds * 1000 : (a.checkIn ? new Date(a.checkIn).getTime() : 0);
+      const tB = b.checkIn?.seconds ? b.checkIn.seconds * 1000 : (b.checkIn ? new Date(b.checkIn).getTime() : 0);
+      return tB - tA;
+    });
+    cb(list);
+  }, err => {
+    console.error('Error in watchActiveAttendances:', err);
+    if (onError) onError(err);
+    cb([]);
   });
 }
 
-export function watchTodayAttendances(storeId: string, cb: (records: AttendanceRecord[]) => void) {
-  const today = new Date();
-  const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+export function watchTodayAttendances(
+  storeId: string,
+  cb: (records: AttendanceRecord[]) => void,
+  onError?: (err: any) => void
+) {
+  const dateStr = getVietnamDateString();
   const q = query(
     collection(db, 'stores', storeId, 'attendances'),
     where('date', '==', dateStr)
   );
   return onSnapshot(q, snap => {
     cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as AttendanceRecord)));
+  }, err => {
+    console.error('Error in watchTodayAttendances:', err);
+    if (onError) onError(err);
+    cb([]);
   });
 }
 
@@ -283,23 +318,30 @@ export async function createManualAttendance(
 export function watchUserActiveAttendance(
   storeId: string,
   userId: string,
-  cb: (record: AttendanceRecord | null) => void
+  cb: (record: AttendanceRecord | null) => void,
+  onError?: (err: any) => void
 ) {
   const q = query(
     collection(db, 'stores', storeId, 'attendances'),
     where('userId', '==', userId),
-    where('checkOut', '==', null),
-    limit(1)
+    where('checkOut', '==', null)
   );
   return onSnapshot(q, snap => {
     if (snap.empty) {
       cb(null);
     } else {
-      const d = snap.docs[0];
-      cb({ id: d.id, ...d.data() } as AttendanceRecord);
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as AttendanceRecord));
+      // Sắp xếp giảm dần theo checkIn để luôn lấy ca đang làm gần nhất
+      list.sort((a, b) => {
+        const tA = a.checkIn?.seconds ? a.checkIn.seconds * 1000 : (a.checkIn ? new Date(a.checkIn).getTime() : 0);
+        const tB = b.checkIn?.seconds ? b.checkIn.seconds * 1000 : (b.checkIn ? new Date(b.checkIn).getTime() : 0);
+        return tB - tA;
+      });
+      cb(list[0]);
     }
   }, err => {
     console.error('Error in watchUserActiveAttendance:', err);
+    if (onError) onError(err);
     cb(null);
   });
 }
@@ -332,14 +374,13 @@ export async function webCheckIn(
   memberName?: string
 ): Promise<string> {
   const now = new Date();
-  const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const dateStr = getVietnamDateString(now);
 
-  // Kiểm tra xem có ca nào đang hoạt động không
+  // Kiểm tra xem có ca nào đang hoạt động không (bất kể ngày nào để xử lý ca xuyên đêm)
   const activeQ = query(
     collection(db, 'stores', storeId, 'attendances'),
     where('userId', '==', userId),
-    where('checkOut', '==', null),
-    limit(1)
+    where('checkOut', '==', null)
   );
   const activeSnap = await getDocs(activeQ);
   if (!activeSnap.empty) {

@@ -1,8 +1,15 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useApp } from './layout';
-import { watchTodayAttendances, watchActiveAttendances, getMonthAttendances } from '@/lib/firestore';
-import { AttendanceRecord, Member } from '@/lib/types';
+import {
+  watchTodayAttendances,
+  watchActiveAttendances,
+  watchUserTodayAttendances,
+  watchUserActiveAttendance,
+  getMonthAttendances,
+  getVietnamDateString
+} from '@/lib/firestore';
+import { AttendanceRecord, Member, canViewAllAttendance } from '@/lib/types';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 function StatCard({ icon, label, value, sub, color }: { icon: string; label: string; value: string | number; sub?: string; color?: string }) {
@@ -27,7 +34,7 @@ const METHOD_LABEL: Record<string, string> = {
 };
 
 export default function DashboardPage() {
-  const { storeId, members } = useApp();
+  const { storeId, members, user, role } = useApp();
   const [todayAtts, setTodayAtts] = useState<AttendanceRecord[]>([]);
   const [activeAtts, setActiveAtts] = useState<AttendanceRecord[]>([]);
   const [chartData, setChartData] = useState<{ date: string; hours: number }[]>([]);
@@ -37,16 +44,33 @@ export default function DashboardPage() {
   const pendingMembers = members.filter(m => m.status === 'pending');
   const inProgressToday = activeAtts;
   const doneToday = todayAtts.filter(a => a.checkOut);
+  const todayStr = getVietnamDateString();
+  const overnightActive = activeAtts.filter(a => a.date !== todayStr);
+  const totalShiftsToday = todayAtts.length + overnightActive.length;
 
   useEffect(() => {
     if (!storeId) return;
-    const unsubToday = watchTodayAttendances(storeId, setTodayAtts);
-    const unsubActive = watchActiveAttendances(storeId, setActiveAtts);
+    const canViewAll = canViewAllAttendance(role);
+
+    let unsubToday: () => void;
+    let unsubActive: () => void;
+
+    if (canViewAll) {
+      unsubToday = watchTodayAttendances(storeId, setTodayAtts);
+      unsubActive = watchActiveAttendances(storeId, setActiveAtts);
+    } else if (user) {
+      unsubToday = watchUserTodayAttendances(storeId, user.uid, todayStr, setTodayAtts);
+      unsubActive = watchUserActiveAttendance(storeId, user.uid, att => setActiveAtts(att ? [att] : []));
+    } else {
+      unsubToday = () => {};
+      unsubActive = () => {};
+    }
+
     return () => {
       unsubToday();
       unsubActive();
     };
-  }, [storeId]);
+  }, [storeId, role, user, todayStr]);
 
   useEffect(() => {
     if (!storeId) return;
@@ -84,7 +108,7 @@ export default function DashboardPage() {
         <StatCard icon="👥" label="Nhân viên hoạt động" value={activeMembers.length} sub={`${pendingMembers.length} chờ duyệt`} color="#1A6B5A" />
         <StatCard icon="✅" label="Đang làm hôm nay" value={inProgressToday.length} sub={`${doneToday.length} đã ra ca`} color="#1565C0" />
         <StatCard icon="⏱️" label="Tổng giờ tháng này" value={`${totalMonthHours.toFixed(1)}h`} sub="Toàn bộ nhân viên" />
-        <StatCard icon="📋" label="Số ca hôm nay" value={todayAtts.length} sub="Tổng lượt chấm công" color="#EB9B28" />
+        <StatCard icon="📋" label="Số ca hôm nay" value={totalShiftsToday} sub="Tổng lượt chấm công" color="#EB9B28" />
       </div>
 
       {/* Chart + Today */}
@@ -118,19 +142,33 @@ export default function DashboardPage() {
             <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
               {inProgressToday.slice(0, 6).map(att => {
                 const checkInTime = att.checkIn?.toDate ? att.checkIn.toDate() : new Date(att.checkIn?.seconds * 1000);
+                const isOvernight = att.date !== todayStr;
+                const diffMs = Math.max(0, Date.now() - checkInTime.getTime());
+                const h = Math.floor(diffMs / 3600000);
+                const m = Math.floor((diffMs % 3600000) / 60000);
+                const durationStr = `${h}h${String(m).padStart(2, '0')}m`;
+
                 return (
                   <div key={att.id} style={{ display:'flex', alignItems:'center', gap:10 }}>
                     <div className="avatar" style={{ width:34, height:34, fontSize:12, flexShrink:0 }}>
                       {getMemberName(att.userId).split(' ').pop()?.[0] ?? '?'}
                     </div>
                     <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:13, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{getMemberName(att.userId)}</div>
+                      <div style={{ fontSize:13, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', display:'flex', alignItems:'center', gap:6 }}>
+                        <span>{getMemberName(att.userId)}</span>
+                        {isOvernight && (
+                          <span style={{ fontSize:10, background:'#fff3e0', color:'#e65100', padding:'1px 5px', borderRadius:4, fontWeight:700 }}>
+                            🌙 Ca đêm
+                          </span>
+                        )}
+                      </div>
                       <div style={{ fontSize:11, color:'var(--text-secondary)' }}>
-                        Vào: {checkInTime.toLocaleTimeString('vi-VN', { hour:'2-digit', minute:'2-digit' })} &nbsp;·&nbsp;
+                        Vào: {isOvernight ? `${att.date} ` : ''}{checkInTime.toLocaleTimeString('vi-VN', { hour:'2-digit', minute:'2-digit' })} &nbsp;·&nbsp;
+                        <span style={{ color:'var(--primary)', fontWeight:600 }}>{durationStr}</span> &nbsp;·&nbsp;
                         <span style={{ color:'var(--success)' }}>{METHOD_LABEL[att.checkInMethod] || att.checkInMethod}</span>
                       </div>
                     </div>
-                    <div style={{ width:8, height:8, borderRadius:'50%', background:'var(--success)', flexShrink:0 }} />
+                    <div style={{ width:8, height:8, borderRadius:'50%', background:'var(--success)', flexShrink:0, animation:'pulse 1.5s infinite' }} />
                   </div>
                 );
               })}

@@ -6,7 +6,8 @@ import {
   watchUserTodayAttendances,
   getMemberMonthAttendances,
   webCheckIn,
-  webCheckOut
+  webCheckOut,
+  getVietnamDateString
 } from '@/lib/firestore';
 import { AttendanceRecord, CheckInMethod, getRoleLabel } from '@/lib/types';
 
@@ -55,10 +56,10 @@ export default function CheckInPage() {
     return () => clearInterval(timer);
   }, []);
 
-  // Today string YYYY-MM-DD
-  const todayStr = `${currentTime.getFullYear()}-${String(currentTime.getMonth() + 1).padStart(2, '0')}-${String(currentTime.getDate()).padStart(2, '0')}`;
+  // Today string YYYY-MM-DD (Vietnam time)
+  const todayStr = getVietnamDateString(currentTime);
 
-  // Watch active attendance for current user
+  // Watch active attendance for current user (cross-midnight resilient)
   useEffect(() => {
     if (!storeId || !user) return;
     const unsub = watchUserActiveAttendance(storeId, user.uid, (att) => {
@@ -75,6 +76,14 @@ export default function CheckInPage() {
     });
     return () => unsub();
   }, [storeId, user, todayStr]);
+
+  // List of shifts to display: ensure active attendance is NEVER lost after midnight
+  const displayedAttendances = (() => {
+    if (!activeAttendance) return todayAttendances;
+    const exists = todayAttendances.some(a => a.id === activeAttendance.id);
+    if (exists) return todayAttendances;
+    return [activeAttendance, ...todayAttendances];
+  })();
 
   // Load monthly attendances for history
   useEffect(() => {
@@ -374,6 +383,22 @@ export default function CheckInPage() {
         {activeAttendance ? (
           /* ACTIVE SHIFT: Show running timer and Check-Out button */
           <div style={{ textAlign: 'center', padding: '16px 0' }}>
+            {activeAttendance.date !== todayStr && (
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                background: '#fff3e0',
+                color: '#e65100',
+                padding: '4px 14px',
+                borderRadius: 20,
+                fontSize: 12,
+                fontWeight: 700,
+                marginBottom: 10
+              }}>
+                <span>🌙</span> Ca làm việc qua đêm (Bắt đầu từ ngày {activeAttendance.date})
+              </div>
+            )}
             <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 8 }}>
               Thời gian đã làm việc trong ca:
             </div>
@@ -404,7 +429,10 @@ export default function CheckInPage() {
             }}>
               <div>
                 <span style={{ color: 'var(--text-secondary)' }}>Giờ vào ca: </span>
-                <strong>{formatTime(activeAttendance.checkIn)}</strong>
+                <strong>
+                  {formatTime(activeAttendance.checkIn)}
+                  {activeAttendance.date !== todayStr && ` (${activeAttendance.date})`}
+                </strong>
               </div>
               <div style={{ width: 1, height: 16, background: 'var(--border)' }} />
               <div>
@@ -566,20 +594,21 @@ export default function CheckInPage() {
         )}
       </div>
 
-      {/* Today's Completed Sessions */}
+      {/* Today's & Ongoing Sessions */}
       <div className="card">
         <h3 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span>📋</span> Các ca làm việc hôm nay ({todayAttendances.length})
+          <span>📋</span> Các ca làm việc hôm nay / hiện tại ({displayedAttendances.length})
         </h3>
 
-        {todayAttendances.length === 0 ? (
+        {displayedAttendances.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-secondary)', fontSize: 13 }}>
             Hôm nay bạn chưa có lượt chấm công nào.
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {todayAttendances.map((att, idx) => {
+            {displayedAttendances.map((att, idx) => {
               const isActive = !att.checkOut;
+              const isOvernight = att.date !== todayStr && isActive;
               return (
                 <div
                   key={att.id}
@@ -605,10 +634,15 @@ export default function CheckInPage() {
                     </div>
                     <div>
                       <div style={{ fontWeight: 600, fontSize: 14 }}>
-                        Vào: <strong>{formatTime(att.checkIn)}</strong> → Ra: <strong>{att.checkOut ? formatTime(att.checkOut) : 'Đang làm việc...'}</strong>
+                        Vào: <strong>{formatTime(att.checkIn)}</strong>{att.date !== todayStr ? <span style={{ color: 'var(--accent)', fontSize: 12 }}> ({att.date})</span> : ''} → Ra: <strong>{att.checkOut ? formatTime(att.checkOut) : 'Đang làm việc...'}</strong>
                       </div>
-                      <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
-                        Phương thức: {getMethodLabel(att.checkInMethod)}
+                      <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span>Phương thức: {getMethodLabel(att.checkInMethod)}</span>
+                        {isOvernight && (
+                          <span style={{ background: '#fff3e0', color: '#e65100', padding: '1px 8px', borderRadius: 6, fontWeight: 700, fontSize: 11 }}>
+                            🌙 Ca đêm từ hôm qua
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -616,7 +650,7 @@ export default function CheckInPage() {
                   <div style={{ textAlign: 'right' }}>
                     {isActive ? (
                       <span style={{ color: 'var(--primary)', fontWeight: 700, fontSize: 14 }}>
-                        Đang làm...
+                        Đang làm ({getElapsedDuration(att.checkIn)})
                       </span>
                     ) : (
                       <span style={{ fontWeight: 700, fontSize: 16, color: 'var(--neutral)' }}>
@@ -709,7 +743,8 @@ export default function CheckInPage() {
             <div style={{ padding: '16px 0', textAlign: 'center' }}>
               <div style={{ fontSize: 48, marginBottom: 12 }}>🏁</div>
               <p style={{ fontSize: 15, margin: 0, color: 'var(--neutral)', lineHeight: 1.5 }}>
-                Bạn đã làm việc được <strong>{getElapsedDuration(activeAttendance.checkIn)}</strong>.
+                Bạn đã làm việc được <strong>{getElapsedDuration(activeAttendance.checkIn)}</strong>
+                {activeAttendance.date !== todayStr && ` (bắt đầu từ ngày ${activeAttendance.date})`}.
               </p>
               <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 8 }}>
                 Bạn có chắc chắn muốn kết thúc ca làm việc lúc này?
