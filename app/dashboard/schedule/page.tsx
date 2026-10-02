@@ -2,7 +2,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useApp } from '../layout';
-import { getWeekSchedule, watchWeekSchedule, saveWeekSchedule, updateMemberOrder, toggleHideMemberSchedule } from '@/lib/firestore';
+import { getWeekSchedule, watchWeekSchedule, saveWeekSchedule, saveUserSchedule, updateMemberOrder, toggleHideMemberSchedule } from '@/lib/firestore';
 import { exportWeeklySchedule } from '@/lib/exportExcel';
 import { ScheduleModel, DaySchedule, ShiftDefinition, getRoleLabel, canManageSchedule, canManageDelivery, normalizeRole, sortMembersByOrder } from '@/lib/types';
 
@@ -38,6 +38,13 @@ function ScheduleContent() {
   const canEditDelivery = canManageDelivery(role); // Owner, Manager 1, Manager 2
   const canInteract = canEditSchedule || canEditDelivery;
   const isOwner = normalizeRole(role) === 'owner';
+  const normRole = normalizeRole(role);
+  const [activeTab, setActiveTab] = useState<'register' | 'store'>('register');
+  const [registerDraft, setRegisterDraft] = useState<DaySchedule>({
+    monday: [], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: []
+  });
+  const [registerSaving, setRegisterSaving] = useState(false);
+
   const [currentWeek, setCurrentWeek] = useState(() => getMondayOfWeek(new Date()));
   useEffect(() => {
     const week = searchParams.get('weekStart');
@@ -48,6 +55,54 @@ function ScheduleContent() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Sync user's draft schedule for registration tab
+  useEffect(() => {
+    if (!user) return;
+    const userSchedule = shifts[user.uid];
+    if (userSchedule) {
+      setRegisterDraft({
+        monday: Array.isArray(userSchedule.monday) ? [...userSchedule.monday] : (userSchedule.monday === 'off' || !userSchedule.monday ? [] : [userSchedule.monday as any]),
+        tuesday: Array.isArray(userSchedule.tuesday) ? [...userSchedule.tuesday] : (userSchedule.tuesday === 'off' || !userSchedule.tuesday ? [] : [userSchedule.tuesday as any]),
+        wednesday: Array.isArray(userSchedule.wednesday) ? [...userSchedule.wednesday] : (userSchedule.wednesday === 'off' || !userSchedule.wednesday ? [] : [userSchedule.wednesday as any]),
+        thursday: Array.isArray(userSchedule.thursday) ? [...userSchedule.thursday] : (userSchedule.thursday === 'off' || !userSchedule.thursday ? [] : [userSchedule.thursday as any]),
+        friday: Array.isArray(userSchedule.friday) ? [...userSchedule.friday] : (userSchedule.friday === 'off' || !userSchedule.friday ? [] : [userSchedule.friday as any]),
+        saturday: Array.isArray(userSchedule.saturday) ? [...userSchedule.saturday] : (userSchedule.saturday === 'off' || !userSchedule.saturday ? [] : [userSchedule.saturday as any]),
+        sunday: Array.isArray(userSchedule.sunday) ? [...userSchedule.sunday] : (userSchedule.sunday === 'off' || !userSchedule.sunday ? [] : [userSchedule.sunday as any]),
+      });
+    } else {
+      setRegisterDraft({
+        monday: [], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: []
+      });
+    }
+  }, [user, shifts, currentWeek]);
+
+  const toggleRegisterShift = (dayKey: keyof DaySchedule, shiftId: string) => {
+    setRegisterDraft(prev => {
+      const current = prev[dayKey] || [];
+      const exists = current.includes(shiftId);
+      const next = exists ? current.filter(id => id !== shiftId) : [...current, shiftId];
+      return { ...prev, [dayKey]: next };
+    });
+  };
+
+  const clearRegisterDay = (dayKey: keyof DaySchedule) => {
+    setRegisterDraft(prev => ({ ...prev, [dayKey]: [] }));
+  };
+
+  const handleSaveUserRegistration = async () => {
+    if (!storeId || !user) return;
+    setRegisterSaving(true);
+    try {
+      const memberName = currentMember?.name || user.displayName || user.email?.split('@')[0] || 'Nhân viên';
+      await saveUserSchedule(storeId, user.uid, currentWeek, registerDraft, memberName);
+      showToast('Đã lưu đăng ký lịch làm việc thành công!');
+    } catch (err: any) {
+      showToast('Lỗi khi lưu đăng ký: ' + (err.message || err));
+    } finally {
+      setRegisterSaving(false);
+    }
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -166,10 +221,11 @@ function ScheduleContent() {
 
   const toggleShiftForCell = (shiftId: string) => {
     if (!editingCell) return;
+    const isSelf = user?.uid === editingCell.userId;
     if (shiftId === 'delivery' || shiftId === 'giaohang') {
-      if (!canEditDelivery) return;
+      if (!canEditDelivery && !isSelf) return;
     } else {
-      if (!canEditSchedule) return;
+      if (!canEditSchedule && !isSelf) return;
     }
     const { userId, dayKey } = editingCell;
     setShifts(prev => {
@@ -207,9 +263,19 @@ function ScheduleContent() {
   };
 
   const saveChanges = async () => {
-    if (!storeId) return;
+    if (!storeId || !user) return;
     setSaving(true);
     try {
+      if (!canEditSchedule && !canEditDelivery) {
+        // Employee saving their own shifts
+        const mySchedule = shifts[user.uid] || { monday:[], tuesday:[], wednesday:[], thursday:[], friday:[], saturday:[], sunday:[] };
+        const memberName = currentMember?.name || user.displayName || user.email?.split('@')[0] || 'Nhân viên';
+        await saveUserSchedule(storeId, user.uid, currentWeek, mySchedule, memberName);
+        setSaving(false);
+        showToast('Đã lưu lịch làm của bạn thành công!');
+        return;
+      }
+
       // Clean up shifts before saving to Firestore to avoid undefined fields
       const sanitizedShifts: Record<string, DaySchedule> = {};
       for (const uid in shifts) {
@@ -339,23 +405,78 @@ function ScheduleContent() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center flex-wrap gap-4">
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--neutral)' }}>Lịch làm tuần</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--neutral)' }}>Lịch làm việc</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 4 }}>
-            Quản lý và phân ca làm việc cho nhân viên
+            Đăng ký và theo dõi lịch làm việc các ca trong tuần
           </p>
         </div>
+
+        {/* Tab switchers */}
+        <div style={{ display: 'flex', background: 'var(--surface)', padding: 4, borderRadius: 14, border: '1px solid var(--border)' }}>
+          <button
+            type="button"
+            onClick={() => setActiveTab('register')}
+            style={{
+              padding: '8px 18px',
+              borderRadius: 10,
+              border: 'none',
+              background: activeTab === 'register' ? 'var(--primary)' : 'transparent',
+              color: activeTab === 'register' ? 'white' : 'var(--neutral)',
+              fontWeight: 700,
+              fontSize: 13,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              transition: 'all 0.15s'
+            }}
+          >
+            <span>✏️</span>
+            <span>Đăng ký lịch làm</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('store')}
+            style={{
+              padding: '8px 18px',
+              borderRadius: 10,
+              border: 'none',
+              background: activeTab === 'store' ? 'var(--primary)' : 'transparent',
+              color: activeTab === 'store' ? 'white' : 'var(--neutral)',
+              fontWeight: 700,
+              fontSize: 13,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              transition: 'all 0.15s'
+            }}
+          >
+            <span>🏪</span>
+            <span>Lịch toàn cửa hàng</span>
+          </button>
+        </div>
+
         <div className="flex gap-3">
           <button onClick={goToCurrentWeek} className="btn btn-secondary">
             📅 Tuần này
           </button>
-          <button onClick={handleExport} className="btn btn-primary" style={{ background: 'var(--success)' }}>
-            📥 Xuất Excel
-          </button>
-          {canInteract && (
+          {activeTab === 'store' && (
+            <button onClick={handleExport} className="btn btn-primary" style={{ background: 'var(--success)' }}>
+              📥 Xuất Excel
+            </button>
+          )}
+          {activeTab === 'store' && (canInteract || true) && (
             <button onClick={saveChanges} className="btn btn-primary" disabled={saving || loading}>
               {saving ? 'Đang lưu...' : '💾 Lưu lịch'}
+            </button>
+          )}
+          {activeTab === 'register' && (
+            <button onClick={handleSaveUserRegistration} className="btn btn-primary" disabled={registerSaving || loading}>
+              {registerSaving ? 'Đang lưu...' : '💾 Lưu đăng ký'}
             </button>
           )}
         </div>
@@ -372,6 +493,193 @@ function ScheduleContent() {
 
         {loading ? (
           <div style={{ padding: 60, textAlign: 'center' }}><span className="spinner spinner-primary" /></div>
+        ) : activeTab === 'register' ? (
+          <div style={{ padding: 20 }}>
+            <div style={{
+              background: 'var(--primary-light)',
+              border: '1px solid rgba(26, 107, 90, 0.2)',
+              borderRadius: 14,
+              padding: '14px 18px',
+              marginBottom: 20,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 12
+            }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--primary)' }}>
+                  Đăng ký lịch làm: {currentMember?.name || user?.displayName || user?.email}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
+                  Chọn các ca làm việc mong muốn cho từng ngày trong tuần ({currentWeek}). Bấm vào ca để chọn hoặc bỏ chọn.
+                </div>
+              </div>
+              <button
+                onClick={handleSaveUserRegistration}
+                disabled={registerSaving}
+                className="btn btn-primary"
+                style={{ padding: '8px 20px', fontSize: 14 }}
+              >
+                {registerSaving ? 'Đang lưu...' : '💾 Lưu đăng ký của bạn'}
+              </button>
+            </div>
+
+            {/* 7 Days Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+              {DAY_KEYS.map((dayKey, i) => {
+                const dayLabel = DAY_LABELS[i];
+                const dateStr = datesInWeek[i];
+                const selectedShifts = registerDraft[dayKey] || [];
+                const isOff = selectedShifts.length === 0;
+
+                return (
+                  <div
+                    key={dayKey}
+                    style={{
+                      background: 'var(--surface)',
+                      borderRadius: 14,
+                      border: isOff ? '1px solid var(--border)' : '2px solid var(--primary)',
+                      padding: 16,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 12,
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <span style={{ fontWeight: 800, fontSize: 16, color: 'var(--neutral)' }}>{dayLabel}</span>
+                        <span style={{ fontSize: 13, color: 'var(--text-secondary)', marginLeft: 8 }}>({dateStr})</span>
+                      </div>
+                      {!isOff && (
+                        <button
+                          type="button"
+                          onClick={() => clearRegisterDay(dayKey)}
+                          style={{
+                            border: 'none',
+                            background: '#ffebee',
+                            color: '#c62828',
+                            fontSize: 11,
+                            fontWeight: 600,
+                            padding: '3px 8px',
+                            borderRadius: 6,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Nghỉ
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Shift options */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {customShifts.map((shift) => {
+                        const isSelected = selectedShifts.includes(shift.id) || selectedShifts.some(s => s === shift.id || s.startsWith(`${shift.id}|`));
+                        const sh = String(shift.startHour).padStart(2, '0');
+                        const sm = String(shift.startMinute).padStart(2, '0');
+                        const eh = String(shift.endHour).padStart(2, '0');
+                        const em = String(shift.endMinute).padStart(2, '0');
+                        const timeStr = `${sh}:${sm} - ${eh}:${em}`;
+
+                        return (
+                          <button
+                            key={shift.id}
+                            type="button"
+                            onClick={() => toggleRegisterShift(dayKey, shift.id)}
+                            style={{
+                              padding: '10px 14px',
+                              borderRadius: 10,
+                              border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border)',
+                              background: isSelected ? 'var(--primary)' : 'white',
+                              color: isSelected ? 'white' : 'var(--neutral)',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              textAlign: 'left',
+                              fontWeight: 600,
+                              fontSize: 13,
+                              transition: 'all 0.15s'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{
+                                width: 18, height: 18, borderRadius: '50%',
+                                border: isSelected ? '2px solid white' : '2px solid #ccc',
+                                background: isSelected ? 'white' : 'transparent',
+                                color: 'var(--primary)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: 11, fontWeight: 800
+                              }}>
+                                {isSelected ? '✓' : ''}
+                              </span>
+                              <span>{shift.name}</span>
+                            </div>
+                            <span style={{ fontSize: 11, opacity: isSelected ? 0.9 : 0.6 }}>{timeStr}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Status footer for this day */}
+                    <div style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      paddingTop: 8,
+                      borderTop: '1px solid var(--border)',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      color: isOff ? 'var(--text-secondary)' : 'var(--primary)'
+                    }}>
+                      <span>{isOff ? '💤 Nghỉ' : `Đã chọn: ${selectedShifts.length} ca`}</span>
+                      {!isOff && (
+                        <span>⏱️ {calculateDayHours(selectedShifts)}h</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Bottom summary bar */}
+            <div style={{
+              marginTop: 24,
+              padding: '18px 24px',
+              borderRadius: 14,
+              background: 'white',
+              border: '1px solid var(--border)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 16
+            }}>
+              <div style={{ display: 'flex', gap: 24 }}>
+                <div>
+                  <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Tổng ca đăng ký: </span>
+                  <strong style={{ fontSize: 16, color: 'var(--neutral)' }}>
+                    {DAY_KEYS.reduce((sum, k) => sum + (registerDraft[k]?.length || 0), 0)} ca
+                  </strong>
+                </div>
+                <div>
+                  <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Tổng giờ dự kiến: </span>
+                  <strong style={{ fontSize: 16, color: 'var(--primary)' }}>
+                    {DAY_KEYS.reduce((sum, k) => sum + calculateDayHours(registerDraft[k]), 0).toFixed(1)}h
+                  </strong>
+                </div>
+              </div>
+
+              <button
+                onClick={handleSaveUserRegistration}
+                disabled={registerSaving}
+                className="btn btn-primary"
+                style={{ padding: '12px 32px', fontSize: 15, fontWeight: 700 }}
+              >
+                {registerSaving ? 'Đang lưu...' : '💾 LƯU ĐĂNG KÝ LỊCH LÀM'}
+              </button>
+            </div>
+          </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="table" style={{ minWidth: 1240, borderCollapse: 'separate', borderSpacing: '0 4px' }}>
@@ -503,8 +811,8 @@ function ScheduleContent() {
                       setDraggedMemberIdx(null);
                     }}
                     style={{ 
-                      background: draggedMemberIdx === idx ? 'rgba(200, 16, 46, 0.05)' : 'white', 
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                      background: draggedMemberIdx === idx ? 'rgba(200, 16, 46, 0.05)' : (m.userId === user?.uid ? '#f0fdf4' : 'white'), 
+                      boxShadow: m.userId === user?.uid ? '0 0 0 1px #86efac' : '0 1px 3px rgba(0,0,0,0.05)',
                       transition: 'background 0.2s'
                     }}
                   >
@@ -541,6 +849,11 @@ function ScheduleContent() {
                           <div>
                             <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, fontSize: 13.5 }}>
                               {m.name}
+                              {m.userId === user?.uid && (
+                                <span style={{ fontSize: 10, background: 'var(--primary-light)', color: 'var(--primary)', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>
+                                  Tôi
+                                </span>
+                              )}
                               {isHidden && (
                                 <span style={{ fontSize: 10, background: '#FFF3BF', color: '#D9480F', padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>
                                   Ẩn
@@ -591,7 +904,7 @@ function ScheduleContent() {
                       return (
                         <td key={dayKey} style={{ padding: 4 }}>
                           <div
-                            onClick={() => canInteract && openModal(m.userId, dayKey, m.name, `${DAY_LABELS[i]} ${datesInWeek[i]}`)}
+                            onClick={() => (canInteract || m.userId === user?.uid) && openModal(m.userId, dayKey, m.name, `${DAY_LABELS[i]} ${datesInWeek[i]}`)}
                             style={{
                               width: '100%',
                               minHeight: 48,
@@ -606,7 +919,7 @@ function ScheduleContent() {
                               color: textColor,
                               fontSize: 12,
                               fontWeight: 600,
-                              cursor: canInteract ? 'pointer' : 'default',
+                              cursor: (canInteract || m.userId === user?.uid) ? 'pointer' : 'default',
                               transition: 'all 0.2s',
                               wordBreak: 'break-word'
                             }}
@@ -690,85 +1003,94 @@ function ScheduleContent() {
               {editingCell.memberName} • {editingCell.dateLabel}
             </p>
 
-            {!canEditSchedule && canEditDelivery && (
-              <div style={{ fontSize: 12, color: '#D9480F', background: '#FFF4E6', padding: '8px 12px', borderRadius: 8, marginBottom: 14, fontWeight: 600, border: '1px solid #FFE066', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span>ℹ️</span>
-                <span>Tài khoản Quản lý 2: Chỉ được phép tích Chở hàng & Giao hàng (Không sửa ca làm việc).</span>
-              </div>
-            )}
+            {(() => {
+              const isSelf = user?.uid === editingCell.userId;
+              const canEditShift = canEditSchedule || isSelf;
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 320, overflowY: 'auto' }}>
-              {customShifts.map(shift => {
-                const currentArr = shifts[editingCell.userId]?.[editingCell.dayKey] || [];
-                const arr = Array.isArray(currentArr) ? currentArr : (currentArr === 'off' || !currentArr ? [] : [currentArr]);
-                const shiftEntry = arr.find(s => s === shift.id || s.startsWith(`${shift.id}|`));
-                const isSelected = !!shiftEntry;
-                const selectedDeptId = shiftEntry?.split('|')[1] || '';
+              return (
+                <>
+                  {!canEditSchedule && canEditDelivery && !isSelf && (
+                    <div style={{ fontSize: 12, color: '#D9480F', background: '#FFF4E6', padding: '8px 12px', borderRadius: 8, marginBottom: 14, fontWeight: 600, border: '1px solid #FFE066', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span>ℹ️</span>
+                      <span>Tài khoản Quản lý 2: Chỉ được phép tích Chở hàng & Giao hàng (Không sửa ca làm việc).</span>
+                    </div>
+                  )}
 
-                return (
-                  <div key={shift.id} style={{
-                    border: `1px solid ${isSelected ? 'var(--primary)' : 'var(--border)'}`,
-                    borderRadius: 8,
-                    background: isSelected ? 'var(--primary-light)' : 'white',
-                    overflow: 'hidden',
-                    flexShrink: 0,
-                    opacity: canEditSchedule ? 1 : (isSelected ? 0.95 : 0.45)
-                  }}>
-                    <label style={{
-                      display: 'flex', alignItems: 'center', gap: 12, padding: 12,
-                      cursor: canEditSchedule ? 'pointer' : 'not-allowed',
-                      background: isSelected ? 'var(--primary)' : 'transparent',
-                      color: isSelected ? 'white' : 'var(--text-primary)'
-                    }}>
-                      <input 
-                        type="checkbox" 
-                        disabled={!canEditSchedule}
-                        checked={isSelected}
-                        onChange={() => canEditSchedule && toggleShiftForCell(shift.id)}
-                        style={{ transform: 'scale(1.2)', cursor: canEditSchedule ? 'pointer' : 'not-allowed' }}
-                      />
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: 14 }}>{shift.name}</div>
-                        <div style={{ fontSize: 12, opacity: 0.8 }}>
-                          {shift.startHour.toString().padStart(2,'0')}:{shift.startMinute.toString().padStart(2,'0')} - {shift.endHour.toString().padStart(2,'0')}:{shift.endMinute.toString().padStart(2,'0')}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 320, overflowY: 'auto' }}>
+                    {customShifts.map(shift => {
+                      const currentArr = shifts[editingCell.userId]?.[editingCell.dayKey] || [];
+                      const arr = Array.isArray(currentArr) ? currentArr : (currentArr === 'off' || !currentArr ? [] : [currentArr]);
+                      const shiftEntry = arr.find(s => s === shift.id || s.startsWith(`${shift.id}|`));
+                      const isSelected = !!shiftEntry;
+                      const selectedDeptId = shiftEntry?.split('|')[1] || '';
+
+                      return (
+                        <div key={shift.id} style={{
+                          border: `1px solid ${isSelected ? 'var(--primary)' : 'var(--border)'}`,
+                          borderRadius: 8,
+                          background: isSelected ? 'var(--primary-light)' : 'white',
+                          overflow: 'hidden',
+                          flexShrink: 0,
+                          opacity: canEditShift ? 1 : (isSelected ? 0.95 : 0.45)
+                        }}>
+                          <label style={{
+                            display: 'flex', alignItems: 'center', gap: 12, padding: 12,
+                            cursor: canEditShift ? 'pointer' : 'not-allowed',
+                            background: isSelected ? 'var(--primary)' : 'transparent',
+                            color: isSelected ? 'white' : 'var(--text-primary)'
+                          }}>
+                            <input 
+                              type="checkbox" 
+                              disabled={!canEditShift}
+                              checked={isSelected}
+                              onChange={() => canEditShift && toggleShiftForCell(shift.id)}
+                              style={{ transform: 'scale(1.2)', cursor: canEditShift ? 'pointer' : 'not-allowed' }}
+                            />
+                            <div>
+                              <div style={{ fontWeight: 700, fontSize: 14 }}>{shift.name}</div>
+                              <div style={{ fontSize: 12, opacity: 0.8 }}>
+                                {shift.startHour.toString().padStart(2,'0')}:{shift.startMinute.toString().padStart(2,'0')} - {shift.endHour.toString().padStart(2,'0')}:{shift.endMinute.toString().padStart(2,'0')}
+                              </div>
+                            </div>
+                          </label>
+                          
+                          {isSelected && (normalizeRole(currentMember?.role) === 'owner' || store?.departmentSelectionEnabled !== false) && (
+                            <div style={{ padding: '8px 12px', background: 'white' }}>
+                              <select 
+                                className="input" 
+                                disabled={!canEditShift}
+                                value={selectedDeptId}
+                                onChange={(e) => {
+                                  if (!canEditShift) return;
+                                  const newDept = e.target.value;
+                                  setShifts(prev => {
+                                    const userSchedule = prev[editingCell.userId] || { monday:[], tuesday:[], wednesday:[], thursday:[], friday:[], saturday:[], sunday:[] };
+                                    let cArr = userSchedule[editingCell.dayKey] || [];
+                                    if (!Array.isArray(cArr)) cArr = cArr === 'off' || !cArr ? [] : [cArr as any];
+                                    let nArr = [...cArr];
+                                    const idx = nArr.findIndex(s => s === shiftEntry);
+                                    if (idx !== -1) {
+                                      nArr[idx] = newDept ? `${shift.id}|${newDept}` : shift.id;
+                                    }
+                                    return { ...prev, [editingCell.userId]: { ...userSchedule, [editingCell.dayKey]: nArr } };
+                                  });
+                                }}
+                                style={{ width: '100%', padding: '6px 10px', fontSize: 13, cursor: canEditShift ? 'pointer' : 'not-allowed' }}
+                              >
+                                <option value="">-- Bộ phận mặc định --</option>
+                                {store?.departments?.map(d => (
+                                  <option key={d.id} value={d.id}>{d.name} ({d.shortName})</option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    </label>
-                    
-                    {isSelected && (normalizeRole(currentMember?.role) === 'owner' || store?.departmentSelectionEnabled !== false) && (
-                      <div style={{ padding: '8px 12px', background: 'white' }}>
-                        <select 
-                          className="input" 
-                          disabled={!canEditSchedule}
-                          value={selectedDeptId}
-                          onChange={(e) => {
-                            if (!canEditSchedule) return;
-                            const newDept = e.target.value;
-                            setShifts(prev => {
-                              const userSchedule = prev[editingCell.userId] || { monday:[], tuesday:[], wednesday:[], thursday:[], friday:[], saturday:[], sunday:[] };
-                              let cArr = userSchedule[editingCell.dayKey] || [];
-                              if (!Array.isArray(cArr)) cArr = cArr === 'off' || !cArr ? [] : [cArr as any];
-                              let nArr = [...cArr];
-                              const idx = nArr.findIndex(s => s === shiftEntry);
-                              if (idx !== -1) {
-                                nArr[idx] = newDept ? `${shift.id}|${newDept}` : shift.id;
-                              }
-                              return { ...prev, [editingCell.userId]: { ...userSchedule, [editingCell.dayKey]: nArr } };
-                            });
-                          }}
-                          style={{ width: '100%', padding: '6px 10px', fontSize: 13, cursor: canEditSchedule ? 'pointer' : 'not-allowed' }}
-                        >
-                          <option value="">-- Bộ phận mặc định --</option>
-                          {store?.departments?.map(d => (
-                            <option key={d.id} value={d.id}>{d.name} ({d.shortName})</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
+                      );
+                    })}
                   </div>
-                );
-              })}
-            </div>
+                </>
+              );
+            })()}
 
             {(() => {
               const currentVal = shifts[editingCell.userId]?.[editingCell.dayKey];

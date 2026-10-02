@@ -1,7 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useApp } from '../layout';
-import { getMonthAttendances, editAttendance, createManualAttendance, getSchedulesInRange, getAttendancesInRange } from '@/lib/firestore';
+import { getMonthAttendances, getMemberMonthAttendances, editAttendance, createManualAttendance, getSchedulesInRange, getAttendancesInRange } from '@/lib/firestore';
 import { exportMonthlyAttendance, exportDetailedInOut } from '@/lib/exportExcel';
 import { AttendanceRecord, ScheduleModel, canViewAllAttendance, canEditAttendance } from '@/lib/types';
 import ExportModal from '../components/ExportModal';
@@ -47,14 +48,18 @@ export default function AttendancePage() {
     const startStr = startObj.toISOString().slice(0, 10);
     const endStr = endObj.toISOString().slice(0, 10);
 
+    const fetchAtts = canView
+      ? getMonthAttendances(storeId, currentMonth)
+      : (user ? getMemberMonthAttendances(storeId, user.uid, currentMonth) : Promise.resolve([]));
+
     Promise.all([
-      getMonthAttendances(storeId, currentMonth),
+      fetchAtts,
       getSchedulesInRange(storeId, startStr, endStr)
     ]).then(([atts, scheds]) => {
       setAttendances(atts);
       setSchedules(scheds);
     }).finally(() => setLoading(false));
-  }, [storeId, currentMonth]);
+  }, [storeId, currentMonth, canView, user]);
 
   const [year, mon] = currentMonth.split('-').map(Number);
   const daysInMonth = new Date(year, mon, 0).getDate();
@@ -181,25 +186,173 @@ export default function AttendancePage() {
   };
 
   if (!canView) {
+    const myAtts = attendances;
+    const totalHours = myAtts.reduce((sum, a) => sum + (a.totalHours || 0), 0);
+    const completedShifts = myAtts.filter(a => a.checkOut).length;
+
     return (
-      <div className="card text-center p-8">
-        <div style={{ fontSize: 40, marginBottom: 12 }}>🔒</div>
-        <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--primary)', marginBottom: 6 }}>Không có quyền truy cập</h2>
-        <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Quản lý 2 không có quyền xem hoặc sửa bảng chấm công của nhân viên khác.</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {/* Quick check-in banner */}
+        <div style={{
+          background: 'linear-gradient(135deg, var(--primary) 0%, #15803d 100%)',
+          color: 'white',
+          padding: '20px 24px',
+          borderRadius: 16,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 16
+        }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>Chấm Công Hôm Nay</h2>
+            <p style={{ margin: '4px 0 0 0', opacity: 0.85, fontSize: 13 }}>
+              Vào ca và kết thúc ca làm việc trực tuyến ngay trên web
+            </p>
+          </div>
+          <Link
+            href="/dashboard/checkin"
+            style={{
+              background: 'white',
+              color: 'var(--primary)',
+              padding: '10px 20px',
+              borderRadius: 12,
+              fontWeight: 700,
+              fontSize: 14,
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+            }}
+          >
+            <span>⏰</span>
+            <span>Chấm công ngay →</span>
+          </Link>
+        </div>
+
+        {/* Header */}
+        <div className="flex justify-between items-center flex-wrap gap-4">
+          <div>
+            <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--neutral)' }}>Bảng công cá nhân</h1>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 4 }}>
+              Xem chi tiết số giờ công bạn đã làm việc trong tháng
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <input 
+              type="month" 
+              className="input" 
+              value={currentMonth}
+              onChange={e => setCurrentMonth(e.target.value)}
+              style={{ width: 150 }}
+            />
+          </div>
+        </div>
+
+        {/* Monthly Summary Cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
+          <div className="card" style={{ padding: 20 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>TỔNG GIỜ CÔNG THÁNG</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--primary)', marginTop: 6 }}>
+              {totalHours.toFixed(1)}h
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>Tháng {currentMonth}</div>
+          </div>
+
+          <div className="card" style={{ padding: 20 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>SỐ CA ĐÃ HOÀN THÀNH</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--neutral)', marginTop: 6 }}>
+              {completedShifts} ca
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>Tổng lượt hoàn thành</div>
+          </div>
+        </div>
+
+        {/* Day-by-day table */}
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          {loading ? (
+            <div style={{ padding: 40, textAlign: 'center' }}><span className="spinner spinner-primary" /></div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table className="table" style={{ width: '100%', fontSize: 13 }}>
+                <thead>
+                  <tr>
+                    <th>Ngày</th>
+                    <th>Trạng thái</th>
+                    <th>Giờ vào</th>
+                    <th>Giờ ra</th>
+                    <th>Phương thức</th>
+                    <th style={{ textAlign: 'right' }}>Số giờ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {daysArray.map(dateStr => {
+                    const dayAtts = myAtts.filter(a => a.date === dateStr);
+                    const d = new Date(dateStr);
+                    const dayName = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'][d.getDay()];
+
+                    if (dayAtts.length === 0) {
+                      return (
+                        <tr key={dateStr} style={{ opacity: 0.6 }}>
+                          <td>{dateStr} ({dayName})</td>
+                          <td style={{ color: 'var(--text-secondary)' }}>Nghỉ</td>
+                          <td>--:--</td>
+                          <td>--:--</td>
+                          <td>--</td>
+                          <td style={{ textAlign: 'right' }}>0.0h</td>
+                        </tr>
+                      );
+                    }
+
+                    return dayAtts.map((att, aIdx) => {
+                      const ci = att.checkIn ? (att.checkIn.toDate ? att.checkIn.toDate() : new Date(att.checkIn.seconds * 1000)) : null;
+                      const co = att.checkOut ? (att.checkOut.toDate ? att.checkOut.toDate() : new Date(att.checkOut.seconds * 1000)) : null;
+                      const inStr = ci ? ci.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+                      const outStr = co ? co.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : (att.checkOut === null ? 'Đang làm việc...' : '--:--');
+
+                      return (
+                        <tr key={att.id} style={{ background: !att.checkOut ? 'var(--primary-light)' : undefined }}>
+                          <td style={{ fontWeight: 600 }}>{dateStr} ({dayName}) {dayAtts.length > 1 ? `(Ca ${aIdx + 1})` : ''}</td>
+                          <td>
+                            {!att.checkOut ? (
+                              <span style={{ color: 'var(--primary)', fontWeight: 700 }}>🟢 Đang làm</span>
+                            ) : (
+                              <span style={{ color: 'var(--success)', fontWeight: 600 }}>✓ Hoàn thành</span>
+                            )}
+                          </td>
+                          <td>{inStr}</td>
+                          <td>{outStr}</td>
+                          <td>{att.checkInMethod === 'wifi' ? '📶 WiFi' : att.checkInMethod === 'gps' ? '📍 GPS' : att.checkInMethod === 'manual' ? '✏️ Thủ công' : att.checkInMethod}</td>
+                          <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--primary)' }}>
+                            {(att.totalHours || 0).toFixed(2)}h
+                          </td>
+                        </tr>
+                      );
+                    });
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center flex-wrap gap-4">
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--neutral)' }}>Bảng công</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 4 }}>
             Theo dõi giờ làm thực tế của nhân viên
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 items-center flex-wrap">
+          <Link href="/dashboard/checkin" className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>⏰</span> Chấm công của bạn
+          </Link>
           <input 
             type="month" 
             className="input" 
@@ -207,12 +360,12 @@ export default function AttendancePage() {
             onChange={e => setCurrentMonth(e.target.value)}
             style={{ width: 150 }}
           />
-            <button onClick={handleExportSummary} className="btn btn-primary" style={{ background: 'var(--success)' }}>
-              <span className="material-icons" style={{ fontSize: 18 }}>download</span> Tổng Hợp
-            </button>
-            <button onClick={handleExportDetailed} className="btn btn-primary" style={{ background: 'var(--accent)' }}>
-              <span className="material-icons" style={{ fontSize: 18 }}>download</span> IN-OUT
-            </button>
+          <button onClick={handleExportSummary} className="btn btn-primary" style={{ background: 'var(--success)' }}>
+            <span className="material-icons" style={{ fontSize: 18 }}>download</span> Tổng Hợp
+          </button>
+          <button onClick={handleExportDetailed} className="btn btn-primary" style={{ background: 'var(--accent)' }}>
+            <span className="material-icons" style={{ fontSize: 18 }}>download</span> IN-OUT
+          </button>
         </div>
       </div>
 

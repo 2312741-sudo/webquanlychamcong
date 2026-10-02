@@ -154,8 +154,12 @@ export async function notificationDestination(item: AppNotification): Promise<st
   const routes: Record<string, string> = {
     '/schedule': '/dashboard/schedule',
     '/schedule-manager': '/dashboard/schedule',
+    '/check-in': '/dashboard/checkin',
+    '/active-staff': canViewAllAttendance(role) ? '/dashboard/attendance' : '/dashboard/checkin',
+    '/attendance-table': '/dashboard/attendance',
+    '/monthly-attendance': '/dashboard/attendance',
+    '/attendance-history': '/dashboard/checkin',
     ...(canApproveMembers(role) ? { '/pending-members': '/dashboard/members' } : {}),
-    ...(canViewAllAttendance(role) ? { '/attendance-table': '/dashboard/attendance' } : {}),
     ...(normalizeRole(role) === 'owner' ? { '/manage-advances': '/dashboard/salary', '/salary': '/dashboard/salary' } : {}),
   };
 

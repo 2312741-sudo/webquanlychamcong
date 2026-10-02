@@ -53,8 +53,7 @@ export function canViewAllAttendance(role?: UserRole | string | null): boolean {
 }
 
 export function canAccessWeb(role?: UserRole | string | null): boolean {
-  const norm = normalizeRole(role);
-  return norm === 'owner' || norm === 'manager1' || norm === 'manager2';
+  return true; // Mở quyền truy cập web cho mọi role (Owner, Manager 1, Manager 2, Employee)
 }
 
 export function formatJoinedDate(joinedAt: any): string {

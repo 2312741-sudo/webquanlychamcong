@@ -6,7 +6,7 @@ import {
   setDoc, limit, DocumentSnapshot, deleteDoc, collectionGroup,
   arrayUnion, arrayRemove, writeBatch, serverTimestamp
 } from 'firebase/firestore';
-import { Member, AttendanceRecord, Store, ScheduleModel, DaySchedule, AdvanceRequest, ProductionTask, ProductionReport, ProductionTaskEntry, AppNotification, normalizeRole } from './types';
+import { Member, AttendanceRecord, Store, ScheduleModel, DaySchedule, AdvanceRequest, ProductionTask, ProductionReport, ProductionTaskEntry, AppNotification, normalizeRole, CheckInMethod } from './types';
 
 export async function getUserStoresData(uid: string): Promise<{ stores: Store[]; currentStoreId: string | null }> {
   try {
@@ -280,6 +280,156 @@ export async function createManualAttendance(
   });
 }
 
+export function watchUserActiveAttendance(
+  storeId: string,
+  userId: string,
+  cb: (record: AttendanceRecord | null) => void
+) {
+  const q = query(
+    collection(db, 'stores', storeId, 'attendances'),
+    where('userId', '==', userId),
+    where('checkOut', '==', null),
+    limit(1)
+  );
+  return onSnapshot(q, snap => {
+    if (snap.empty) {
+      cb(null);
+    } else {
+      const d = snap.docs[0];
+      cb({ id: d.id, ...d.data() } as AttendanceRecord);
+    }
+  }, err => {
+    console.error('Error in watchUserActiveAttendance:', err);
+    cb(null);
+  });
+}
+
+export function watchUserTodayAttendances(
+  storeId: string,
+  userId: string,
+  dateStr: string,
+  cb: (records: AttendanceRecord[]) => void
+) {
+  const q = query(
+    collection(db, 'stores', storeId, 'attendances'),
+    where('userId', '==', userId),
+    where('date', '==', dateStr)
+  );
+  return onSnapshot(q, snap => {
+    const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as AttendanceRecord));
+    cb(list);
+  }, err => {
+    console.error('Error in watchUserTodayAttendances:', err);
+    cb([]);
+  });
+}
+
+export async function webCheckIn(
+  storeId: string,
+  userId: string,
+  method: CheckInMethod = 'wifi',
+  storeName?: string,
+  memberName?: string
+): Promise<string> {
+  const now = new Date();
+  const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+  // Kiểm tra xem có ca nào đang hoạt động không
+  const activeQ = query(
+    collection(db, 'stores', storeId, 'attendances'),
+    where('userId', '==', userId),
+    where('checkOut', '==', null),
+    limit(1)
+  );
+  const activeSnap = await getDocs(activeQ);
+  if (!activeSnap.empty) {
+    throw new Error('Bạn đang trong một ca làm việc chưa kết thúc.');
+  }
+
+  const docRef = await addDoc(collection(db, 'stores', storeId, 'attendances'), {
+    userId,
+    storeId,
+    date: dateStr,
+    checkIn: Timestamp.fromDate(now),
+    checkOut: null,
+    checkInMethod: method,
+    totalHours: 0.0,
+    isEdited: false,
+    editedBy: null,
+    editNote: null,
+    isOffline: false,
+  });
+
+  // Gửi thông báo đến Quản lý & Chủ cửa hàng
+  try {
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    await addDoc(collection(db, 'stores', storeId, 'notifications'), {
+      storeId,
+      title: 'Nhân viên vào ca',
+      body: `${memberName || 'Nhân viên'} tại ${storeName || 'Cửa hàng'} đã vào ca lúc ${timeStr} (Web).`,
+      type: 'check_in',
+      createdAt: Timestamp.fromDate(now),
+      targetRoles: ['owner', 'manager_1', 'manager_2', 'manager', 'legacyManager', 'manager1', 'manager2'],
+      readBy: [userId],
+      routePath: '/active-staff',
+      routeExtra: { storeId, userId, date: dateStr },
+    });
+  } catch (err) {
+    console.warn('[webCheckIn] Notification error:', err);
+  }
+
+  return docRef.id;
+}
+
+export async function webCheckOut(
+  storeId: string,
+  attendanceId: string,
+  userId: string,
+  storeName?: string,
+  memberName?: string
+): Promise<number> {
+  const now = new Date();
+  const attRef = doc(db, 'stores', storeId, 'attendances', attendanceId);
+  const snap = await getDoc(attRef);
+  if (!snap.exists()) {
+    throw new Error('Không tìm thấy ca làm việc.');
+  }
+  const data = snap.data();
+  if (data.checkOut != null) {
+    throw new Error('Ca làm việc này đã được kết thúc trước đó.');
+  }
+
+  const checkInDate = data.checkIn?.toDate ? data.checkIn.toDate() : new Date(data.checkIn.seconds * 1000);
+  const diffMs = now.getTime() - checkInDate.getTime();
+  const hours = Math.max(0, diffMs / 3600000);
+  const totalHours = parseFloat(hours.toFixed(2));
+
+  await updateDoc(attRef, {
+    checkOut: Timestamp.fromDate(now),
+    totalHours,
+  });
+
+  // Gửi thông báo đến Quản lý & Chủ cửa hàng
+  try {
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    await addDoc(collection(db, 'stores', storeId, 'notifications'), {
+      storeId,
+      title: 'Nhân viên kết thúc ca',
+      body: `${memberName || 'Nhân viên'} tại ${storeName || 'Cửa hàng'} đã kết thúc ca lúc ${timeStr} (Tổng: ${totalHours.toFixed(1)}h).`,
+      type: 'check_out',
+      createdAt: Timestamp.fromDate(now),
+      targetRoles: ['owner', 'manager_1', 'manager_2', 'manager', 'legacyManager', 'manager1', 'manager2'],
+      readBy: [userId],
+      routePath: '/attendance-table',
+      routeExtra: { storeId, userId, date: data.date },
+    });
+  } catch (err) {
+    console.warn('[webCheckOut] Notification error:', err);
+  }
+
+  return totalHours;
+}
+
 export async function setMemberStatus(storeId: string, userId: string, status: 'active' | 'kicked') {
   await updateDoc(doc(db, 'stores', storeId, 'members', userId), { status });
 }
@@ -485,6 +635,43 @@ export async function saveWeekSchedule(
     });
   } catch (notifErr) {
     console.warn('[saveWeekSchedule] Could not post schedule notification:', notifErr);
+  }
+}
+
+export async function saveUserSchedule(
+  storeId: string,
+  userId: string,
+  weekStart: string,
+  schedule: DaySchedule,
+  memberName?: string
+): Promise<void> {
+  const scheduleRef = doc(db, 'stores', storeId, 'schedules', weekStart);
+  const now = Timestamp.now();
+  await setDoc(scheduleRef, {
+    storeId,
+    weekStart,
+    shifts: {
+      [userId]: schedule,
+    },
+    updatedAt: now,
+    updatedBy: userId,
+  }, { merge: true });
+
+  // Gửi thông báo đến Quản lý & Chủ cửa hàng (giống logic Mobile)
+  try {
+    await addDoc(collection(db, 'stores', storeId, 'notifications'), {
+      storeId,
+      title: 'Đăng ký lịch làm mới',
+      body: `${memberName || 'Nhân viên'} vừa đăng ký lịch làm việc tuần (${weekStart}).`,
+      type: 'schedule_changed',
+      createdAt: now,
+      targetRoles: ['owner', 'manager_1', 'manager', 'legacyManager', 'manager1'],
+      readBy: [userId],
+      routePath: '/dashboard/schedule',
+      routeExtra: { storeId, weekStart, userId },
+    });
+  } catch (notifErr) {
+    console.warn('[saveUserSchedule] Could not post schedule notification:', notifErr);
   }
 }
 

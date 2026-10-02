@@ -21,10 +21,11 @@ export const useApp = () => useContext(AppContext);
 
 const NAV = [
   { href: '/dashboard', icon: '📊', label: 'Tổng quan' },
+  { href: '/dashboard/checkin', icon: '⏰', label: 'Chấm công' },
+  { href: '/dashboard/schedule', icon: '🗓️', label: 'Lịch làm' },
   { href: '/dashboard/attendance', icon: '📅', label: 'Bảng công' },
   { href: '/dashboard/salary', icon: '💰', label: 'Báo cáo lương' },
   { href: '/dashboard/members', icon: '👥', label: 'Nhân viên' },
-  { href: '/dashboard/schedule', icon: '🗓️', label: 'Lịch làm' },
   { href: '/dashboard/production', icon: '🏭', label: 'Sản xuất' },
   { href: '/dashboard/performance', icon: '⚡', label: 'Đo hiệu năng' },
   { href: '/dashboard/settings', icon: '⚙️', label: 'Cài đặt' },
@@ -130,12 +131,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     if (!role) return;
     const norm = normalizeRole(role);
-    if (norm === 'manager2') {
-      if (pathname !== '/dashboard/schedule') {
+    if (norm === 'employee') {
+      const allowed = ['/dashboard/checkin', '/dashboard/schedule', '/dashboard/attendance'];
+      if (!allowed.some(p => pathname === p || pathname.startsWith(p))) {
+        router.replace('/dashboard/checkin');
+      }
+    } else if (norm === 'manager2') {
+      const allowed = ['/dashboard/checkin', '/dashboard/schedule', '/dashboard/attendance'];
+      if (!allowed.some(p => pathname === p || pathname.startsWith(p))) {
         router.replace('/dashboard/schedule');
       }
     } else if (norm === 'manager1') {
-      if (pathname !== '/dashboard/schedule' && pathname !== '/dashboard/members' && pathname !== '/dashboard/attendance') {
+      const allowed = ['/dashboard', '/dashboard/checkin', '/dashboard/schedule', '/dashboard/members', '/dashboard/attendance'];
+      if (!allowed.some(p => pathname === p || pathname.startsWith(p))) {
         router.replace('/dashboard/schedule');
       }
     } else if (norm !== 'owner') {
@@ -198,14 +206,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       : '';
 
   const filteredNav = NAV.filter(item => {
+    if (normRole === 'employee') {
+      return item.href === '/dashboard/checkin' || item.href === '/dashboard/schedule' || item.href === '/dashboard/attendance';
+    }
     if (normRole === 'manager2') {
-      return item.href === '/dashboard/schedule';
+      return item.href === '/dashboard/checkin' || item.href === '/dashboard/schedule' || item.href === '/dashboard/attendance';
     }
     if (normRole === 'manager1') {
-      return item.href === '/dashboard/schedule' || item.href === '/dashboard/members' || item.href === '/dashboard/attendance';
-    }
-    if (normRole === 'employee') {
-      return false;
+      return item.href === '/dashboard' || item.href === '/dashboard/checkin' || item.href === '/dashboard/schedule' || item.href === '/dashboard/members' || item.href === '/dashboard/attendance';
     }
     return true; // owner has full access
   });
@@ -495,19 +503,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <div className="empty-state-icon">🏪</div>
                 <div className="empty-state-text">Bạn chưa tham gia cửa hàng nào</div>
                 <div className="empty-state-sub">Vui lòng mở app điện thoại để tạo hoặc tham gia cửa hàng</div>
-              </div>
-            ) : normRole === 'employee' ? (
-              <div style={{ textAlign:'center', display:'flex', flexDirection:'column', alignItems:'center', gap:16, background:'white', padding:40, borderRadius:20, boxShadow:'0 10px 40px rgba(0,0,0,0.05)', maxWidth: 450, margin: '40px auto' }}>
-                <div style={{ fontSize:48 }}>📱</div>
-                <h2 style={{ margin:0, color:'var(--danger)' }}>Truy cập bị từ chối</h2>
-                <p style={{ margin:0, color:'var(--text-secondary)', lineHeight:1.5 }}>
-                  Tài khoản nhân viên không được phép sử dụng bảng điều khiển Web của cửa hàng <b>{store?.name}</b>. Vui lòng tải ứng dụng Mobile để chấm công.
-                </p>
-                {userStores.length > 1 && (
-                  <button onClick={() => setShowStoreSwitcher(true)} className="btn btn-primary" style={{ marginTop:16 }}>
-                    Chuyển sang cửa hàng khác
-                  </button>
-                )}
               </div>
             ) : children}
           </main>
