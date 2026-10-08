@@ -23,6 +23,7 @@ const NAV = [
   { href: '/dashboard', icon: '📊', label: 'Tổng quan' },
   { href: '/dashboard/checkin', icon: '⏰', label: 'Chấm công' },
   { href: '/dashboard/schedule', icon: '🗓️', label: 'Lịch làm' },
+  { href: '/dashboard/tasks', icon: '📋', label: 'Giao việc' },
   { href: '/dashboard/attendance', icon: '📅', label: 'Bảng công' },
   { href: '/dashboard/salary', icon: '💰', label: 'Báo cáo lương' },
   { href: '/dashboard/members', icon: '👥', label: 'Nhân viên' },
@@ -132,17 +133,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (!role) return;
     const norm = normalizeRole(role);
     if (norm === 'employee') {
-      const allowed = ['/dashboard/checkin', '/dashboard/schedule', '/dashboard/attendance'];
+      const allowed = ['/dashboard/checkin', '/dashboard/schedule', '/dashboard/tasks', '/dashboard/attendance'];
       if (!allowed.some(p => pathname === p || pathname.startsWith(p))) {
         router.replace('/dashboard/checkin');
       }
     } else if (norm === 'manager2') {
-      const allowed = ['/dashboard/checkin', '/dashboard/schedule', '/dashboard/attendance'];
+      const allowed = ['/dashboard/checkin', '/dashboard/schedule', '/dashboard/tasks', '/dashboard/attendance'];
       if (!allowed.some(p => pathname === p || pathname.startsWith(p))) {
         router.replace('/dashboard/schedule');
       }
     } else if (norm === 'manager1') {
-      const allowed = ['/dashboard', '/dashboard/checkin', '/dashboard/schedule', '/dashboard/members', '/dashboard/attendance'];
+      const allowed = ['/dashboard', '/dashboard/checkin', '/dashboard/schedule', '/dashboard/tasks', '/dashboard/members', '/dashboard/attendance'];
       if (!allowed.some(p => pathname === p || pathname.startsWith(p))) {
         router.replace('/dashboard/schedule');
       }
@@ -207,13 +208,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const filteredNav = NAV.filter(item => {
     if (normRole === 'employee') {
-      return item.href === '/dashboard/checkin' || item.href === '/dashboard/schedule' || item.href === '/dashboard/attendance';
+      return item.href === '/dashboard/checkin' || item.href === '/dashboard/schedule' || item.href === '/dashboard/tasks' || item.href === '/dashboard/attendance';
     }
     if (normRole === 'manager2') {
-      return item.href === '/dashboard/checkin' || item.href === '/dashboard/schedule' || item.href === '/dashboard/attendance';
+      return item.href === '/dashboard/checkin' || item.href === '/dashboard/schedule' || item.href === '/dashboard/tasks' || item.href === '/dashboard/attendance';
     }
     if (normRole === 'manager1') {
-      return item.href === '/dashboard' || item.href === '/dashboard/checkin' || item.href === '/dashboard/schedule' || item.href === '/dashboard/members' || item.href === '/dashboard/attendance';
+      return item.href === '/dashboard' || item.href === '/dashboard/checkin' || item.href === '/dashboard/schedule' || item.href === '/dashboard/tasks' || item.href === '/dashboard/members' || item.href === '/dashboard/attendance';
     }
     return true; // owner has full access
   });

@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useApp } from '../layout';
 import {
   watchUserActiveAttendance,
@@ -7,9 +8,10 @@ import {
   getMemberMonthAttendances,
   webCheckIn,
   webCheckOut,
-  getVietnamDateString
+  getVietnamDateString,
+  getUnfinishedTasksForUserOnDate
 } from '@/lib/firestore';
-import { AttendanceRecord, CheckInMethod, getRoleLabel } from '@/lib/types';
+import { AttendanceRecord, CheckInMethod, getRoleLabel, AssignedTask } from '@/lib/types';
 
 function getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371e3; // metres
@@ -47,8 +49,11 @@ export default function CheckInPage() {
   const [gpsError, setGpsError] = useState<string | null>(null);
   const [gpsDistanceText, setGpsDistanceText] = useState<string | null>(null);
 
-  // Checkout confirmation modal
+  // Checkout confirmation modal & Task gatekeeper
   const [showCheckOutConfirm, setShowCheckOutConfirm] = useState(false);
+  const [unfinishedTasks, setUnfinishedTasks] = useState<AssignedTask[]>([]);
+  const [showTaskWarningModal, setShowTaskWarningModal] = useState(false);
+  const [checkingTasks, setCheckingTasks] = useState(false);
 
   // Live timer update
   useEffect(() => {
@@ -197,6 +202,29 @@ export default function CheckInPage() {
       setErrorMsg(err.message || 'Chấm vào thất bại. Vui lòng thử lại.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleInitiateCheckOut = async () => {
+    if (!storeId || !user || !activeAttendance) return;
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    setCheckingTasks(true);
+
+    try {
+      const targetDate = activeAttendance.date || todayStr;
+      const unfinished = await getUnfinishedTasksForUserOnDate(storeId, user.uid, targetDate);
+      if (unfinished && unfinished.length > 0) {
+        setUnfinishedTasks(unfinished);
+        setShowTaskWarningModal(true);
+        return;
+      }
+      setShowCheckOutConfirm(true);
+    } catch (err: any) {
+      console.error('Lỗi khi kiểm tra công việc chưa hoàn thành:', err);
+      setShowCheckOutConfirm(true);
+    } finally {
+      setCheckingTasks(false);
     }
   };
 
@@ -443,8 +471,8 @@ export default function CheckInPage() {
 
             <div style={{ display: 'flex', justifyContent: 'center' }}>
               <button
-                onClick={() => setShowCheckOutConfirm(true)}
-                disabled={loading}
+                onClick={handleInitiateCheckOut}
+                disabled={loading || checkingTasks}
                 style={{
                   background: 'linear-gradient(135deg, #d32f2f 0%, #b71c1c 100%)',
                   color: 'white',
@@ -453,7 +481,7 @@ export default function CheckInPage() {
                   borderRadius: 16,
                   fontSize: 18,
                   fontWeight: 700,
-                  cursor: loading ? 'not-allowed' : 'pointer',
+                  cursor: (loading || checkingTasks) ? 'not-allowed' : 'pointer',
                   boxShadow: '0 8px 24px rgba(211, 47, 47, 0.35)',
                   transition: 'all 0.2s',
                   display: 'inline-flex',
@@ -464,7 +492,16 @@ export default function CheckInPage() {
                   maxWidth: 360
                 }}
               >
-                {loading ? <span className="spinner spinner-white" /> : '🛑 RA CA (KẾT THÚC CA)'}
+                {checkingTasks ? (
+                  <>
+                    <span className="spinner spinner-white" />
+                    <span>Đang kiểm tra việc...</span>
+                  </>
+                ) : loading ? (
+                  <span className="spinner spinner-white" />
+                ) : (
+                  '🛑 RA CA (KẾT THÚC CA)'
+                )}
               </button>
             </div>
           </div>
@@ -766,6 +803,103 @@ export default function CheckInPage() {
               >
                 {loading ? <span className="spinner spinner-white" /> : 'Xác nhận ra ca'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Gatekeeper Warning Modal: Unfinished Tasks */}
+      {showTaskWarningModal && (
+        <div className="modal-overlay" onClick={() => setShowTaskWarningModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
+            <div className="modal-header" style={{ borderBottom: '1px solid #fee2e2', paddingBottom: 12 }}>
+              <div className="modal-title" style={{ color: '#b91c1c', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span>⚠️</span>
+                <span>Chưa hoàn thành công việc trong ca</span>
+              </div>
+              <button className="modal-close" onClick={() => setShowTaskWarningModal(false)}>×</button>
+            </div>
+
+            <div style={{ padding: '16px 0' }}>
+              <div style={{
+                background: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: 12,
+                padding: '14px 16px',
+                marginBottom: 16,
+                color: '#991b1b',
+                fontSize: 14,
+                lineHeight: 1.5
+              }}>
+                Bạn còn <strong>{unfinishedTasks.length} công việc</strong> chưa hoàn thành trong ca này! Vui lòng hoàn thành công việc trước khi ra ca.
+              </div>
+
+              <div style={{ maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, paddingRight: 4 }}>
+                {unfinishedTasks.map((task, idx) => (
+                  <div
+                    key={task.id || idx}
+                    style={{
+                      background: '#fafafa',
+                      border: '1px solid #e5e5e5',
+                      borderRadius: 10,
+                      padding: '12px 14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 4
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                      <div style={{ fontWeight: 600, fontSize: 14, color: '#1f2937' }}>
+                        {idx + 1}. {task.title}
+                      </div>
+                      {task.requirePhoto && (
+                        <span style={{
+                          fontSize: 11,
+                          background: '#fef3c7',
+                          color: '#92400e',
+                          padding: '2px 8px',
+                          borderRadius: 6,
+                          fontWeight: 500,
+                          whiteSpace: 'nowrap'
+                        }}>
+                          📸 Bắt buộc ảnh
+                        </span>
+                      )}
+                    </div>
+                    {task.description && (
+                      <p style={{ margin: 0, fontSize: 13, color: '#6b7280', lineHeight: 1.4 }}>
+                        {task.description}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="modal-actions" style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 16 }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setShowTaskWarningModal(false)}
+              >
+                Ở lại ca làm
+              </button>
+              <Link
+                href="/dashboard/tasks"
+                className="btn btn-primary"
+                style={{
+                  background: 'var(--primary)',
+                  color: 'white',
+                  textDecoration: 'none',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6
+                }}
+                onClick={() => setShowTaskWarningModal(false)}
+              >
+                <span>📋</span>
+                <span>Tới trang Giao việc</span>
+              </Link>
             </div>
           </div>
         </div>

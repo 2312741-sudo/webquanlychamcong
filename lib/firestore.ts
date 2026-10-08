@@ -1,12 +1,18 @@
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { db } from './firebase';
+import app, { db } from './firebase';
 import {
   collection, doc, query, where, getDocs, getDoc,
   updateDoc, addDoc, orderBy, Timestamp, onSnapshot,
   setDoc, limit, DocumentSnapshot, deleteDoc, collectionGroup,
   arrayUnion, arrayRemove, writeBatch, serverTimestamp
 } from 'firebase/firestore';
-import { Member, AttendanceRecord, Store, ScheduleModel, DaySchedule, AdvanceRequest, ProductionTask, ProductionReport, ProductionTaskEntry, AppNotification, normalizeRole, CheckInMethod } from './types';
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import {
+  Member, AttendanceRecord, Store, ScheduleModel, DaySchedule,
+  AdvanceRequest, ProductionTask, ProductionReport, ProductionTaskEntry,
+  AppNotification, normalizeRole, CheckInMethod,
+  AssignedTask, TaskSubmission, TaskTargetType, TaskStatus
+} from './types';
 
 export async function getUserStoresData(uid: string): Promise<{ stores: Store[]; currentStoreId: string | null }> {
   try {
@@ -876,6 +882,167 @@ export async function deleteProductionReport(
   reportId: string
 ): Promise<void> {
   await deleteDoc(doc(db, 'stores', storeId, 'production_reports', reportId));
+}
+
+// ─── Assigned Tasks (Giao việc) ─────────────────────────────────────────────
+
+export async function createTask(
+  storeId: string,
+  task: Omit<AssignedTask, 'id' | 'createdAt'>
+): Promise<string> {
+  const ref = await addDoc(collection(db, 'stores', storeId, 'assigned_tasks'), {
+    ...task,
+    createdAt: serverTimestamp(),
+  });
+  return ref.id;
+}
+
+export async function updateTask(
+  storeId: string,
+  taskId: string,
+  data: Partial<AssignedTask>
+): Promise<void> {
+  await updateDoc(doc(db, 'stores', storeId, 'assigned_tasks', taskId), {
+    ...data,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function deleteTask(
+  storeId: string,
+  taskId: string
+): Promise<void> {
+  await deleteDoc(doc(db, 'stores', storeId, 'assigned_tasks', taskId));
+}
+
+export function watchStoreTasks(
+  storeId: string,
+  callback: (tasks: AssignedTask[]) => void,
+  dateStr?: string
+): () => void {
+  const colRef = collection(db, 'stores', storeId, 'assigned_tasks');
+  return onSnapshot(colRef, (snap) => {
+    let tasks = snap.docs.map(d => ({ id: d.id, ...d.data() } as AssignedTask));
+    tasks = tasks.filter(t => t.status !== 'archived');
+    if (dateStr) {
+      tasks = tasks.filter(t => Array.isArray(t.executionDates) && t.executionDates.includes(dateStr));
+    }
+    callback(tasks);
+  }, (err) => {
+    console.error('Error in watchStoreTasks:', err);
+    callback([]);
+  });
+}
+
+export async function getTasksForUserOnDate(
+  storeId: string,
+  userId: string,
+  dateStr: string
+): Promise<AssignedTask[]> {
+  try {
+    const q = query(
+      collection(db, 'stores', storeId, 'assigned_tasks'),
+      where('status', '==', 'active')
+    );
+    const snap = await getDocs(q);
+    const tasks = snap.docs.map(d => ({ id: d.id, ...d.data() } as AssignedTask));
+    return tasks.filter(task => {
+      const matchDate = Array.isArray(task.executionDates) && task.executionDates.includes(dateStr);
+      if (!matchDate) return false;
+      if (task.targetType === 'allStore') return true;
+      return Array.isArray(task.assignedUserIds) && task.assignedUserIds.includes(userId);
+    });
+  } catch (err) {
+    console.error('Error in getTasksForUserOnDate:', err);
+    return [];
+  }
+}
+
+export function watchTaskSubmissions(
+  storeId: string,
+  taskId: string,
+  callback: (subs: TaskSubmission[]) => void,
+  workDate?: string
+): () => void {
+  const colRef = collection(db, 'stores', storeId, 'assigned_tasks', taskId, 'submissions');
+  const q = workDate ? query(colRef, where('workDate', '==', workDate)) : colRef;
+  return onSnapshot(q, (snap) => {
+    let subs = snap.docs.map(d => ({ id: d.id, ...d.data() } as TaskSubmission));
+    if (workDate) {
+      subs = subs.filter(s => s.workDate === workDate);
+    }
+    callback(subs);
+  }, (err) => {
+    console.error('Error in watchTaskSubmissions:', err);
+    callback([]);
+  });
+}
+
+export async function saveTaskSubmission(
+  storeId: string,
+  taskId: string,
+  submission: Omit<TaskSubmission, 'lastSavedAt'>
+): Promise<void> {
+  const ref = doc(db, 'stores', storeId, 'assigned_tasks', taskId, 'submissions', submission.id);
+  await setDoc(ref, {
+    ...submission,
+    lastSavedAt: serverTimestamp(),
+  }, { merge: true });
+}
+
+export async function uploadTaskPhotoWeb(
+  storeId: string,
+  taskId: string,
+  userId: string,
+  dateStr: string,
+  file: File
+): Promise<string> {
+  const storage = getStorage(app);
+  const ext = file.name.split('.').pop() || 'jpg';
+  const path = `stores/${storeId}/task_reports/${dateStr}/${taskId}/${userId}_${Date.now()}.${ext}`;
+  const fileRef = storageRef(storage, path);
+  await uploadBytes(fileRef, file);
+  const downloadUrl = await getDownloadURL(fileRef);
+  return downloadUrl;
+}
+
+export async function getUnfinishedTasksForUserOnDate(
+  storeId: string,
+  userId: string,
+  dateStr: string
+): Promise<AssignedTask[]> {
+  try {
+    const tasks = await getTasksForUserOnDate(storeId, userId, dateStr);
+    const checks = await Promise.all(
+      tasks.map(async (task) => {
+        try {
+          const subRef = doc(
+            db,
+            'stores',
+            storeId,
+            'assigned_tasks',
+            task.id,
+            'submissions',
+            `${userId}_${dateStr}`
+          );
+          const subSnap = await getDoc(subRef);
+          if (!subSnap.exists()) {
+            return { task, unfinished: true };
+          }
+          const data = subSnap.data() as TaskSubmission;
+          return { task, unfinished: !data.isCompleted };
+        } catch (subErr) {
+          console.error(`Error checking submission for task ${task.id}:`, subErr);
+          return { task, unfinished: true };
+        }
+      })
+    );
+
+    return checks.filter(c => c.unfinished).map(c => c.task);
+  } catch (err) {
+    console.error('Error in getUnfinishedTasksForUserOnDate:', err);
+    return [];
+  }
 }
 
 export { watchNotifications, markNotificationAsRead, markAllNotificationsAsRead } from './notifications';

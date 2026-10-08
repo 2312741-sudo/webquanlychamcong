@@ -271,3 +271,41 @@ export interface AppNotification {
   routePath?: string;
   routeExtra?: Record<string, any>;
 }
+
+// ─── Assigned Tasks (Giao việc) ─────────────────────────────────────────────
+
+export type TaskTargetType = 'individual' | 'allStore';
+export type TaskStatus = 'active' | 'completed' | 'cancelled' | 'archived';
+
+export interface AssignedTask {
+  id: string;
+  storeId: string;
+  title: string;
+  description: string;
+  createdBy: string;
+  createdByName: string;
+  createdByRole: UserRole;
+  targetType: TaskTargetType;
+  assignedUserIds: string[];
+  assignedNames: string[];
+  executionDates: string[]; // YYYY-MM-DD
+  requirePhoto: boolean;
+  status: TaskStatus;
+  createdAt: any;
+  updatedAt?: any;
+}
+
+export interface TaskSubmission {
+  id: string; // `${userId}_${workDate}`
+  taskId: string;
+  storeId: string;
+  userId: string;
+  userName: string;
+  workDate: string; // YYYY-MM-DD
+  reportText: string;
+  photoUrls: string[];
+  isCompleted: boolean;
+  completedAt?: any;
+  lastSavedAt: any;
+}
+
