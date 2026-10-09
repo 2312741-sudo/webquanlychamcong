@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useApp } from '../layout';
-import { updateStore, clearAllSchedules, deleteAllAttendances, deleteStoreAndCleanup } from '@/lib/firestore';
+import { updateStore, clearAllSchedules, deleteAllAttendances, deleteStoreAndCleanup, getStoreDeletePassword, setStoreDeletePassword } from '@/lib/firestore';
 import { ShiftDefinition, Department, StoreLocation, StoreWifi } from '@/lib/types';
 
 export default function SettingsPage() {
@@ -50,9 +50,18 @@ export default function SettingsPage() {
       }
       setShifts(store.customShifts || []);
       setDepartments(store.departments || []);
-      setDeletePassword((store as any).deletePassword || '123456');
     }
   }, [store]);
+
+  // Mật khẩu xác nhận xóa đọc từ tài liệu riêng (tự chuyển từ trường cũ nếu còn)
+  useEffect(() => {
+    if (!storeId || !store) return;
+    let cancelled = false;
+    getStoreDeletePassword(storeId, (store as { deletePassword?: string }).deletePassword)
+      .then((pass) => { if (!cancelled) setDeletePassword(pass); })
+      .catch(() => { /* Không phải Chủ / Quản lý 1: không có quyền đọc */ });
+    return () => { cancelled = true; };
+  }, [storeId, store]);
 
   const handleSave = async () => {
     if (!storeId) return;
@@ -90,14 +99,13 @@ export default function SettingsPage() {
       alert('Vui lòng nhập đủ mật khẩu cũ và mới');
       return;
     }
-    const currentPass = (store as any).deletePassword || '123456';
-    if (oldPassword !== currentPass) {
+    if (oldPassword !== deletePassword) {
       alert('Mật khẩu cũ không chính xác!');
       return;
     }
     setSaving(true);
     try {
-      await updateStore(storeId, { deletePassword: newPassword });
+      await setStoreDeletePassword(storeId, newPassword);
       setDeletePassword(newPassword);
       alert('Đổi mật khẩu thành công!');
       setOldPassword('');

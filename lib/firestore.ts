@@ -4,7 +4,7 @@ import {
   collection, doc, query, where, getDocs, getDoc,
   updateDoc, addDoc, orderBy, Timestamp, onSnapshot,
   setDoc, limit, DocumentSnapshot, deleteDoc, collectionGroup,
-  arrayUnion, arrayRemove, writeBatch, serverTimestamp
+  arrayUnion, arrayRemove, writeBatch, serverTimestamp, deleteField
 } from 'firebase/firestore';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import {
@@ -724,6 +724,35 @@ export async function saveUserSchedule(
 
 export async function updateStore(storeId: string, data: Record<string, any>) {
   await updateDoc(doc(db, 'stores', storeId), data);
+}
+
+/**
+ * Mật khẩu xác nhận xóa dữ liệu lưu ở stores/{storeId}/private/settings
+ * (chỉ Chủ / Quản lý 1 đọc được). Trường cũ `deletePassword` trên tài liệu cửa hàng
+ * ai đăng nhập cũng đọc được nên chỉ dùng làm dữ liệu chuyển tiếp.
+ */
+const DEFAULT_DELETE_PASSWORD = '123456';
+
+export async function getStoreDeletePassword(storeId: string, legacyPassword?: string): Promise<string> {
+  const snap = await getDoc(doc(db, 'stores', storeId, 'private', 'settings'));
+  const value = snap.exists() ? snap.data()?.deletePassword : undefined;
+  if (typeof value === 'string' && value) return value;
+  // Chưa chuyển: chép mật khẩu cũ sang chỗ riêng và xóa khỏi tài liệu công khai
+  if (legacyPassword) {
+    await setStoreDeletePassword(storeId, legacyPassword);
+    return legacyPassword;
+  }
+  return DEFAULT_DELETE_PASSWORD;
+}
+
+export async function setStoreDeletePassword(storeId: string, password: string): Promise<void> {
+  await setDoc(
+    doc(db, 'stores', storeId, 'private', 'settings'),
+    { deletePassword: password, updatedAt: serverTimestamp() },
+    { merge: true },
+  );
+  // Xóa trường cũ (nếu còn) khỏi tài liệu cửa hàng
+  await updateDoc(doc(db, 'stores', storeId), { deletePassword: deleteField() });
 }
 
 export async function clearAllSchedules(storeId: string): Promise<void> {
