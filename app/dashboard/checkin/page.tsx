@@ -812,27 +812,45 @@ export default function CheckInPage() {
       {showTaskWarningModal && (
         <div className="modal-overlay" onClick={() => setShowTaskWarningModal(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
-            <div className="modal-header" style={{ borderBottom: '1px solid #fee2e2', paddingBottom: 12 }}>
-              <div className="modal-title" style={{ color: '#b91c1c', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span>⚠️</span>
-                <span>Chưa hoàn thành công việc trong ca</span>
+            <div className="modal-header" style={{ borderBottom: '1px solid #fed7aa', paddingBottom: 12 }}>
+              <div className="modal-title" style={{ color: '#c2410c', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span>📋</span>
+                <span>Công việc chưa hoàn thành trong ca</span>
               </div>
               <button className="modal-close" onClick={() => setShowTaskWarningModal(false)}>×</button>
             </div>
 
             <div style={{ padding: '16px 0' }}>
               <div style={{
-                background: '#fef2f2',
-                border: '1px solid #fecaca',
+                background: '#fff7ed',
+                border: '1px solid #fed7aa',
                 borderRadius: 12,
                 padding: '14px 16px',
                 marginBottom: 16,
-                color: '#991b1b',
+                color: '#9a3412',
                 fontSize: 14,
                 lineHeight: 1.5
               }}>
-                Bạn còn <strong>{unfinishedTasks.length} công việc</strong> chưa hoàn thành trong ca này! Vui lòng hoàn thành công việc trước khi ra ca.
+                Bạn còn <strong>{unfinishedTasks.length} công việc</strong> chưa hoàn thành trong ca này. Bạn có thể hoàn thành ngay bây giờ hoặc tiếp tục ra ca và hoàn thành sau bất kỳ lúc nào.
               </div>
+
+              {activeAttendance && (
+                <div style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 10,
+                  padding: '10px 14px',
+                  marginBottom: 16,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  fontSize: 13,
+                  color: '#475569'
+                }}>
+                  <span>⏱️ Thời gian ca làm: <strong style={{ color: '#16a34a' }}>{getElapsedDuration(activeAttendance.checkIn)}</strong></span>
+                  <span>Vào ca: {formatTime(activeAttendance.checkIn)}</span>
+                </div>
+              )}
 
               <div style={{ maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, paddingRight: 4 }}>
                 {unfinishedTasks.map((task, idx) => (
@@ -876,7 +894,7 @@ export default function CheckInPage() {
               </div>
             </div>
 
-            <div className="modal-actions" style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 16 }}>
+            <div className="modal-actions" style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16, flexWrap: 'wrap' }}>
               <button
                 type="button"
                 className="btn btn-secondary"
@@ -886,10 +904,10 @@ export default function CheckInPage() {
               </button>
               <Link
                 href="/dashboard/tasks"
-                className="btn btn-primary"
+                className="btn btn-outline"
                 style={{
-                  background: 'var(--primary)',
-                  color: 'white',
+                  border: '1px solid var(--border)',
+                  color: 'var(--neutral)',
                   textDecoration: 'none',
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -900,6 +918,17 @@ export default function CheckInPage() {
                 <span>📋</span>
                 <span>Tới trang Giao việc</span>
               </Link>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={() => {
+                  setShowTaskWarningModal(false);
+                  handleCheckOut();
+                }}
+                disabled={loading}
+              >
+                {loading ? <span className="spinner spinner-white" /> : 'Xác nhận ra ca (Hoàn thành sau)'}
+              </button>
             </div>
           </div>
         </div>
