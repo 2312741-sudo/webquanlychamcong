@@ -213,7 +213,12 @@ export default function CheckInPage() {
 
     try {
       const targetDate = activeAttendance.date || todayStr;
-      const unfinished = await getUnfinishedTasksForUserOnDate(storeId, user.uid, targetDate);
+      const unfinished = await getUnfinishedTasksForUserOnDate(
+        storeId,
+        user.uid,
+        targetDate,
+        currentMember?.department
+      );
       if (unfinished && unfinished.length > 0) {
         setUnfinishedTasks(unfinished);
         setShowTaskWarningModal(true);

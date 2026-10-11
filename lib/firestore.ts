@@ -954,7 +954,7 @@ export function watchStoreTasks(
     let tasks = snap.docs.map(d => ({ id: d.id, ...d.data() } as AssignedTask));
     tasks = tasks.filter(t => t.status !== 'archived');
     if (dateStr) {
-      tasks = tasks.filter(t => Array.isArray(t.executionDates) && t.executionDates.includes(dateStr));
+      tasks = tasks.filter(t => t.repeatDaily || (Array.isArray(t.executionDates) && t.executionDates.includes(dateStr)));
     }
     callback(tasks);
   }, (err) => {
@@ -966,7 +966,8 @@ export function watchStoreTasks(
 export async function getTasksForUserOnDate(
   storeId: string,
   userId: string,
-  dateStr: string
+  dateStr: string,
+  userDepartment?: string
 ): Promise<AssignedTask[]> {
   try {
     const q = query(
@@ -976,9 +977,15 @@ export async function getTasksForUserOnDate(
     const snap = await getDocs(q);
     const tasks = snap.docs.map(d => ({ id: d.id, ...d.data() } as AssignedTask));
     return tasks.filter(task => {
-      const matchDate = Array.isArray(task.executionDates) && task.executionDates.includes(dateStr);
+      const matchDate = task.repeatDaily ? true : (Array.isArray(task.executionDates) && task.executionDates.includes(dateStr));
       if (!matchDate) return false;
       if (task.targetType === 'allStore') return true;
+      if (task.targetType === 'department') {
+        if (userDepartment && (task.targetDepartmentId === userDepartment || task.targetDepartmentName === userDepartment)) {
+          return true;
+        }
+        return Array.isArray(task.assignedUserIds) && task.assignedUserIds.includes(userId);
+      }
       return Array.isArray(task.assignedUserIds) && task.assignedUserIds.includes(userId);
     });
   } catch (err) {
@@ -1038,10 +1045,11 @@ export async function uploadTaskPhotoWeb(
 export async function getUnfinishedTasksForUserOnDate(
   storeId: string,
   userId: string,
-  dateStr: string
+  dateStr: string,
+  userDepartment?: string
 ): Promise<AssignedTask[]> {
   try {
-    const tasks = await getTasksForUserOnDate(storeId, userId, dateStr);
+    const tasks = await getTasksForUserOnDate(storeId, userId, dateStr, userDepartment);
     const checks = await Promise.all(
       tasks.map(async (task) => {
         try {

@@ -87,6 +87,7 @@ export interface Member {
   standardHoursPerMonth: number;
   joinedAt: any;
   employeeCode?: string;
+  department?: string;
   birthday?: string;
 }
 
@@ -274,7 +275,7 @@ export interface AppNotification {
 
 // ─── Assigned Tasks (Giao việc) ─────────────────────────────────────────────
 
-export type TaskTargetType = 'individual' | 'allStore';
+export type TaskTargetType = 'individual' | 'allStore' | 'department';
 export type TaskStatus = 'active' | 'completed' | 'cancelled' | 'archived';
 
 export interface AssignedTask {
@@ -286,9 +287,12 @@ export interface AssignedTask {
   createdByName: string;
   createdByRole: UserRole;
   targetType: TaskTargetType;
+  targetDepartmentId?: string;
+  targetDepartmentName?: string;
   assignedUserIds: string[];
   assignedNames: string[];
   executionDates: string[]; // YYYY-MM-DD
+  repeatDaily?: boolean;
   requirePhoto: boolean;
   status: TaskStatus;
   createdAt: any;

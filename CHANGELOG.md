@@ -1,12 +1,28 @@
-# 📋 NHẬT KÝ THAY ĐỔI CHI TIẾT (CHANGELOG) — 24/08/2026 & 25/08/2026
+# 📋 NHẬT KÝ THAY ĐỔI CHI TIẾT (CHANGELOG) — v1.1.7 (12/10/2026)
 
 **Dự án:** Chấm Công Trạm (`cham_cong_tram` Mobile App & `cham_cong_web` Web Dashboard)  
 **Tác giả:** Nguyễn Thanh Tâm ([nthanhtam.402@gmail.com](mailto:nthanhtam.402@gmail.com))  
-**Phiên bản hiện tại:** `v1.0.4-patch` (Mobile: `1.0.4+5`, Web: `1.0.4`)
+**Phiên bản hiện tại:** `v1.1.7` (Mobile: `1.1.7+24`, Web: `1.1.7`)
 
 ---
 
-## 🚀 TỔNG HỢP NÂNG CẤP & SỬA LỖI TRONG 2 NGÀY GẦN NHẤT
+## 🚀 BẢN PHÁT HÀNH v1.1.7 (12/10/2026)
+1. **[TÍNH NĂNG MỚI] Giao việc theo bộ phận trên Web Portal**:
+   - Thêm tùy chọn "Theo bộ phận" trong modal Giao việc mới tại `/dashboard/tasks`.
+   - Hiển thị danh sách các phòng ban/bộ phận kèm số lượng nhân viên trực thuộc.
+   - Modal chi tiết báo cáo lọc chính xác danh sách nhân viên theo bộ phận được giao.
+2. **[BẢO MẬT XÁC THỰC] Khóa thư viện, bắt buộc Camera**:
+   - Thêm thuộc tính `capture="environment"` cho input tải ảnh minh chứng, điều hướng camera chụp trực tiếp.
+   - Thêm thông báo khóa chọn ảnh thư viện để bảo đảm tính xác thực.
+3. **[TÍNH NĂNG MỚI] Chế độ Lặp mỗi ngày**:
+   - Thêm checkbox "🔁 Lặp mỗi ngày", tự động lập lịch 60 ngày tiếp theo.
+   - Hiển thị nhãn `🔁 Tự động lặp lại mỗi ngày` trên thẻ công việc.
+4. **[ĐỘ ỔN ĐỊNH & BUILD]**:
+   - Biên dịch `next build` thành công 100%, TypeScript check sạch 0 lỗi.
+
+---
+
+## 🚀 TỔNG HỢP NÂNG CẤP & SỬA LỖI TRƯỚC ĐÓ
 
 ```
                                   DÒNG THỜI GIAN PHÁT TRIỂN

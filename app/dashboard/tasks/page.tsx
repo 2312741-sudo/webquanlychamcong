@@ -24,7 +24,7 @@ import {
 } from '@/lib/types';
 
 export default function TasksPage() {
-  const { storeId, store, members, user, role } = useApp();
+  const { storeId, store, members, currentMember, user, role } = useApp();
   const normalizedRole = normalizeRole(role);
   const isManagerOrOwner = ['owner', 'manager1', 'manager2'].includes(normalizedRole);
 
@@ -54,7 +54,12 @@ export default function TasksPage() {
     if (!storeId || !user) return;
     setLoadingMyTasks(true);
     try {
-      const tasks = await getTasksForUserOnDate(storeId, user.uid, selectedMyDate);
+      const tasks = await getTasksForUserOnDate(
+        storeId,
+        user.uid,
+        selectedMyDate,
+        currentMember?.department
+      );
       setMyTasks(tasks);
 
       // Load submissions for these tasks
@@ -77,7 +82,7 @@ export default function TasksPage() {
     } finally {
       setLoadingMyTasks(false);
     }
-  }, [storeId, user, selectedMyDate]);
+  }, [storeId, user, selectedMyDate, currentMember?.department]);
 
   useEffect(() => {
     loadMyTasks();
@@ -254,18 +259,18 @@ export default function TasksPage() {
     // Filter date
     if (filterDateMode === 'today') {
       result = result.filter(
-        (t) => Array.isArray(t.executionDates) && t.executionDates.includes(todayStr)
+        (t) => t.repeatDaily || (Array.isArray(t.executionDates) && t.executionDates.includes(todayStr))
       );
     } else if (filterDateMode === 'tomorrow') {
       const tom = new Date();
       tom.setDate(tom.getDate() + 1);
       const tomStr = getVietnamDateString(tom);
       result = result.filter(
-        (t) => Array.isArray(t.executionDates) && t.executionDates.includes(tomStr)
+        (t) => t.repeatDaily || (Array.isArray(t.executionDates) && t.executionDates.includes(tomStr))
       );
     } else if (filterDateMode === 'custom' && filterCustomDate) {
       result = result.filter(
-        (t) => Array.isArray(t.executionDates) && t.executionDates.includes(filterCustomDate)
+        (t) => t.repeatDaily || (Array.isArray(t.executionDates) && t.executionDates.includes(filterCustomDate))
       );
     }
 
@@ -296,6 +301,8 @@ export default function TasksPage() {
   const [newDates, setNewDates] = useState<string[]>([todayStr]);
   const [customAddDate, setCustomAddDate] = useState<string>('');
   const [newTargetType, setNewTargetType] = useState<TaskTargetType>('allStore');
+  const [newDepartmentId, setNewDepartmentId] = useState<string>('');
+  const [newRepeatDaily, setNewRepeatDaily] = useState<boolean>(false);
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [newRequirePhoto, setNewRequirePhoto] = useState<boolean>(false);
   const [creatingTask, setCreatingTask] = useState<boolean>(false);
@@ -306,6 +313,8 @@ export default function TasksPage() {
     setNewDates([todayStr]);
     setCustomAddDate('');
     setNewTargetType('allStore');
+    setNewDepartmentId('');
+    setNewRepeatDaily(false);
     setSelectedMemberIds([]);
     setNewRequirePhoto(false);
   };
@@ -321,6 +330,22 @@ export default function TasksPage() {
     setNewDates((prev) => prev.filter((d) => d !== dateStr));
   };
 
+  const handleToggleRepeatDaily = (checked: boolean) => {
+    setNewRepeatDaily(checked);
+    if (checked) {
+      const dates: string[] = [];
+      const base = new Date();
+      for (let i = 0; i < 60; i++) {
+        const d = new Date(base);
+        d.setDate(base.getDate() + i);
+        dates.push(getVietnamDateString(d));
+      }
+      setNewDates(dates);
+    } else {
+      setNewDates([todayStr]);
+    }
+  };
+
   const handleCreateTaskSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!storeId || !user) return;
@@ -328,7 +353,16 @@ export default function TasksPage() {
       alert('Vui lòng nhập tiêu đề công việc');
       return;
     }
-    if (newDates.length === 0) {
+    let finalDates = [...newDates];
+    if (newRepeatDaily && finalDates.length === 0) {
+      const base = new Date();
+      for (let i = 0; i < 60; i++) {
+        const d = new Date(base);
+        d.setDate(base.getDate() + i);
+        finalDates.push(getVietnamDateString(d));
+      }
+    }
+    if (!newRepeatDaily && finalDates.length === 0) {
       alert('Vui lòng chọn ít nhất 1 ngày thực hiện');
       return;
     }
@@ -336,16 +370,35 @@ export default function TasksPage() {
       alert('Vui lòng chọn ít nhất 1 thành viên nhận việc');
       return;
     }
+    if (newTargetType === 'department' && !newDepartmentId) {
+      alert('Vui lòng chọn bộ phận nhận việc');
+      return;
+    }
 
     setCreatingTask(true);
     try {
-      const assignedNames =
-        newTargetType === 'allStore'
-          ? ['Toàn bộ cửa hàng']
-          : selectedMemberIds.map((uid) => {
-              const m = members.find((mem) => mem.userId === uid);
-              return m?.name || uid;
-            });
+      let assignedNames: string[] = [];
+      let assignedUserIds: string[] = [];
+      let targetDeptName = '';
+
+      if (newTargetType === 'allStore') {
+        assignedNames = ['Toàn bộ cửa hàng'];
+        assignedUserIds = [];
+      } else if (newTargetType === 'department') {
+        const deptObj = store?.departments?.find((d) => d.id === newDepartmentId);
+        targetDeptName = deptObj?.name || 'Bộ phận';
+        const deptMembers = members.filter(
+          (m) => m.department === newDepartmentId || m.department === targetDeptName
+        );
+        assignedUserIds = deptMembers.map((m) => m.userId);
+        assignedNames = deptMembers.map((m) => m.name || m.userId);
+      } else {
+        assignedUserIds = selectedMemberIds;
+        assignedNames = selectedMemberIds.map((uid) => {
+          const m = members.find((mem) => mem.userId === uid);
+          return m?.name || uid;
+        });
+      }
 
       const taskData: Omit<AssignedTask, 'id' | 'createdAt'> = {
         storeId,
@@ -355,9 +408,12 @@ export default function TasksPage() {
         createdByName: user.displayName || user.email?.split('@')[0] || 'Quản lý',
         createdByRole: (role as any) || 'manager1',
         targetType: newTargetType,
-        assignedUserIds: newTargetType === 'allStore' ? [] : selectedMemberIds,
+        targetDepartmentId: newTargetType === 'department' ? newDepartmentId : undefined,
+        targetDepartmentName: newTargetType === 'department' ? targetDeptName : undefined,
+        assignedUserIds,
         assignedNames,
-        executionDates: newDates,
+        executionDates: finalDates,
+        repeatDaily: newRepeatDaily,
         requirePhoto: newRequirePhoto,
         status: 'active',
       };
@@ -629,6 +685,34 @@ export default function TasksPage() {
                           <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>
                             {idx + 1}. {task.title}
                           </span>
+                          {task.repeatDaily && (
+                            <span
+                              style={{
+                                background: '#ecfdf5',
+                                color: '#047857',
+                                fontSize: 12,
+                                fontWeight: 700,
+                                padding: '3px 8px',
+                                borderRadius: 6,
+                              }}
+                            >
+                              🔁 Lặp mỗi ngày
+                            </span>
+                          )}
+                          {task.targetType === 'department' && (
+                            <span
+                              style={{
+                                background: '#ede9fe',
+                                color: '#6d28d9',
+                                fontSize: 12,
+                                fontWeight: 600,
+                                padding: '3px 8px',
+                                borderRadius: 6,
+                              }}
+                            >
+                              🏢 {task.targetDepartmentName || 'Bộ phận'}
+                            </span>
+                          )}
                           {task.requirePhoto && (
                             <span
                               style={{
@@ -743,33 +827,56 @@ export default function TasksPage() {
                             {task.requirePhoto && <span style={{ color: '#ef4444', marginLeft: 4 }}>* (Bắt buộc)</span>}
                           </label>
 
-                          {/* Upload button */}
+                          {/* Upload button - strictly camera capture */}
                           <label
                             style={{
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: 6,
-                              background: '#f3f4f6',
-                              color: '#1f2937',
-                              padding: '6px 12px',
+                              background: '#fef3c7',
+                              color: '#92400e',
+                              padding: '7px 14px',
                               borderRadius: 8,
                               fontSize: 13,
                               fontWeight: 600,
                               cursor: draft.uploading ? 'not-allowed' : 'pointer',
-                              border: '1px solid #d1d5db',
+                              border: '1px solid #fde68a',
                             }}
+                            title="Bắt buộc chụp ảnh trực tiếp tại thời điểm hoàn thành"
                           >
                             <span>📷</span>
-                            <span>{draft.uploading ? 'Đang tải ảnh...' : 'Thêm ảnh'}</span>
+                            <span>{draft.uploading ? 'Đang tải ảnh...' : 'Chụp ảnh trực tiếp'}</span>
                             <input
                               type="file"
                               accept="image/*"
+                              capture="environment"
                               multiple
                               disabled={draft.uploading}
                               style={{ display: 'none' }}
                               onChange={(e) => handleUploadPhoto(task.id, e)}
                             />
                           </label>
+                        </div>
+
+                        {/* Locked library notice */}
+                        <div
+                          style={{
+                            padding: '8px 12px',
+                            background: '#fffbeb',
+                            border: '1px solid #fef3c7',
+                            borderRadius: 8,
+                            fontSize: 12,
+                            color: '#92400e',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            marginBottom: 10,
+                          }}
+                        >
+                          <span>🔒</span>
+                          <span>
+                            <strong>Đã khóa chọn từ thư viện:</strong> Bắt buộc chụp ảnh trực tiếp từ camera tại thời điểm hoàn thành để xác thực.
+                          </span>
                         </div>
 
                         {/* Photos thumbnails grid */}
@@ -1082,6 +1189,7 @@ export default function TasksPage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 16 }}>
               {filteredTasks.map((task) => {
                 const isAllStore = task.targetType === 'allStore';
+                const isDept = task.targetType === 'department';
 
                 return (
                   <div
@@ -1100,19 +1208,40 @@ export default function TasksPage() {
                   >
                     <div>
                       {/* Top badges */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
-                        <span
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 700,
-                            padding: '3px 8px',
-                            borderRadius: 6,
-                            background: isAllStore ? '#dbeafe' : '#fef3c7',
-                            color: isAllStore ? '#1e40af' : '#92400e',
-                          }}
-                        >
-                          {isAllStore ? '🏪 Toàn cửa hàng' : `👤 ${task.assignedNames?.length || 0} nhân sự`}
-                        </span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              padding: '3px 8px',
+                              borderRadius: 6,
+                              background: isAllStore ? '#dbeafe' : isDept ? '#ede9fe' : '#fef3c7',
+                              color: isAllStore ? '#1e40af' : isDept ? '#6d28d9' : '#92400e',
+                            }}
+                          >
+                            {isAllStore
+                              ? '🏪 Toàn cửa hàng'
+                              : isDept
+                              ? `🏢 Bộ phận: ${task.targetDepartmentName || 'Bộ phận'}`
+                              : `👤 ${task.assignedNames?.length || 0} nhân sự`}
+                          </span>
+
+                          {task.repeatDaily && (
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 700,
+                                padding: '3px 8px',
+                                borderRadius: 6,
+                                background: '#ecfdf5',
+                                color: '#047857',
+                              }}
+                            >
+                              🔁 Lặp mỗi ngày
+                            </span>
+                          )}
+                        </div>
 
                         <div style={{ display: 'flex', gap: 4 }}>
                           {task.requirePhoto && (
@@ -1155,8 +1284,14 @@ export default function TasksPage() {
                         </p>
                       )}
 
-                      {/* Target members preview if individual */}
-                      {!isAllStore && task.assignedNames && task.assignedNames.length > 0 && (
+                      {/* Target preview */}
+                      {isDept && (
+                        <div style={{ fontSize: 12, color: '#6d28d9', marginBottom: 10 }}>
+                          <strong>Áp dụng cho:</strong> Bộ phận {task.targetDepartmentName}
+                          {task.assignedNames && task.assignedNames.length > 0 && ` (${task.assignedNames.length} nhân viên)`}
+                        </div>
+                      )}
+                      {!isAllStore && !isDept && task.assignedNames && task.assignedNames.length > 0 && (
                         <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 10 }}>
                           <strong>Giao cho:</strong> {task.assignedNames.join(', ')}
                         </div>
@@ -1165,25 +1300,31 @@ export default function TasksPage() {
                       {/* Dates chips */}
                       <div style={{ marginBottom: 14 }}>
                         <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>
-                          Ngày thực hiện ({task.executionDates?.length || 0} ngày):
+                          {task.repeatDaily ? 'Lịch thực hiện:' : `Ngày thực hiện (${task.executionDates?.length || 0} ngày):`}
                         </div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                          {task.executionDates?.map((d) => (
-                            <span
-                              key={d}
-                              style={{
-                                fontSize: 11,
-                                background: d === todayStr ? 'var(--primary-light)' : '#f3f4f6',
-                                color: d === todayStr ? 'var(--primary)' : '#4b5563',
-                                fontWeight: d === todayStr ? 700 : 500,
-                                padding: '2px 6px',
-                                borderRadius: 4,
-                              }}
-                            >
-                              {d === todayStr ? `🔥 Hôm nay (${d})` : d}
-                            </span>
-                          ))}
-                        </div>
+                        {task.repeatDaily ? (
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#047857', background: '#ecfdf5', padding: '3px 8px', borderRadius: 6 }}>
+                            <span>🔁 Tự động lặp lại mỗi ngày</span>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                            {task.executionDates?.map((d) => (
+                              <span
+                                key={d}
+                                style={{
+                                  fontSize: 11,
+                                  background: d === todayStr ? 'var(--primary-light)' : '#f3f4f6',
+                                  color: d === todayStr ? 'var(--primary)' : '#4b5563',
+                                  fontWeight: d === todayStr ? 700 : 500,
+                                  padding: '2px 6px',
+                                  borderRadius: 4,
+                                }}
+                              >
+                                {d === todayStr ? `🔥 Hôm nay (${d})` : d}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -1295,122 +1436,168 @@ export default function TasksPage() {
                 />
               </div>
 
-              {/* Ngày thực hiện (Linh hoạt chọn nhiều ngày) */}
+              {/* Ngày thực hiện (Linh hoạt chọn nhiều ngày hoặc Lặp mỗi ngày) */}
               <div style={{ background: '#f9fafb', padding: 14, borderRadius: 12, border: '1px solid #e5e7eb' }}>
-                <label style={{ display: 'block', fontWeight: 700, fontSize: 14, marginBottom: 6, color: 'var(--text-primary)' }}>
-                  📅 Ngày thực hiện: <span style={{ color: '#ef4444' }}>*</span>
+                <label style={{ display: 'block', fontWeight: 700, fontSize: 14, marginBottom: 8, color: 'var(--text-primary)' }}>
+                  📅 Thời gian thực hiện: <span style={{ color: '#ef4444' }}>*</span>
                 </label>
-                <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 10 }}>
-                  Bạn có thể chọn một hoặc nhiều ngày trong tương lai (Hôm nay, Ngày mai, Chủ Nhật, Thứ 4...).
-                </p>
 
-                {/* Quick Add Buttons */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-                  {getUpcomingDays().map((day) => {
-                    const isSelected = newDates.includes(day.dateStr);
-                    return (
+                {/* Switch Lặp mỗi ngày */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    background: newRepeatDaily ? '#ecfdf5' : '#ffffff',
+                    border: newRepeatDaily ? '1.5px solid #10b981' : '1px solid #d1d5db',
+                    borderRadius: 10,
+                    padding: '10px 14px',
+                    marginBottom: 12,
+                  }}
+                >
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: 13.5, color: newRepeatDaily ? '#065f46' : 'var(--text-primary)' }}>
+                      <span>🔁 Lặp mỗi ngày</span>
+                      {newRepeatDaily && (
+                        <span style={{ fontSize: 10, fontWeight: 700, background: '#10b981', color: 'white', padding: '1px 6px', borderRadius: 4 }}>
+                          BẬT
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 12, color: newRepeatDaily ? '#047857' : '#6b7280', marginTop: 2 }}>
+                      {newRepeatDaily
+                        ? 'Tự động áp dụng cho các ca làm việc mỗi ngày (đã lập lịch sẵn 60 ngày)'
+                        : 'Giao việc cho các ngày cụ thể được chọn bên dưới'}
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    id="repeatDailyToggle"
+                    checked={newRepeatDaily}
+                    onChange={(e) => handleToggleRepeatDaily(e.target.checked)}
+                    style={{ width: 18, height: 18, cursor: 'pointer' }}
+                  />
+                </div>
+
+                {newRepeatDaily ? (
+                  <div style={{ padding: '10px 14px', background: '#f0fdf4', border: '1px dashed #86efac', borderRadius: 8, fontSize: 12.5, color: '#166534' }}>
+                    ✓ Công việc này sẽ tự động lặp lại hàng ngày (từ hôm nay {todayStr} đến 60 ngày tiếp theo). Nhân viên làm việc ngày nào sẽ thấy nhiệm vụ của ngày đó.
+                  </div>
+                ) : (
+                  <>
+                    <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 10 }}>
+                      Bạn có thể chọn một hoặc nhiều ngày trong tương lai (Hôm nay, Ngày mai, Chủ Nhật, Thứ 4...).
+                    </p>
+
+                    {/* Quick Add Buttons */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                      {getUpcomingDays().map((day) => {
+                        const isSelected = newDates.includes(day.dateStr);
+                        return (
+                          <button
+                            key={day.dateStr}
+                            type="button"
+                            onClick={() => {
+                              if (isSelected) {
+                                handleRemoveDateFromNewTask(day.dateStr);
+                              } else {
+                                handleAddDateToNewTask(day.dateStr);
+                              }
+                            }}
+                            style={{
+                              padding: '5px 10px',
+                              borderRadius: 6,
+                              fontSize: 12,
+                              fontWeight: 600,
+                              background: isSelected ? 'var(--primary)' : '#e5e7eb',
+                              color: isSelected ? 'white' : '#374151',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {isSelected ? '✓ ' : '+ '}
+                            {day.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Or Custom Date picker */}
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
+                      <input
+                        type="date"
+                        value={customAddDate}
+                        onChange={(e) => setCustomAddDate(e.target.value)}
+                        style={{
+                          padding: '6px 10px',
+                          borderRadius: 6,
+                          border: '1px solid var(--border)',
+                          fontSize: 13,
+                        }}
+                      />
                       <button
-                        key={day.dateStr}
                         type="button"
                         onClick={() => {
-                          if (isSelected) {
-                            handleRemoveDateFromNewTask(day.dateStr);
-                          } else {
-                            handleAddDateToNewTask(day.dateStr);
+                          if (customAddDate) {
+                            handleAddDateToNewTask(customAddDate);
+                            setCustomAddDate('');
                           }
                         }}
                         style={{
-                          padding: '5px 10px',
+                          padding: '6px 12px',
                           borderRadius: 6,
+                          background: '#1f2937',
+                          color: 'white',
                           fontSize: 12,
                           fontWeight: 600,
-                          background: isSelected ? 'var(--primary)' : '#e5e7eb',
-                          color: isSelected ? 'white' : '#374151',
-                          cursor: 'pointer',
                         }}
                       >
-                        {isSelected ? '✓ ' : '+ '}
-                        {day.label}
+                        + Thêm ngày tùy chọn
                       </button>
-                    );
-                  })}
-                </div>
+                    </div>
 
-                {/* Or Custom Date picker */}
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
-                  <input
-                    type="date"
-                    value={customAddDate}
-                    onChange={(e) => setCustomAddDate(e.target.value)}
-                    style={{
-                      padding: '6px 10px',
-                      borderRadius: 6,
-                      border: '1px solid var(--border)',
-                      fontSize: 13,
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (customAddDate) {
-                        handleAddDateToNewTask(customAddDate);
-                        setCustomAddDate('');
-                      }
-                    }}
-                    style={{
-                      padding: '6px 12px',
-                      borderRadius: 6,
-                      background: '#1f2937',
-                      color: 'white',
-                      fontSize: 12,
-                      fontWeight: 600,
-                    }}
-                  >
-                    + Thêm ngày tùy chọn
-                  </button>
-                </div>
-
-                {/* Selected Dates Chips */}
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#4b5563', marginBottom: 4 }}>
-                    Các ngày đã chọn ({newDates.length}):
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {newDates.map((d) => (
-                      <span
-                        key={d}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          background: 'white',
-                          border: '1px solid var(--border)',
-                          padding: '3px 8px',
-                          borderRadius: 6,
-                          fontSize: 12,
-                          fontWeight: 600,
-                          color: 'var(--text-primary)',
-                        }}
-                      >
-                        <span>{d}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveDateFromNewTask(d)}
-                          style={{
-                            background: 'none',
-                            color: '#ef4444',
-                            fontWeight: 700,
-                            padding: 0,
-                            cursor: 'pointer',
-                            fontSize: 12,
-                          }}
-                        >
-                          ✕
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                </div>
+                    {/* Selected Dates Chips */}
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#4b5563', marginBottom: 4 }}>
+                        Các ngày đã chọn ({newDates.length}):
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {newDates.map((d) => (
+                          <span
+                            key={d}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              background: 'white',
+                              border: '1px solid var(--border)',
+                              padding: '3px 8px',
+                              borderRadius: 6,
+                              fontSize: 12,
+                              fontWeight: 600,
+                              color: 'var(--text-primary)',
+                            }}
+                          >
+                            <span>{d}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveDateFromNewTask(d)}
+                              style={{
+                                background: 'none',
+                                color: '#ef4444',
+                                fontWeight: 700,
+                                padding: 0,
+                                cursor: 'pointer',
+                                fontSize: 12,
+                              }}
+                            >
+                              ✕
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Đối tượng nhận việc */}
@@ -1418,13 +1605,16 @@ export default function TasksPage() {
                 <label style={{ display: 'block', fontWeight: 600, fontSize: 14, marginBottom: 8 }}>
                   👥 Đối tượng nhận việc:
                 </label>
-                <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
+                <div style={{ display: 'flex', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 14 }}>
                     <input
                       type="radio"
                       name="targetType"
                       checked={newTargetType === 'allStore'}
-                      onChange={() => setNewTargetType('allStore')}
+                      onChange={() => {
+                        setNewTargetType('allStore');
+                        setNewDepartmentId('');
+                      }}
                     />
                     <strong>Toàn bộ cửa hàng</strong> (Mọi nhân sự & quản lý)
                   </label>
@@ -1432,12 +1622,112 @@ export default function TasksPage() {
                     <input
                       type="radio"
                       name="targetType"
+                      checked={newTargetType === 'department'}
+                      onChange={() => {
+                        setNewTargetType('department');
+                        if (!newDepartmentId && store?.departments && store.departments.length > 0) {
+                          setNewDepartmentId(store.departments[0].id);
+                        }
+                      }}
+                    />
+                    <strong>Theo bộ phận</strong>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 14 }}>
+                    <input
+                      type="radio"
+                      name="targetType"
                       checked={newTargetType === 'individual'}
-                      onChange={() => setNewTargetType('individual')}
+                      onChange={() => {
+                        setNewTargetType('individual');
+                        setNewDepartmentId('');
+                      }}
                     />
                     <strong>Chỉ định cá nhân / nhóm</strong>
                   </label>
                 </div>
+
+                {/* Department selection */}
+                {newTargetType === 'department' && (
+                  <div
+                    style={{
+                      border: '1px solid var(--border)',
+                      borderRadius: 10,
+                      padding: 12,
+                      background: '#fafafa',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 8,
+                      marginBottom: 12,
+                    }}
+                  >
+                    {(!store?.departments || store.departments.length === 0) ? (
+                      <div style={{ fontSize: 13, color: '#b45309', padding: '6px 0' }}>
+                        ⚠️ Cửa hàng chưa có danh sách bộ phận. Vui lòng vào Cài đặt cửa hàng để thiết lập bộ phận (ví dụ: Pha chế, Thu ngân, Bếp, Phục vụ...).
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: '#4b5563', marginBottom: 2 }}>
+                          Chọn bộ phận nhận việc:
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 }}>
+                          {store.departments.map((dept) => {
+                            const isSelected = newDepartmentId === dept.id;
+                            const deptMembers = members.filter(
+                              (m) => m.department === dept.id || m.department === dept.name
+                            );
+                            return (
+                              <label
+                                key={dept.id}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  padding: '10px 12px',
+                                  borderRadius: 8,
+                                  cursor: 'pointer',
+                                  border: isSelected ? '1.5px solid #2563eb' : '1px solid #e5e7eb',
+                                  background: isSelected ? '#eff6ff' : 'white',
+                                  transition: 'all 0.15s ease',
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <input
+                                    type="radio"
+                                    name="departmentOption"
+                                    checked={isSelected}
+                                    onChange={() => setNewDepartmentId(dept.id)}
+                                  />
+                                  <div>
+                                    <span style={{ fontWeight: 600, fontSize: 13.5, color: isSelected ? '#1e40af' : '#1f2937' }}>
+                                      {dept.name}
+                                    </span>
+                                    {dept.shortName && (
+                                      <span style={{ fontSize: 12, color: '#6b7280', marginLeft: 4 }}>
+                                        ({dept.shortName})
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <span
+                                  style={{
+                                    fontSize: 11,
+                                    fontWeight: 600,
+                                    padding: '2px 8px',
+                                    borderRadius: 10,
+                                    background: isSelected ? '#dbeafe' : '#f3f4f6',
+                                    color: isSelected ? '#1e40af' : '#4b5563',
+                                  }}
+                                >
+                                  {deptMembers.length} NV
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
 
                 {/* Member selection if individual */}
                 {newTargetType === 'individual' && (
@@ -1684,6 +1974,14 @@ function TaskSubmissionsModal({
     if (task.targetType === 'allStore') {
       return members;
     }
+    if (task.targetType === 'department') {
+      return members.filter(
+        (m) =>
+          m.department === task.targetDepartmentId ||
+          m.department === task.targetDepartmentName ||
+          task.assignedUserIds?.includes(m.userId)
+      );
+    }
     return members.filter((m) => task.assignedUserIds?.includes(m.userId));
   }, [task, members]);
 
@@ -1718,6 +2016,33 @@ function TaskSubmissionsModal({
         <div style={{ padding: '16px 0' }}>
           {/* Info Header */}
           <div style={{ background: '#f9fafb', borderRadius: 12, padding: 14, marginBottom: 16 }}>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+              {task.targetType === 'allStore' && (
+                <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6, background: '#dbeafe', color: '#1e40af' }}>
+                  🏪 Toàn cửa hàng
+                </span>
+              )}
+              {task.targetType === 'department' && (
+                <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6, background: '#ede9fe', color: '#6d28d9' }}>
+                  🏢 Bộ phận: {task.targetDepartmentName || 'Bộ phận'}
+                </span>
+              )}
+              {task.targetType === 'individual' && (
+                <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6, background: '#fef3c7', color: '#92400e' }}>
+                  👤 Chỉ định cá nhân
+                </span>
+              )}
+              {task.repeatDaily && (
+                <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6, background: '#ecfdf5', color: '#047857' }}>
+                  🔁 Lặp mỗi ngày
+                </span>
+              )}
+              {task.requirePhoto && (
+                <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 6, background: '#f3e8ff', color: '#6b21a8' }}>
+                  📸 Bắt buộc ảnh
+                </span>
+              )}
+            </div>
             {task.description && (
               <p style={{ fontSize: 14, color: '#4b5563', marginBottom: 10 }}>{task.description}</p>
             )}
