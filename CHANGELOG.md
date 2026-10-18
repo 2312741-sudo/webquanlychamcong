@@ -1,8 +1,24 @@
-# 📋 NHẬT KÝ THAY ĐỔI CHI TIẾT (CHANGELOG) — v1.1.7 (12/10/2026)
+# 📋 NHẬT KÝ THAY ĐỔI CHI TIẾT (CHANGELOG) — v1.1.8 (19/10/2026)
 
 **Dự án:** Chấm Công Trạm (`cham_cong_tram` Mobile App & `cham_cong_web` Web Dashboard)  
 **Tác giả:** Nguyễn Thanh Tâm ([nthanhtam.402@gmail.com](mailto:nthanhtam.402@gmail.com))  
-**Phiên bản hiện tại:** `v1.1.7` (Mobile: `1.1.7+24`, Web: `1.1.7`)
+**Phiên bản hiện tại:** `v1.1.8` (Mobile: `1.1.8+25`, Web: `1.1.8`)
+
+---
+
+## 🚀 BẢN PHÁT HÀNH v1.1.8 (19/10/2026)
+1. **[TÍNH NĂNG MỚI] Chỉnh sửa công việc đã giao trên Web Dashboard**:
+   - Thêm nút "✏️ Chỉnh sửa" trong chi tiết nhiệm vụ và danh sách quản lý công việc `/dashboard/tasks`.
+   - Hỗ trợ cập nhật toàn diện: Tiêu đề, mô tả, danh sách ngày thực hiện, đối tượng nhận việc (toàn bộ cửa hàng, bộ phận, hoặc từng nhân viên), cờ yêu cầu chụp ảnh xác thực và lặp mỗi ngày.
+2. **[SỬA LỖI QUAN TRỌNG] Khắc phục lỗi chọn "Tất cả mọi người" khi giao việc**:
+   - Tối ưu hóa xử lý payload và lưu trữ Firestore cho các tác vụ áp dụng toàn bộ thành viên cửa hàng.
+   - Tránh hiện tượng lỗi state / timeout khi số lượng nhân sự lớn.
+3. **[ĐIỀU HƯỚNG THEO CA] Tự động giao việc theo bộ phận từng ngày**:
+   - Đồng bộ logic phân định nhân sự theo ca làm việc trong ngày: Khớp chính xác nhân sự vào ca theo phòng ban thực tế trên lịch tuần.
+4. **[PHỤC HỒI TÍNH NĂNG] Trang Quản lý & Duyệt yêu cầu gấp**:
+   - Hoàn thiện và khôi phục giao diện duyệt nhanh yêu cầu đổi ca, xin nghỉ và chấm công bổ sung.
+5. **[ĐỘ ỔN ĐỊNH & BUILD]**:
+   - Biên dịch `next build` thành công 100%, TypeScript check không lỗi.
 
 ---
 
