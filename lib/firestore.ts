@@ -915,12 +915,23 @@ export async function deleteProductionReport(
 
 // ─── Assigned Tasks (Giao việc) ─────────────────────────────────────────────
 
+function cleanFirestoreData<T extends Record<string, any>>(data: T): Record<string, any> {
+  const clean: Record<string, any> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (value !== undefined) {
+      clean[key] = value;
+    }
+  }
+  return clean;
+}
+
 export async function createTask(
   storeId: string,
   task: Omit<AssignedTask, 'id' | 'createdAt'>
 ): Promise<string> {
+  const clean = cleanFirestoreData(task);
   const ref = await addDoc(collection(db, 'stores', storeId, 'assigned_tasks'), {
-    ...task,
+    ...clean,
     createdAt: serverTimestamp(),
   });
   return ref.id;
@@ -931,8 +942,9 @@ export async function updateTask(
   taskId: string,
   data: Partial<AssignedTask>
 ): Promise<void> {
+  const clean = cleanFirestoreData(data);
   await updateDoc(doc(db, 'stores', storeId, 'assigned_tasks', taskId), {
-    ...data,
+    ...clean,
     updatedAt: serverTimestamp(),
   });
 }
@@ -970,6 +982,18 @@ export async function getTasksForUserOnDate(
   userDepartment?: string
 ): Promise<AssignedTask[]> {
   try {
+    let resolvedDept = userDepartment;
+    if (!resolvedDept) {
+      try {
+        const memSnap = await getDoc(doc(db, 'stores', storeId, 'members', userId));
+        if (memSnap.exists()) {
+          resolvedDept = memSnap.data()?.department;
+        }
+      } catch (err) {
+        // Fallback silently
+      }
+    }
+
     const q = query(
       collection(db, 'stores', storeId, 'assigned_tasks'),
       where('status', '==', 'active')
@@ -981,8 +1005,13 @@ export async function getTasksForUserOnDate(
       if (!matchDate) return false;
       if (task.targetType === 'allStore') return true;
       if (task.targetType === 'department') {
-        if (userDepartment && (task.targetDepartmentId === userDepartment || task.targetDepartmentName === userDepartment)) {
-          return true;
+        if (resolvedDept && resolvedDept.trim().length > 0) {
+          const rDeptLower = resolvedDept.trim().toLowerCase();
+          const targetIdLower = (task.targetDepartmentId || '').trim().toLowerCase();
+          const targetNameLower = (task.targetDepartmentName || '').trim().toLowerCase();
+          if ((targetIdLower && rDeptLower === targetIdLower) || (targetNameLower && rDeptLower === targetNameLower)) {
+            return true;
+          }
         }
         return Array.isArray(task.assignedUserIds) && task.assignedUserIds.includes(userId);
       }

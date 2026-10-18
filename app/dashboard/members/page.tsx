@@ -16,6 +16,7 @@ export default function MembersPage() {
   const [stdHours, setStdHours] = useState(208);
   const [employeeCode, setEmployeeCode] = useState('');
   const [joinedAt, setJoinedAt] = useState('');
+  const [department, setDepartment] = useState<string>('');
   const [hideSchedule, setHideSchedule] = useState(false);
   const [saving, setSaving] = useState(false);
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
@@ -115,6 +116,7 @@ export default function MembersPage() {
     setStdHours(m.standardHoursPerMonth || 208);
     setEmployeeCode(m.employeeCode || '');
     setJoinedAt(m.joinedAt || '');
+    setDepartment(m.department || '');
     setHideSchedule((store?.hiddenScheduleUserIds || []).includes(m.userId));
   };
 
@@ -123,7 +125,11 @@ export default function MembersPage() {
     setSaving(true);
     try {
       await updateMemberSalary(storeId, editingSalary.userId, empType, salaryAmt, stdHours);
-      await updateMemberInfo(storeId, editingSalary.userId, { employeeCode, joinedAt });
+      await updateMemberInfo(storeId, editingSalary.userId, { 
+        employeeCode, 
+        joinedAt,
+        department: department || null,
+      });
       await toggleHideMemberSchedule(storeId, editingSalary.userId, hideSchedule);
       setEditingSalary(null);
     } catch (e) {
@@ -221,6 +227,7 @@ export default function MembersPage() {
                 {isOwner && roleFilter === 'all' && <th style={{ width: 40, textAlign: 'center' }}>Thứ tự</th>}
                 <th>Nhân viên</th>
                 <th>Mã NV / Ngày vào</th>
+                <th>Bộ phận</th>
                 <th>Vai trò</th>
                 <th>Loại hợp đồng</th>
                 <th>Lương cơ bản</th>
@@ -306,6 +313,31 @@ export default function MembersPage() {
                       </div>
                     </td>
                     <td>
+                      {(() => {
+                        const dept = store?.departments?.find(d => d.id === m.department || d.name === m.department);
+                        const deptName = dept?.name || m.department;
+                        if (deptName) {
+                          return (
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              padding: '4px 10px',
+                              borderRadius: 8,
+                              fontSize: 12,
+                              fontWeight: 600,
+                              background: '#F0F9FF',
+                              color: '#0369A1',
+                              border: '1px solid #BAE6FD'
+                            }}>
+                              🏢 {deptName}
+                            </span>
+                          );
+                        }
+                        return <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>-</span>;
+                      })()}
+                    </td>
+                    <td>
                       {isOwner && m.userId !== user?.uid && m.userId !== store?.ownerId ? (
                         <select 
                           className="select" 
@@ -369,7 +401,7 @@ export default function MembersPage() {
                 );
               })}
               {filteredActiveMembers.length === 0 && (
-                <tr><td colSpan={isOwner ? 8 : 5} style={{ textAlign: 'center', padding: 40, color: 'var(--text-secondary)' }}>Không có nhân viên nào phù hợp</td></tr>
+                <tr><td colSpan={isOwner ? 9 : 6} style={{ textAlign: 'center', padding: 40, color: 'var(--text-secondary)' }}>Không có nhân viên nào phù hợp</td></tr>
               )}
             </tbody>
           </table>
@@ -439,6 +471,27 @@ export default function MembersPage() {
                     onChange={e => setJoinedAt(e.target.value)}
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="label">Bộ phận làm việc</label>
+                <select 
+                  className="select" 
+                  value={department} 
+                  onChange={e => setDepartment(e.target.value)}
+                >
+                  <option value="">-- Chưa phân bộ phận --</option>
+                  {(store?.departments || []).map(dept => (
+                    <option key={dept.id} value={dept.id}>
+                      {dept.name} {dept.shortName ? `(${dept.shortName})` : ''}
+                    </option>
+                  ))}
+                </select>
+                {(!store?.departments || store.departments.length === 0) && (
+                  <div style={{ fontSize: 12, color: '#b45309', marginTop: 4 }}>
+                    ⚠️ Cửa hàng chưa thiết lập danh mục bộ phận. Bạn có thể vào Cài đặt cửa hàng để thêm các bộ phận (Pha chế, Bếp, Thu ngân...).
+                  </div>
+                )}
               </div>
 
               <div>

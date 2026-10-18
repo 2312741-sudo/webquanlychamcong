@@ -1,6 +1,6 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, initializeFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyA2fvOwEKwkeS9AlDNDCELvtyCx07dE6xM',
@@ -14,5 +14,12 @@ const firebaseConfig = {
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+
+let dbInstance;
+try {
+  dbInstance = initializeFirestore(app, { ignoreUndefinedProperties: true });
+} catch {
+  dbInstance = getFirestore(app);
+}
+export const db = dbInstance;
 export default app;

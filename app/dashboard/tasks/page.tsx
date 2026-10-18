@@ -292,6 +292,7 @@ export default function TasksPage() {
 
   // ── Modals state ──
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
+  const [editingTask, setEditingTask] = useState<AssignedTask | null>(null);
   const [detailTask, setDetailTask] = useState<AssignedTask | null>(null);
   const [lightboxImg, setLightboxImg] = useState<string | null>(null);
 
@@ -388,10 +389,14 @@ export default function TasksPage() {
         const deptObj = store?.departments?.find((d) => d.id === newDepartmentId);
         targetDeptName = deptObj?.name || 'Bộ phận';
         const deptMembers = members.filter(
-          (m) => m.department === newDepartmentId || m.department === targetDeptName
+          (m) => m.department && deptObj && (
+            m.department.trim().toLowerCase() === deptObj.id.trim().toLowerCase() ||
+            m.department.trim().toLowerCase() === deptObj.name.trim().toLowerCase()
+          )
         );
-        assignedUserIds = deptMembers.map((m) => m.userId);
-        assignedNames = deptMembers.map((m) => m.name || m.userId);
+        const combinedIds = Array.from(new Set([...deptMembers.map(m => m.userId), ...selectedMemberIds]));
+        assignedUserIds = combinedIds;
+        assignedNames = combinedIds.map(uid => members.find(m => m.userId === uid)?.name || uid);
       } else {
         assignedUserIds = selectedMemberIds;
         assignedNames = selectedMemberIds.map((uid) => {
@@ -408,14 +413,18 @@ export default function TasksPage() {
         createdByName: user.displayName || user.email?.split('@')[0] || 'Quản lý',
         createdByRole: (role as any) || 'manager1',
         targetType: newTargetType,
-        targetDepartmentId: newTargetType === 'department' ? newDepartmentId : undefined,
-        targetDepartmentName: newTargetType === 'department' ? targetDeptName : undefined,
         assignedUserIds,
         assignedNames,
         executionDates: finalDates,
         repeatDaily: newRepeatDaily,
         requirePhoto: newRequirePhoto,
         status: 'active',
+        ...(newTargetType === 'department'
+          ? {
+              targetDepartmentId: newDepartmentId,
+              targetDepartmentName: targetDeptName,
+            }
+          : {}),
       };
 
       await createTask(storeId, taskData);
@@ -1337,6 +1346,26 @@ export default function TasksPage() {
                       <div style={{ display: 'flex', gap: 8 }}>
                         <button
                           type="button"
+                          onClick={() => setEditingTask(task)}
+                          style={{
+                            background: '#fef3c7',
+                            color: '#b45309',
+                            padding: '6px 12px',
+                            borderRadius: 8,
+                            fontSize: 12,
+                            fontWeight: 700,
+                            border: '1px solid #fde68a',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4,
+                          }}
+                          title="Chỉnh sửa công việc này"
+                        >
+                          ✏️ Sửa việc
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => setDetailTask(task)}
                           style={{
                             background: '#eff6ff',
@@ -1673,7 +1702,10 @@ export default function TasksPage() {
                           {store.departments.map((dept) => {
                             const isSelected = newDepartmentId === dept.id;
                             const deptMembers = members.filter(
-                              (m) => m.department === dept.id || m.department === dept.name
+                              (m) => m.department && (
+                                m.department.trim().toLowerCase() === dept.id.trim().toLowerCase() ||
+                                m.department.trim().toLowerCase() === dept.name.trim().toLowerCase()
+                              )
                             );
                             return (
                               <label
@@ -1873,6 +1905,25 @@ export default function TasksPage() {
           todayStr={todayStr}
           onClose={() => setDetailTask(null)}
           onOpenLightbox={(url) => setLightboxImg(url)}
+          onEditTask={(task) => {
+            setDetailTask(null);
+            setEditingTask(task);
+          }}
+        />
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {/* MODAL: CHỈNH SỬA CÔNG VIỆC (Edit Task) */}
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {editingTask && (
+        <EditTaskModal
+          storeId={storeId!}
+          task={editingTask}
+          members={members}
+          store={store}
+          todayStr={todayStr}
+          onClose={() => setEditingTask(null)}
+          onSuccess={() => setEditingTask(null)}
         />
       )}
 
@@ -1942,6 +1993,7 @@ function TaskSubmissionsModal({
   todayStr,
   onClose,
   onOpenLightbox,
+  onEditTask,
 }: {
   storeId: string;
   task: AssignedTask;
@@ -1949,6 +2001,7 @@ function TaskSubmissionsModal({
   todayStr: string;
   onClose: () => void;
   onOpenLightbox: (url: string) => void;
+  onEditTask?: (task: AssignedTask) => void;
 }) {
   const [selectedDate, setSelectedDate] = useState<string>(
     task.executionDates?.includes(todayStr) ? todayStr : task.executionDates?.[0] || todayStr
@@ -2006,11 +2059,34 @@ function TaskSubmissionsModal({
         onClick={(e) => e.stopPropagation()}
         style={{ maxWidth: 680, maxHeight: '90vh', overflowY: 'auto' }}
       >
-        <div className="modal-header">
+        <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div className="modal-title">
             <span>📋 Báo cáo công việc: {task.title}</span>
           </div>
-          <button className="modal-close" onClick={onClose}>✕</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {onEditTask && (
+              <button
+                type="button"
+                onClick={() => onEditTask(task)}
+                style={{
+                  background: '#fef3c7',
+                  color: '#b45309',
+                  border: '1px solid #fde68a',
+                  padding: '5px 12px',
+                  borderRadius: 6,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+              >
+                ✏️ Sửa việc
+              </button>
+            )}
+            <button className="modal-close" onClick={onClose}>✕</button>
+          </div>
         </div>
 
         <div style={{ padding: '16px 0' }}>
@@ -2198,6 +2274,627 @@ function TaskSubmissionsModal({
             Đóng
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// SUB-COMPONENT: EDIT TASK MODAL
+// ────────────────────────────────────────────────────────────────────────────
+function EditTaskModal({
+  storeId,
+  task,
+  members,
+  store,
+  todayStr,
+  onClose,
+  onSuccess,
+}: {
+  storeId: string;
+  task: AssignedTask;
+  members: Member[];
+  store: any;
+  todayStr: string;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [title, setTitle] = useState(task.title || '');
+  const [description, setDescription] = useState(task.description || '');
+  const [status, setStatus] = useState<TaskStatus>(task.status || 'active');
+  const [targetType, setTargetType] = useState<TaskTargetType>(task.targetType || 'allStore');
+  const [departmentId, setDepartmentId] = useState<string>(task.targetDepartmentId || '');
+  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>(task.assignedUserIds || []);
+  const [repeatDaily, setRepeatDaily] = useState<boolean>(task.repeatDaily || false);
+  const [dates, setDates] = useState<string[]>(task.executionDates || [todayStr]);
+  const [customAddDate, setCustomAddDate] = useState<string>('');
+  const [requirePhoto, setRequirePhoto] = useState<boolean>(task.requirePhoto || false);
+  const [saving, setSaving] = useState<boolean>(false);
+
+  const handleAddDate = (dateStr: string) => {
+    if (!dateStr) return;
+    if (!dates.includes(dateStr)) {
+      setDates((prev) => [...prev, dateStr].sort());
+    }
+  };
+
+  const handleRemoveDate = (dateStr: string) => {
+    setDates((prev) => prev.filter((d) => d !== dateStr));
+  };
+
+  const handleToggleRepeatDaily = (checked: boolean) => {
+    setRepeatDaily(checked);
+    if (checked) {
+      const genDates: string[] = [];
+      const base = new Date();
+      for (let i = 0; i < 60; i++) {
+        const d = new Date(base);
+        d.setDate(base.getDate() + i);
+        genDates.push(getVietnamDateString(d));
+      }
+      setDates(genDates);
+    } else {
+      setDates(task.executionDates?.length ? task.executionDates : [todayStr]);
+    }
+  };
+
+  const getUpcomingDays = () => {
+    const days: { label: string; dateStr: string }[] = [];
+    const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      const str = getVietnamDateString(d);
+      let label = `${dayNames[d.getDay()]} (${d.getDate()}/${d.getMonth() + 1})`;
+      if (i === 0) label = `Hôm nay (${d.getDate()}/${d.getMonth() + 1})`;
+      if (i === 1) label = `Ngày mai (${d.getDate()}/${d.getMonth() + 1})`;
+      days.push({ label, dateStr: str });
+    }
+    return days;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!storeId || !task.id) return;
+
+    if (!title.trim()) {
+      alert('Vui lòng nhập tiêu đề công việc');
+      return;
+    }
+
+    let finalDates = [...dates];
+    if (repeatDaily && finalDates.length === 0) {
+      const base = new Date();
+      for (let i = 0; i < 60; i++) {
+        const d = new Date(base);
+        d.setDate(base.getDate() + i);
+        finalDates.push(getVietnamDateString(d));
+      }
+    }
+    if (!repeatDaily && finalDates.length === 0) {
+      alert('Vui lòng chọn ít nhất 1 ngày thực hiện');
+      return;
+    }
+
+    if (targetType === 'individual' && selectedMemberIds.length === 0) {
+      alert('Vui lòng chọn ít nhất 1 thành viên nhận việc');
+      return;
+    }
+
+    if (targetType === 'department' && !departmentId) {
+      alert('Vui lòng chọn bộ phận nhận việc');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      let assignedNames: string[] = [];
+      let assignedUserIds: string[] = [];
+      let targetDeptName = '';
+
+      if (targetType === 'allStore') {
+        assignedNames = ['Toàn bộ cửa hàng'];
+        assignedUserIds = [];
+      } else if (targetType === 'department') {
+        const deptObj = store?.departments?.find((d: any) => d.id === departmentId);
+        targetDeptName = deptObj?.name || 'Bộ phận';
+        const deptMembers = members.filter(
+          (m) => m.department && deptObj && (
+            m.department.trim().toLowerCase() === deptObj.id.trim().toLowerCase() ||
+            m.department.trim().toLowerCase() === deptObj.name.trim().toLowerCase()
+          )
+        );
+        const combinedIds = Array.from(new Set([...deptMembers.map(m => m.userId), ...selectedMemberIds]));
+        assignedUserIds = combinedIds;
+        assignedNames = combinedIds.map(uid => members.find(m => m.userId === uid)?.name || uid);
+      } else {
+        assignedUserIds = selectedMemberIds;
+        assignedNames = selectedMemberIds.map((uid) => {
+          const m = members.find((mem) => mem.userId === uid);
+          return m?.name || uid;
+        });
+      }
+
+      const updateData: Partial<AssignedTask> = {
+        title: title.trim(),
+        description: description.trim(),
+        status,
+        targetType,
+        assignedUserIds,
+        assignedNames,
+        executionDates: finalDates,
+        repeatDaily,
+        requirePhoto,
+        targetDepartmentId: targetType === 'department' ? departmentId : '',
+        targetDepartmentName: targetType === 'department' ? targetDeptName : '',
+      };
+
+      await updateTask(storeId, task.id, updateData);
+      alert('✅ Cập nhật công việc thành công!');
+      onSuccess();
+    } catch (err: any) {
+      console.error('Lỗi khi cập nhật công việc:', err);
+      alert('Lỗi cập nhật: ' + (err.message || 'Thử lại'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div
+        className="modal"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: 620, maxHeight: '90vh', overflowY: 'auto' }}
+      >
+        <div className="modal-header">
+          <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>✏️</span>
+            <span>Chỉnh sửa công việc: {task.title}</span>
+          </div>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+
+        <form onSubmit={handleSubmit} style={{ padding: '16px 0', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Trạng thái công việc */}
+          <div style={{ background: '#f8fafc', padding: 12, borderRadius: 10, border: '1px solid #e2e8f0' }}>
+            <label style={{ display: 'block', fontWeight: 700, fontSize: 13, marginBottom: 8, color: '#1e293b' }}>
+              Trạng thái công việc:
+            </label>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {[
+                { val: 'active', label: '⚡ Đang thực hiện', color: '#16a34a', bg: '#f0fdf4' },
+                { val: 'completed', label: '✓ Đã hoàn thành', color: '#2563eb', bg: '#eff6ff' },
+                { val: 'cancelled', label: '✕ Đã hủy', color: '#dc2626', bg: '#fef2f2' },
+                { val: 'archived', label: '📁 Lưu trữ', color: '#6b7280', bg: '#f3f4f6' },
+              ].map((s) => {
+                const isSelected = status === s.val;
+                return (
+                  <button
+                    key={s.val}
+                    type="button"
+                    onClick={() => setStatus(s.val as TaskStatus)}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: 8,
+                      fontSize: 12.5,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      border: isSelected ? `2px solid ${s.color}` : '1px solid #d1d5db',
+                      background: isSelected ? s.bg : '#ffffff',
+                      color: isSelected ? s.color : '#4b5563',
+                    }}
+                  >
+                    {s.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Tiêu đề */}
+          <div>
+            <label style={{ display: 'block', fontWeight: 600, fontSize: 14, marginBottom: 6 }}>
+              Tiêu đề công việc <span style={{ color: '#ef4444' }}>*</span>
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="Nhập tiêu đề công việc..."
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '10px 14px',
+                borderRadius: 8,
+                border: '1px solid var(--border)',
+                fontSize: 14,
+                outline: 'none',
+              }}
+            />
+          </div>
+
+          {/* Mô tả chi tiết */}
+          <div>
+            <label style={{ display: 'block', fontWeight: 600, fontSize: 14, marginBottom: 6 }}>
+              Mô tả chi tiết / Hướng dẫn thực hiện
+            </label>
+            <textarea
+              rows={3}
+              placeholder="Mô tả cụ thể các bước nhân viên cần làm..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '10px 14px',
+                borderRadius: 8,
+                border: '1px solid var(--border)',
+                fontSize: 14,
+                outline: 'none',
+              }}
+            />
+          </div>
+
+          {/* Thời gian thực hiện */}
+          <div style={{ background: '#f9fafb', padding: 14, borderRadius: 12, border: '1px solid #e5e7eb' }}>
+            <label style={{ display: 'block', fontWeight: 700, fontSize: 14, marginBottom: 8, color: 'var(--text-primary)' }}>
+              📅 Thời gian thực hiện: <span style={{ color: '#ef4444' }}>*</span>
+            </label>
+
+            {/* Switch Lặp mỗi ngày */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: repeatDaily ? '#ecfdf5' : '#ffffff',
+                border: repeatDaily ? '1.5px solid #10b981' : '1px solid #d1d5db',
+                borderRadius: 10,
+                padding: '10px 14px',
+                marginBottom: 12,
+              }}
+            >
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: 13.5, color: repeatDaily ? '#065f46' : 'var(--text-primary)' }}>
+                  <span>🔁 Lặp mỗi ngày</span>
+                  {repeatDaily && (
+                    <span style={{ fontSize: 10, fontWeight: 700, background: '#10b981', color: 'white', padding: '1px 6px', borderRadius: 4 }}>
+                      BẬT
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: 12, color: repeatDaily ? '#047857' : '#6b7280', marginTop: 2 }}>
+                  {repeatDaily
+                    ? 'Tự động áp dụng cho các ca làm việc mỗi ngày'
+                    : 'Giao việc cho các ngày cụ thể được chọn bên dưới'}
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={repeatDaily}
+                onChange={(e) => handleToggleRepeatDaily(e.target.checked)}
+                style={{ width: 18, height: 18, cursor: 'pointer' }}
+              />
+            </div>
+
+            {repeatDaily ? (
+              <div style={{ padding: '10px 14px', background: '#f0fdf4', border: '1px dashed #86efac', borderRadius: 8, fontSize: 12.5, color: '#166534' }}>
+                ✓ Công việc này tự động áp dụng hàng ngày.
+              </div>
+            ) : (
+              <>
+                {/* Quick Add Buttons */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                  {getUpcomingDays().map((day) => {
+                    const isSelected = dates.includes(day.dateStr);
+                    return (
+                      <button
+                        key={day.dateStr}
+                        type="button"
+                        onClick={() => {
+                          if (isSelected) {
+                            handleRemoveDate(day.dateStr);
+                          } else {
+                            handleAddDate(day.dateStr);
+                          }
+                        }}
+                        style={{
+                          padding: '5px 10px',
+                          borderRadius: 6,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          background: isSelected ? 'var(--primary)' : '#e5e7eb',
+                          color: isSelected ? 'white' : '#374151',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {isSelected ? '✓ ' : '+ '}
+                        {day.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Custom Date picker */}
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
+                  <input
+                    type="date"
+                    value={customAddDate}
+                    onChange={(e) => setCustomAddDate(e.target.value)}
+                    style={{
+                      padding: '6px 10px',
+                      borderRadius: 6,
+                      border: '1px solid var(--border)',
+                      fontSize: 13,
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (customAddDate) {
+                        handleAddDate(customAddDate);
+                        setCustomAddDate('');
+                      }
+                    }}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: 6,
+                      background: '#1f2937',
+                      color: 'white',
+                      fontSize: 12,
+                      fontWeight: 600,
+                    }}
+                  >
+                    + Thêm ngày
+                  </button>
+                </div>
+
+                {/* Selected Dates Chips */}
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#4b5563', marginBottom: 4 }}>
+                    Các ngày thực hiện ({dates.length}):
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {dates.map((d) => (
+                      <span
+                        key={d}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          background: 'white',
+                          border: '1px solid var(--border)',
+                          padding: '3px 8px',
+                          borderRadius: 6,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: 'var(--text-primary)',
+                        }}
+                      >
+                        <span>{d}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveDate(d)}
+                          style={{
+                            background: 'none',
+                            color: '#ef4444',
+                            fontWeight: 700,
+                            padding: 0,
+                            cursor: 'pointer',
+                            fontSize: 12,
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Đối tượng nhận việc */}
+          <div>
+            <label style={{ display: 'block', fontWeight: 600, fontSize: 14, marginBottom: 8 }}>
+              👥 Đối tượng nhận việc:
+            </label>
+            <div style={{ display: 'flex', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 14 }}>
+                <input
+                  type="radio"
+                  name="editTargetType"
+                  checked={targetType === 'allStore'}
+                  onChange={() => {
+                    setTargetType('allStore');
+                    setDepartmentId('');
+                  }}
+                />
+                <strong>Toàn bộ cửa hàng</strong>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 14 }}>
+                <input
+                  type="radio"
+                  name="editTargetType"
+                  checked={targetType === 'department'}
+                  onChange={() => {
+                    setTargetType('department');
+                    if (!departmentId && store?.departments && store.departments.length > 0) {
+                      setDepartmentId(store.departments[0].id);
+                    }
+                  }}
+                />
+                <strong>Theo bộ phận</strong>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 14 }}>
+                <input
+                  type="radio"
+                  name="editTargetType"
+                  checked={targetType === 'individual'}
+                  onChange={() => {
+                    setTargetType('individual');
+                  }}
+                />
+                <strong>Chỉ định cá nhân / nhóm</strong>
+              </label>
+            </div>
+
+            {/* Department selection */}
+            {targetType === 'department' && (
+              <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 10, padding: 12, marginBottom: 12 }}>
+                {!store?.departments || store.departments.length === 0 ? (
+                  <div style={{ fontSize: 13, color: '#dc2626' }}>
+                    Cửa hàng chưa thiết lập danh sách bộ phận.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {store.departments.map((dept: any) => {
+                      const isSelected = departmentId === dept.id;
+                      const deptMembers = members.filter(
+                        (m) => m.department && (
+                          m.department.trim().toLowerCase() === dept.id.trim().toLowerCase() ||
+                          m.department.trim().toLowerCase() === dept.name.trim().toLowerCase()
+                        )
+                      );
+                      return (
+                        <label
+                          key={dept.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '8px 12px',
+                            borderRadius: 8,
+                            background: isSelected ? '#eff6ff' : '#ffffff',
+                            border: isSelected ? '1.5px solid #3b82f6' : '1px solid #e2e8f0',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <input
+                              type="radio"
+                              name="editDepartmentSelect"
+                              checked={isSelected}
+                              onChange={() => setDepartmentId(dept.id)}
+                            />
+                            <span>{dept.name}</span>
+                          </div>
+                          <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10, background: isSelected ? '#dbeafe' : '#f3f4f6', color: isSelected ? '#1e40af' : '#4b5563' }}>
+                            {deptMembers.length} NV
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Member selection */}
+            {targetType === 'individual' && (
+              <div
+                style={{
+                  border: '1px solid var(--border)',
+                  borderRadius: 10,
+                  padding: 12,
+                  maxHeight: 180,
+                  overflowY: 'auto',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, borderBottom: '1px solid #f3f4f6', paddingBottom: 6 }}>
+                  <span>Chọn thành viên ({selectedMemberIds.length}/{members.length}):</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedMemberIds.length === members.length) {
+                        setSelectedMemberIds([]);
+                      } else {
+                        setSelectedMemberIds(members.map((m) => m.userId));
+                      }
+                    }}
+                    style={{ background: 'none', color: '#2563eb', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    {selectedMemberIds.length === members.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+                  </button>
+                </div>
+                {members.map((mem) => {
+                  const isChecked = selectedMemberIds.includes(mem.userId);
+                  return (
+                    <label
+                      key={mem.userId}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        cursor: 'pointer',
+                        padding: '4px 6px',
+                        borderRadius: 6,
+                        background: isChecked ? '#eff6ff' : 'transparent',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedMemberIds((prev) => [...prev, mem.userId]);
+                            } else {
+                              setSelectedMemberIds((prev) => prev.filter((id) => id !== mem.userId));
+                            }
+                          }}
+                        />
+                        <span style={{ fontSize: 13, fontWeight: isChecked ? 600 : 400 }}>
+                          {mem.name || mem.userId}
+                        </span>
+                      </div>
+                      <span style={{ fontSize: 11, color: '#6b7280' }}>{getRoleLabel(mem.role)}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Switch Bắt buộc ảnh */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: '#f9fafb',
+              padding: 12,
+              borderRadius: 10,
+              border: '1px solid var(--border)',
+            }}
+          >
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 13.5 }}>📸 Bắt buộc chụp ảnh minh chứng</div>
+              <div style={{ fontSize: 12, color: '#6b7280' }}>
+                Khi bật, người làm việc phải chụp ảnh minh chứng thì mới được hoàn thành.
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={requirePhoto}
+              onChange={(e) => setRequirePhoto(e.target.checked)}
+              style={{ width: 18, height: 18, cursor: 'pointer' }}
+            />
+          </div>
+
+          {/* Action buttons */}
+          <div className="modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 12 }}>
+            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>
+              Hủy
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
