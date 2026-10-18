@@ -10,9 +10,10 @@ import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'fire
 import {
   Member, AttendanceRecord, Store, ScheduleModel, DaySchedule,
   AdvanceRequest, ProductionTask, ProductionReport, ProductionTaskEntry,
-  AppNotification, normalizeRole, CheckInMethod,
+  AppNotification, normalizeRole, CheckInMethod, Department,
   AssignedTask, TaskSubmission, TaskTargetType, TaskStatus
 } from './types';
+import { getMondayOfWeek, isUserInDepartmentOnDate } from './departmentUtils';
 
 export async function getUserStoresData(uid: string): Promise<{ stores: Store[]; currentStoreId: string | null }> {
   try {
@@ -979,7 +980,8 @@ export async function getTasksForUserOnDate(
   storeId: string,
   userId: string,
   dateStr: string,
-  userDepartment?: string
+  userDepartment?: string,
+  schedule?: ScheduleModel | null
 ): Promise<AssignedTask[]> {
   try {
     let resolvedDept = userDepartment;
@@ -994,6 +996,31 @@ export async function getTasksForUserOnDate(
       }
     }
 
+    // Resolve week schedule for dateStr if not passed
+    let resolvedSchedule = schedule;
+    if (resolvedSchedule === undefined) {
+      try {
+        const weekStart = getMondayOfWeek(dateStr);
+        const schedSnap = await getDoc(doc(db, 'stores', storeId, 'schedules', weekStart));
+        if (schedSnap.exists()) {
+          resolvedSchedule = { id: schedSnap.id, ...schedSnap.data() } as ScheduleModel;
+        } else {
+          resolvedSchedule = null;
+        }
+      } catch (_) {
+        resolvedSchedule = null;
+      }
+    }
+
+    // Resolve store departments for name/ID matching
+    let storeDepts: Department[] | undefined;
+    try {
+      const storeSnap = await getDoc(doc(db, 'stores', storeId));
+      if (storeSnap.exists()) {
+        storeDepts = storeSnap.data()?.departments;
+      }
+    } catch (_) {}
+
     const q = query(
       collection(db, 'stores', storeId, 'assigned_tasks'),
       where('status', '==', 'active')
@@ -1005,14 +1032,16 @@ export async function getTasksForUserOnDate(
       if (!matchDate) return false;
       if (task.targetType === 'allStore') return true;
       if (task.targetType === 'department') {
-        if (resolvedDept && resolvedDept.trim().length > 0) {
-          const rDeptLower = resolvedDept.trim().toLowerCase();
-          const targetIdLower = (task.targetDepartmentId || '').trim().toLowerCase();
-          const targetNameLower = (task.targetDepartmentName || '').trim().toLowerCase();
-          if ((targetIdLower && rDeptLower === targetIdLower) || (targetNameLower && rDeptLower === targetNameLower)) {
-            return true;
-          }
-        }
+        const matchesDept = isUserInDepartmentOnDate({
+          userId,
+          dateStr,
+          targetDeptId: task.targetDepartmentId,
+          targetDeptName: task.targetDepartmentName,
+          schedule: resolvedSchedule,
+          memberDepartment: resolvedDept,
+          storeDepartments: storeDepts,
+        });
+        if (matchesDept) return true;
         return Array.isArray(task.assignedUserIds) && task.assignedUserIds.includes(userId);
       }
       return Array.isArray(task.assignedUserIds) && task.assignedUserIds.includes(userId);
@@ -1075,10 +1104,11 @@ export async function getUnfinishedTasksForUserOnDate(
   storeId: string,
   userId: string,
   dateStr: string,
-  userDepartment?: string
+  userDepartment?: string,
+  schedule?: ScheduleModel | null
 ): Promise<AssignedTask[]> {
   try {
-    const tasks = await getTasksForUserOnDate(storeId, userId, dateStr, userDepartment);
+    const tasks = await getTasksForUserOnDate(storeId, userId, dateStr, userDepartment, schedule);
     const checks = await Promise.all(
       tasks.map(async (task) => {
         try {

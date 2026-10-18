@@ -12,6 +12,7 @@ import {
   saveTaskSubmission,
   uploadTaskPhotoWeb,
   getVietnamDateString,
+  watchWeekSchedule,
 } from '@/lib/firestore';
 import {
   AssignedTask,
@@ -19,9 +20,12 @@ import {
   TaskTargetType,
   TaskStatus,
   Member,
+  Store,
+  ScheduleModel,
   getRoleLabel,
   normalizeRole,
 } from '@/lib/types';
+import { getMondayOfWeek, getUserIdsInDepartmentOnDate } from '@/lib/departmentUtils';
 
 export default function TasksPage() {
   const { storeId, store, members, currentMember, user, role } = useApp();
@@ -1695,6 +1699,9 @@ export default function TasksPage() {
                       </div>
                     ) : (
                       <>
+                        <div style={{ background: '#ede9fe', color: '#6d28d9', padding: '8px 12px', borderRadius: 8, fontSize: 12, marginBottom: 8, lineHeight: 1.4 }}>
+                          💡 <strong>Tự động theo ca:</strong> Công việc sẽ tự động giao cho các nhân sự có ca làm việc thuộc bộ phận này theo từng ngày (dựa theo Lịch làm việc tuần / Bộ phận của nhân viên).
+                        </div>
                         <div style={{ fontSize: 12, fontWeight: 600, color: '#4b5563', marginBottom: 2 }}>
                           Chọn bộ phận nhận việc:
                         </div>
@@ -1900,6 +1907,7 @@ export default function TasksPage() {
       {detailTask && (
         <TaskSubmissionsModal
           storeId={storeId!}
+          store={store}
           task={detailTask}
           members={members}
           todayStr={todayStr}
@@ -1988,6 +1996,7 @@ export default function TasksPage() {
 // ────────────────────────────────────────────────────────────────────────────
 function TaskSubmissionsModal({
   storeId,
+  store,
   task,
   members,
   todayStr,
@@ -1996,6 +2005,7 @@ function TaskSubmissionsModal({
   onEditTask,
 }: {
   storeId: string;
+  store?: Store | null;
   task: AssignedTask;
   members: Member[];
   todayStr: string;
@@ -2007,6 +2017,17 @@ function TaskSubmissionsModal({
     task.executionDates?.includes(todayStr) ? todayStr : task.executionDates?.[0] || todayStr
   );
   const [submissions, setSubmissions] = useState<TaskSubmission[]>([]);
+  const [schedule, setSchedule] = useState<ScheduleModel | null>(null);
+
+  // Watch week schedule of the week containing selectedDate
+  useEffect(() => {
+    if (!storeId || !selectedDate) return;
+    const weekStart = getMondayOfWeek(selectedDate);
+    const unsub = watchWeekSchedule(storeId, weekStart, (sched) => {
+      setSchedule(sched);
+    });
+    return unsub;
+  }, [storeId, selectedDate]);
 
   // Watch submissions for this task
   useEffect(() => {
@@ -2022,21 +2043,28 @@ function TaskSubmissionsModal({
     return unsub;
   }, [storeId, task.id, selectedDate]);
 
-  // Determine list of target members for this date
+  // Determine list of target members for this date (dynamic based on schedule & department)
   const targetMembers = useMemo(() => {
     if (task.targetType === 'allStore') {
       return members;
     }
     if (task.targetType === 'department') {
-      return members.filter(
-        (m) =>
-          m.department === task.targetDepartmentId ||
-          m.department === task.targetDepartmentName ||
-          task.assignedUserIds?.includes(m.userId)
-      );
+      const deptMemberIds = getUserIdsInDepartmentOnDate({
+        dateStr: selectedDate,
+        targetDeptId: task.targetDepartmentId,
+        targetDeptName: task.targetDepartmentName,
+        allMembers: members,
+        schedule,
+        storeDepartments: store?.departments,
+      });
+      const combinedIds = Array.from(new Set([
+        ...deptMemberIds,
+        ...(task.assignedUserIds || []),
+      ]));
+      return members.filter((m) => combinedIds.includes(m.userId));
     }
     return members.filter((m) => task.assignedUserIds?.includes(m.userId));
-  }, [task, members]);
+  }, [task, members, selectedDate, schedule, store?.departments]);
 
   // Map each member to their submission
   const memberStatusList = useMemo(() => {
@@ -2748,6 +2776,9 @@ function EditTaskModal({
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ background: '#ede9fe', color: '#6d28d9', padding: '8px 12px', borderRadius: 8, fontSize: 12, lineHeight: 1.4 }}>
+                      💡 <strong>Tự động theo ca:</strong> Công việc sẽ tự động giao cho các nhân sự có ca làm việc thuộc bộ phận này theo từng ngày (dựa theo Lịch làm việc tuần / Bộ phận của nhân viên).
+                    </div>
                     {store.departments.map((dept: any) => {
                       const isSelected = departmentId === dept.id;
                       const deptMembers = members.filter(
