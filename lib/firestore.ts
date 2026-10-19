@@ -13,7 +13,7 @@ import {
   AppNotification, normalizeRole, CheckInMethod, Department,
   AssignedTask, TaskSubmission, TaskTargetType, TaskStatus
 } from './types';
-import { getMondayOfWeek, isUserInDepartmentOnDate } from './departmentUtils';
+import { getMondayOfWeek, isUserInDepartmentOnDate, isDateMatchingTask } from './departmentUtils';
 
 export async function getUserStoresData(uid: string): Promise<{ stores: Store[]; currentStoreId: string | null }> {
   try {
@@ -967,7 +967,7 @@ export function watchStoreTasks(
     let tasks = snap.docs.map(d => ({ id: d.id, ...d.data() } as AssignedTask));
     tasks = tasks.filter(t => t.status !== 'archived');
     if (dateStr) {
-      tasks = tasks.filter(t => t.repeatDaily || (Array.isArray(t.executionDates) && t.executionDates.includes(dateStr)));
+      tasks = tasks.filter(t => isDateMatchingTask(dateStr, t));
     }
     callback(tasks);
   }, (err) => {
@@ -976,12 +976,56 @@ export function watchStoreTasks(
   });
 }
 
+/**
+ * Hàm lọc các task áp dụng cho user vào ngày dateStr chạy thuần túy trên bộ nhớ (0ms latency)
+ */
+export function filterTasksForUserOnDate({
+  tasks,
+  userId,
+  dateStr,
+  userDepartment,
+  schedule,
+  storeDepartments,
+}: {
+  tasks: AssignedTask[];
+  userId: string;
+  dateStr: string;
+  userDepartment?: string | null;
+  schedule?: ScheduleModel | null;
+  storeDepartments?: Department[];
+}): AssignedTask[] {
+  return tasks.filter((task) => {
+    if (task.status !== 'active') return false;
+    const matchDate = isDateMatchingTask(dateStr, task);
+    if (!matchDate) return false;
+    if (task.targetType === 'allStore') return true;
+    if (task.targetType === 'department') {
+      const matchesDept = isUserInDepartmentOnDate({
+        userId,
+        dateStr,
+        targetDeptId: task.targetDepartmentId,
+        targetDeptName: task.targetDepartmentName,
+        targetDeptIds: task.targetDepartmentIds,
+        targetDeptNames: task.targetDepartmentNames,
+        schedule,
+        memberDepartment: userDepartment,
+        storeDepartments,
+      });
+      if (matchesDept) return true;
+      return Array.isArray(task.assignedUserIds) && task.assignedUserIds.includes(userId);
+    }
+    return Array.isArray(task.assignedUserIds) && task.assignedUserIds.includes(userId);
+  });
+}
+
 export async function getTasksForUserOnDate(
   storeId: string,
   userId: string,
   dateStr: string,
   userDepartment?: string,
-  schedule?: ScheduleModel | null
+  schedule?: ScheduleModel | null,
+  storeDepartments?: Department[],
+  preloadedTasks?: AssignedTask[]
 ): Promise<AssignedTask[]> {
   try {
     let resolvedDept = userDepartment;
@@ -1012,39 +1056,36 @@ export async function getTasksForUserOnDate(
       }
     }
 
-    // Resolve store departments for name/ID matching
-    let storeDepts: Department[] | undefined;
-    try {
-      const storeSnap = await getDoc(doc(db, 'stores', storeId));
-      if (storeSnap.exists()) {
-        storeDepts = storeSnap.data()?.departments;
-      }
-    } catch (_) {}
+    // Resolve store departments for name/ID matching if not passed
+    let resolvedStoreDepts = storeDepartments;
+    if (!resolvedStoreDepts) {
+      try {
+        const storeSnap = await getDoc(doc(db, 'stores', storeId));
+        if (storeSnap.exists()) {
+          resolvedStoreDepts = storeSnap.data()?.departments;
+        }
+      } catch (_) {}
+    }
 
-    const q = query(
-      collection(db, 'stores', storeId, 'assigned_tasks'),
-      where('status', '==', 'active')
-    );
-    const snap = await getDocs(q);
-    const tasks = snap.docs.map(d => ({ id: d.id, ...d.data() } as AssignedTask));
-    return tasks.filter(task => {
-      const matchDate = task.repeatDaily ? true : (Array.isArray(task.executionDates) && task.executionDates.includes(dateStr));
-      if (!matchDate) return false;
-      if (task.targetType === 'allStore') return true;
-      if (task.targetType === 'department') {
-        const matchesDept = isUserInDepartmentOnDate({
-          userId,
-          dateStr,
-          targetDeptId: task.targetDepartmentId,
-          targetDeptName: task.targetDepartmentName,
-          schedule: resolvedSchedule,
-          memberDepartment: resolvedDept,
-          storeDepartments: storeDepts,
-        });
-        if (matchesDept) return true;
-        return Array.isArray(task.assignedUserIds) && task.assignedUserIds.includes(userId);
-      }
-      return Array.isArray(task.assignedUserIds) && task.assignedUserIds.includes(userId);
+    let tasks: AssignedTask[];
+    if (preloadedTasks && preloadedTasks.length > 0) {
+      tasks = preloadedTasks;
+    } else {
+      const q = query(
+        collection(db, 'stores', storeId, 'assigned_tasks'),
+        where('status', '==', 'active')
+      );
+      const snap = await getDocs(q);
+      tasks = snap.docs.map(d => ({ id: d.id, ...d.data() } as AssignedTask));
+    }
+
+    return filterTasksForUserOnDate({
+      tasks,
+      userId,
+      dateStr,
+      userDepartment: resolvedDept,
+      schedule: resolvedSchedule,
+      storeDepartments: resolvedStoreDepts,
     });
   } catch (err) {
     console.error('Error in getTasksForUserOnDate:', err);

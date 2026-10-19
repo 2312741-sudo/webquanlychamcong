@@ -7,6 +7,7 @@ import {
   updateTask,
   deleteTask,
   watchStoreTasks,
+  filterTasksForUserOnDate,
   getTasksForUserOnDate,
   watchTaskSubmissions,
   saveTaskSubmission,
@@ -25,7 +26,11 @@ import {
   getRoleLabel,
   normalizeRole,
 } from '@/lib/types';
-import { getMondayOfWeek, getUserIdsInDepartmentOnDate } from '@/lib/departmentUtils';
+import {
+  getMondayOfWeek,
+  getUserIdsInDepartmentOnDate,
+  isDateMatchingTask,
+} from '@/lib/departmentUtils';
 
 export default function TasksPage() {
   const { storeId, store, members, currentMember, user, role } = useApp();
@@ -39,13 +44,27 @@ export default function TasksPage() {
     isManagerOrOwner ? 'management' : 'my_tasks'
   );
 
+  // ── Store-wide Tasks Listener (Realtime in-memory cache for 0ms date switching) ──
+  const [allTasks, setAllTasks] = useState<AssignedTask[]>([]);
+  const [tasksLoaded, setTasksLoaded] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!storeId) return;
+    const unsub = watchStoreTasks(storeId, (tasks) => {
+      setAllTasks(tasks);
+      setTasksLoaded(true);
+    });
+    return unsub;
+  }, [storeId]);
+
+  // Week schedules cache by weekStart (e.g. '2026-10-19')
+  const [weekSchedules, setWeekSchedules] = useState<Record<string, ScheduleModel | null>>({});
+
   // ──────────────────────────────────────────────────────────────────────────
   // TAB 1: VIỆC CỦA TÔI TRONG CA (My Tasks)
   // ──────────────────────────────────────────────────────────────────────────
   const [selectedMyDate, setSelectedMyDate] = useState<string>(todayStr);
-  const [myTasks, setMyTasks] = useState<AssignedTask[]>([]);
   const [mySubmissions, setMySubmissions] = useState<Record<string, TaskSubmission>>({});
-  const [loadingMyTasks, setLoadingMyTasks] = useState<boolean>(true);
 
   // Form drafts for reporting each task: { [taskId]: { text: string, photos: string[], uploading: boolean } }
   const [taskDrafts, setTaskDrafts] = useState<
@@ -53,44 +72,31 @@ export default function TasksPage() {
   >({});
   const [savingTaskId, setSavingTaskId] = useState<string | null>(null);
 
-  // Fetch my tasks for selected date
-  const loadMyTasks = useCallback(async () => {
-    if (!storeId || !user) return;
-    setLoadingMyTasks(true);
-    try {
-      const tasks = await getTasksForUserOnDate(
-        storeId,
-        user.uid,
-        selectedMyDate,
-        currentMember?.department
-      );
-      setMyTasks(tasks);
-
-      // Load submissions for these tasks
-      const subsRecord: Record<string, TaskSubmission> = {};
-      const draftsRecord: Record<string, { text: string; photos: string[]; uploading: boolean }> = {};
-
-      for (const t of tasks) {
-        // We will fetch submission for (user.uid, selectedMyDate)
-        try {
-          const subDocId = `${user.uid}_${selectedMyDate}`;
-          // Read from store tasks submissions
-          // We can use a lightweight one-shot fetch or watch
-          // For now, let's load submissions
-        } catch (e) {
-          console.error(e);
-        }
-      }
-    } catch (err) {
-      console.error('Lỗi khi tải công việc cá nhân:', err);
-    } finally {
-      setLoadingMyTasks(false);
-    }
-  }, [storeId, user, selectedMyDate, currentMember?.department]);
-
+  // Subscribe to week schedule for selected date if not yet loaded
+  const currentWeekStart = useMemo(() => getMondayOfWeek(selectedMyDate), [selectedMyDate]);
   useEffect(() => {
-    loadMyTasks();
-  }, [loadMyTasks]);
+    if (!storeId || !currentWeekStart) return;
+    if (weekSchedules[currentWeekStart] !== undefined) return;
+    const unsub = watchWeekSchedule(storeId, currentWeekStart, (sched) => {
+      setWeekSchedules((prev) => ({ ...prev, [currentWeekStart]: sched }));
+    });
+    return unsub;
+  }, [storeId, currentWeekStart, weekSchedules]);
+
+  // Pure in-memory filtering: 0ms instant response when switching dates!
+  const myTasks = useMemo(() => {
+    if (!user) return [];
+    return filterTasksForUserOnDate({
+      tasks: allTasks,
+      userId: user.uid,
+      dateStr: selectedMyDate,
+      userDepartment: currentMember?.department,
+      schedule: weekSchedules[currentWeekStart] ?? null,
+      storeDepartments: store?.departments,
+    });
+  }, [allTasks, user, selectedMyDate, currentMember?.department, weekSchedules, currentWeekStart, store?.departments]);
+
+  const loadingMyTasks = !tasksLoaded;
 
   // Subscribe to submissions for my tasks on selected date
   useEffect(() => {
@@ -106,7 +112,6 @@ export default function TasksPage() {
           if (mySub) {
             setMySubmissions((prev) => ({ ...prev, [task.id]: mySub }));
             setTaskDrafts((prev) => {
-              // Only seed draft if not already edited
               if (!prev[task.id]) {
                 return {
                   ...prev,
@@ -243,39 +248,25 @@ export default function TasksPage() {
   // ──────────────────────────────────────────────────────────────────────────
   // TAB 2: QUẢN LÝ GIAO VIỆC (Management)
   // ──────────────────────────────────────────────────────────────────────────
-  const [allTasks, setAllTasks] = useState<AssignedTask[]>([]);
   const [filterDateMode, setFilterDateMode] = useState<'all' | 'today' | 'tomorrow' | 'custom'>('all');
   const [filterCustomDate, setFilterCustomDate] = useState<string>(todayStr);
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'completed' | 'cancelled'>('all');
   const [searchKeyword, setSearchKeyword] = useState<string>('');
 
-  // Watch store tasks
-  useEffect(() => {
-    if (!storeId || !isManagerOrOwner) return;
-    const unsub = watchStoreTasks(storeId, setAllTasks);
-    return unsub;
-  }, [storeId, isManagerOrOwner]);
-
-  // Filtered tasks
+  // Filtered tasks using isDateMatchingTask (supports repeatDaily & repeatDaysOfWeek)
   const filteredTasks = useMemo(() => {
     let result = allTasks;
 
     // Filter date
     if (filterDateMode === 'today') {
-      result = result.filter(
-        (t) => t.repeatDaily || (Array.isArray(t.executionDates) && t.executionDates.includes(todayStr))
-      );
+      result = result.filter((t) => isDateMatchingTask(todayStr, t));
     } else if (filterDateMode === 'tomorrow') {
       const tom = new Date();
       tom.setDate(tom.getDate() + 1);
       const tomStr = getVietnamDateString(tom);
-      result = result.filter(
-        (t) => t.repeatDaily || (Array.isArray(t.executionDates) && t.executionDates.includes(tomStr))
-      );
+      result = result.filter((t) => isDateMatchingTask(tomStr, t));
     } else if (filterDateMode === 'custom' && filterCustomDate) {
-      result = result.filter(
-        (t) => t.repeatDaily || (Array.isArray(t.executionDates) && t.executionDates.includes(filterCustomDate))
-      );
+      result = result.filter((t) => isDateMatchingTask(filterCustomDate, t));
     }
 
     // Filter status
@@ -303,11 +294,13 @@ export default function TasksPage() {
   // ── Create Task Form State ──
   const [newTitle, setNewTitle] = useState('');
   const [newDescription, setNewDescription] = useState('');
+  // Recurrence mode: 0: Ngày cụ thể, 1: Lặp mỗi ngày, 2: Lặp theo thứ hàng tuần
+  const [newRepeatMode, setNewRepeatMode] = useState<number>(0);
+  const [newRepeatDaysOfWeek, setNewRepeatDaysOfWeek] = useState<number[]>([]);
   const [newDates, setNewDates] = useState<string[]>([todayStr]);
   const [customAddDate, setCustomAddDate] = useState<string>('');
   const [newTargetType, setNewTargetType] = useState<TaskTargetType>('allStore');
-  const [newDepartmentId, setNewDepartmentId] = useState<string>('');
-  const [newRepeatDaily, setNewRepeatDaily] = useState<boolean>(false);
+  const [newDepartmentIds, setNewDepartmentIds] = useState<string[]>([]);
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [newRequirePhoto, setNewRequirePhoto] = useState<boolean>(false);
   const [creatingTask, setCreatingTask] = useState<boolean>(false);
@@ -315,11 +308,12 @@ export default function TasksPage() {
   const resetCreateForm = () => {
     setNewTitle('');
     setNewDescription('');
+    setNewRepeatMode(0);
+    setNewRepeatDaysOfWeek([]);
     setNewDates([todayStr]);
     setCustomAddDate('');
     setNewTargetType('allStore');
-    setNewDepartmentId('');
-    setNewRepeatDaily(false);
+    setNewDepartmentIds([]);
     setSelectedMemberIds([]);
     setNewRequirePhoto(false);
   };
@@ -335,20 +329,14 @@ export default function TasksPage() {
     setNewDates((prev) => prev.filter((d) => d !== dateStr));
   };
 
-  const handleToggleRepeatDaily = (checked: boolean) => {
-    setNewRepeatDaily(checked);
-    if (checked) {
-      const dates: string[] = [];
-      const base = new Date();
-      for (let i = 0; i < 60; i++) {
-        const d = new Date(base);
-        d.setDate(base.getDate() + i);
-        dates.push(getVietnamDateString(d));
+  const handleToggleDayOfWeek = (day: number) => {
+    setNewRepeatDaysOfWeek((prev) => {
+      if (prev.includes(day)) {
+        return prev.filter((d) => d !== day);
+      } else {
+        return [...prev, day].sort((a, b) => a - b);
       }
-      setNewDates(dates);
-    } else {
-      setNewDates([todayStr]);
-    }
+    });
   };
 
   const handleCreateTaskSubmit = async (e: React.FormEvent) => {
@@ -358,49 +346,85 @@ export default function TasksPage() {
       alert('Vui lòng nhập tiêu đề công việc');
       return;
     }
-    let finalDates = [...newDates];
-    if (newRepeatDaily && finalDates.length === 0) {
-      const base = new Date();
+
+    const isRepeatDaily = newRepeatMode === 1;
+    const isRepeatDaysOfWeek = newRepeatMode === 2;
+    const sortedDaysOfWeek = isRepeatDaysOfWeek ? [...newRepeatDaysOfWeek].sort((a, b) => a - b) : [];
+
+    if (newRepeatMode === 0 && newDates.length === 0) {
+      alert('Vui lòng chọn ít nhất 1 ngày thực hiện');
+      return;
+    }
+
+    if (isRepeatDaysOfWeek && sortedDaysOfWeek.length === 0) {
+      alert('Vui lòng chọn ít nhất một thứ trong tuần để lặp lại');
+      return;
+    }
+
+    if (newTargetType === 'individual' && selectedMemberIds.length === 0) {
+      alert('Vui lòng chọn ít nhất 1 thành viên nhận việc');
+      return;
+    }
+    if (newTargetType === 'department' && newDepartmentIds.length === 0) {
+      alert('Vui lòng chọn ít nhất một bộ phận nhận việc');
+      return;
+    }
+
+    // Generate fallback executionDates for next 60 days
+    const finalDates: string[] = [];
+    const base = new Date();
+    if (isRepeatDaysOfWeek) {
+      for (let i = 0; i < 60; i++) {
+        const d = new Date(base);
+        d.setDate(base.getDate() + i);
+        const jsDay = d.getDay();
+        const isoDay = jsDay === 0 ? 7 : jsDay;
+        if (sortedDaysOfWeek.includes(isoDay)) {
+          finalDates.push(getVietnamDateString(d));
+        }
+      }
+    } else if (isRepeatDaily) {
       for (let i = 0; i < 60; i++) {
         const d = new Date(base);
         d.setDate(base.getDate() + i);
         finalDates.push(getVietnamDateString(d));
       }
-    }
-    if (!newRepeatDaily && finalDates.length === 0) {
-      alert('Vui lòng chọn ít nhất 1 ngày thực hiện');
-      return;
-    }
-    if (newTargetType === 'individual' && selectedMemberIds.length === 0) {
-      alert('Vui lòng chọn ít nhất 1 thành viên nhận việc');
-      return;
-    }
-    if (newTargetType === 'department' && !newDepartmentId) {
-      alert('Vui lòng chọn bộ phận nhận việc');
-      return;
+    } else {
+      finalDates.push(...newDates);
     }
 
     setCreatingTask(true);
     try {
       let assignedNames: string[] = [];
       let assignedUserIds: string[] = [];
-      let targetDeptName = '';
+      const selectedDeptNames: string[] = [];
 
       if (newTargetType === 'allStore') {
         assignedNames = ['Toàn bộ cửa hàng'];
         assignedUserIds = [];
       } else if (newTargetType === 'department') {
-        const deptObj = store?.departments?.find((d) => d.id === newDepartmentId);
-        targetDeptName = deptObj?.name || 'Bộ phận';
-        const deptMembers = members.filter(
-          (m) => m.department && deptObj && (
-            m.department.trim().toLowerCase() === deptObj.id.trim().toLowerCase() ||
-            m.department.trim().toLowerCase() === deptObj.name.trim().toLowerCase()
-          )
-        );
-        const combinedIds = Array.from(new Set([...deptMembers.map(m => m.userId), ...selectedMemberIds]));
+        const depts = store?.departments || [];
+        for (const dId of newDepartmentIds) {
+          const d = depts.find((dept: any) => dept.id === dId);
+          if (d) selectedDeptNames.push(d.name);
+        }
+
+        const deptMembers = members.filter((m) => {
+          if (!m.department || !m.department.trim()) return false;
+          const mDept = m.department.trim().toLowerCase();
+          return newDepartmentIds.some((dId) => {
+            const d = depts.find((dept: any) => dept.id === dId);
+            if (!d) return false;
+            const sId = d.id.trim().toLowerCase();
+            const sName = d.name.trim().toLowerCase();
+            const sShort = d.shortName?.trim().toLowerCase();
+            return mDept === sId || mDept === sName || (sShort && mDept === sShort);
+          });
+        });
+
+        const combinedIds = Array.from(new Set([...deptMembers.map((m) => m.userId), ...selectedMemberIds]));
         assignedUserIds = combinedIds;
-        assignedNames = combinedIds.map(uid => members.find(m => m.userId === uid)?.name || uid);
+        assignedNames = combinedIds.map((uid) => members.find((m) => m.userId === uid)?.name || uid);
       } else {
         assignedUserIds = selectedMemberIds;
         assignedNames = selectedMemberIds.map((uid) => {
@@ -420,13 +444,16 @@ export default function TasksPage() {
         assignedUserIds,
         assignedNames,
         executionDates: finalDates,
-        repeatDaily: newRepeatDaily,
+        repeatDaily: isRepeatDaily,
+        repeatDaysOfWeek: sortedDaysOfWeek,
         requirePhoto: newRequirePhoto,
         status: 'active',
         ...(newTargetType === 'department'
           ? {
-              targetDepartmentId: newDepartmentId,
-              targetDepartmentName: targetDeptName,
+              targetDepartmentId: newDepartmentIds[0] || '',
+              targetDepartmentName: selectedDeptNames[0] || '',
+              targetDepartmentIds: newDepartmentIds,
+              targetDepartmentNames: selectedDeptNames,
             }
           : {}),
       };
@@ -698,7 +725,7 @@ export default function TasksPage() {
                           <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>
                             {idx + 1}. {task.title}
                           </span>
-                          {task.repeatDaily && (
+                          {task.repeatDaily ? (
                             <span
                               style={{
                                 background: '#ecfdf5',
@@ -711,7 +738,20 @@ export default function TasksPage() {
                             >
                               🔁 Lặp mỗi ngày
                             </span>
-                          )}
+                          ) : task.repeatDaysOfWeek && task.repeatDaysOfWeek.length > 0 ? (
+                            <span
+                              style={{
+                                background: '#ecfdf5',
+                                color: '#047857',
+                                fontSize: 12,
+                                fontWeight: 700,
+                                padding: '3px 8px',
+                                borderRadius: 6,
+                              }}
+                            >
+                              🗓️ Lặp thứ {task.repeatDaysOfWeek.map(d => d === 7 ? 'CN' : `T${d + 1}`).join(', ')}
+                            </span>
+                          ) : null}
                           {task.targetType === 'department' && (
                             <span
                               style={{
@@ -723,7 +763,7 @@ export default function TasksPage() {
                                 borderRadius: 6,
                               }}
                             >
-                              🏢 {task.targetDepartmentName || 'Bộ phận'}
+                              🏢 {(task.targetDepartmentNames && task.targetDepartmentNames.length > 0 ? task.targetDepartmentNames.join(', ') : task.targetDepartmentName) || 'Bộ phận'}
                             </span>
                           )}
                           {task.requirePhoto && (
@@ -1236,11 +1276,11 @@ export default function TasksPage() {
                             {isAllStore
                               ? '🏪 Toàn cửa hàng'
                               : isDept
-                              ? `🏢 Bộ phận: ${task.targetDepartmentName || 'Bộ phận'}`
+                              ? `🏢 Bộ phận: ${task.targetDepartmentNames && task.targetDepartmentNames.length > 0 ? task.targetDepartmentNames.join(', ') : (task.targetDepartmentName || 'Bộ phận')}`
                               : `👤 ${task.assignedNames?.length || 0} nhân sự`}
                           </span>
 
-                          {task.repeatDaily && (
+                          {task.repeatDaily ? (
                             <span
                               style={{
                                 fontSize: 11,
@@ -1253,7 +1293,20 @@ export default function TasksPage() {
                             >
                               🔁 Lặp mỗi ngày
                             </span>
-                          )}
+                          ) : task.repeatDaysOfWeek && task.repeatDaysOfWeek.length > 0 ? (
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 700,
+                                padding: '3px 8px',
+                                borderRadius: 6,
+                                background: '#ecfdf5',
+                                color: '#047857',
+                              }}
+                            >
+                              🗓️ Lặp thứ {task.repeatDaysOfWeek.map(d => d === 7 ? 'CN' : `T${d + 1}`).join(', ')}
+                            </span>
+                          ) : null}
                         </div>
 
                         <div style={{ display: 'flex', gap: 4 }}>
@@ -1300,7 +1353,7 @@ export default function TasksPage() {
                       {/* Target preview */}
                       {isDept && (
                         <div style={{ fontSize: 12, color: '#6d28d9', marginBottom: 10 }}>
-                          <strong>Áp dụng cho:</strong> Bộ phận {task.targetDepartmentName}
+                          <strong>Áp dụng cho:</strong> Bộ phận {task.targetDepartmentNames && task.targetDepartmentNames.length > 0 ? task.targetDepartmentNames.join(', ') : task.targetDepartmentName}
                           {task.assignedNames && task.assignedNames.length > 0 && ` (${task.assignedNames.length} nhân viên)`}
                         </div>
                       )}
@@ -1313,11 +1366,15 @@ export default function TasksPage() {
                       {/* Dates chips */}
                       <div style={{ marginBottom: 14 }}>
                         <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>
-                          {task.repeatDaily ? 'Lịch thực hiện:' : `Ngày thực hiện (${task.executionDates?.length || 0} ngày):`}
+                          {task.repeatDaily || (task.repeatDaysOfWeek && task.repeatDaysOfWeek.length > 0) ? 'Lịch thực hiện:' : `Ngày thực hiện (${task.executionDates?.length || 0} ngày):`}
                         </div>
                         {task.repeatDaily ? (
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#047857', background: '#ecfdf5', padding: '3px 8px', borderRadius: 6 }}>
                             <span>🔁 Tự động lặp lại mỗi ngày</span>
+                          </div>
+                        ) : task.repeatDaysOfWeek && task.repeatDaysOfWeek.length > 0 ? (
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#047857', background: '#ecfdf5', padding: '3px 8px', borderRadius: 6 }}>
+                            <span>🗓️ Lặp vào thứ {task.repeatDaysOfWeek.map(d => d === 7 ? 'CN' : `T${d + 1}`).join(', ')} hàng tuần</span>
                           </div>
                         ) : (
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
@@ -1469,54 +1526,158 @@ export default function TasksPage() {
                 />
               </div>
 
-              {/* Ngày thực hiện (Linh hoạt chọn nhiều ngày hoặc Lặp mỗi ngày) */}
+              {/* Ngày thực hiện & Lặp lại */}
               <div style={{ background: '#f9fafb', padding: 14, borderRadius: 12, border: '1px solid #e5e7eb' }}>
                 <label style={{ display: 'block', fontWeight: 700, fontSize: 14, marginBottom: 8, color: 'var(--text-primary)' }}>
-                  📅 Thời gian thực hiện: <span style={{ color: '#ef4444' }}>*</span>
+                  📅 Thời gian thực hiện & Lặp lại: <span style={{ color: '#ef4444' }}>*</span>
                 </label>
 
-                {/* Switch Lặp mỗi ngày */}
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    background: newRepeatDaily ? '#ecfdf5' : '#ffffff',
-                    border: newRepeatDaily ? '1.5px solid #10b981' : '1px solid #d1d5db',
-                    borderRadius: 10,
-                    padding: '10px 14px',
-                    marginBottom: 12,
-                  }}
-                >
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: 13.5, color: newRepeatDaily ? '#065f46' : 'var(--text-primary)' }}>
-                      <span>🔁 Lặp mỗi ngày</span>
-                      {newRepeatDaily && (
-                        <span style={{ fontSize: 10, fontWeight: 700, background: '#10b981', color: 'white', padding: '1px 6px', borderRadius: 4 }}>
-                          BẬT
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ fontSize: 12, color: newRepeatDaily ? '#047857' : '#6b7280', marginTop: 2 }}>
-                      {newRepeatDaily
-                        ? 'Tự động áp dụng cho các ca làm việc mỗi ngày (đã lập lịch sẵn 60 ngày)'
-                        : 'Giao việc cho các ngày cụ thể được chọn bên dưới'}
-                    </div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    id="repeatDailyToggle"
-                    checked={newRepeatDaily}
-                    onChange={(e) => handleToggleRepeatDaily(e.target.checked)}
-                    style={{ width: 18, height: 18, cursor: 'pointer' }}
-                  />
+                {/* Segment buttons for repeat mode */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 14 }}>
+                  <button
+                    type="button"
+                    onClick={() => setNewRepeatMode(0)}
+                    style={{
+                      padding: '8px 10px',
+                      borderRadius: 8,
+                      fontSize: 13,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      border: newRepeatMode === 0 ? '1.5px solid var(--primary)' : '1px solid #d1d5db',
+                      background: newRepeatMode === 0 ? 'var(--primary)' : 'white',
+                      color: newRepeatMode === 0 ? 'white' : '#374151',
+                    }}
+                  >
+                    📅 Ngày cụ thể
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewRepeatMode(1)}
+                    style={{
+                      padding: '8px 10px',
+                      borderRadius: 8,
+                      fontSize: 13,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      border: newRepeatMode === 1 ? '1.5px solid #10b981' : '1px solid #d1d5db',
+                      background: newRepeatMode === 1 ? '#10b981' : 'white',
+                      color: newRepeatMode === 1 ? 'white' : '#374151',
+                    }}
+                  >
+                    🔁 Lặp mỗi ngày
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewRepeatMode(2);
+                      if (newRepeatDaysOfWeek.length === 0) {
+                        const jsDay = new Date().getDay();
+                        setNewRepeatDaysOfWeek([jsDay === 0 ? 7 : jsDay]);
+                      }
+                    }}
+                    style={{
+                      padding: '8px 10px',
+                      borderRadius: 8,
+                      fontSize: 13,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      border: newRepeatMode === 2 ? '1.5px solid #6366f1' : '1px solid #d1d5db',
+                      background: newRepeatMode === 2 ? '#6366f1' : 'white',
+                      color: newRepeatMode === 2 ? 'white' : '#374151',
+                    }}
+                  >
+                    🗓️ Lặp theo thứ
+                  </button>
                 </div>
 
-                {newRepeatDaily ? (
-                  <div style={{ padding: '10px 14px', background: '#f0fdf4', border: '1px dashed #86efac', borderRadius: 8, fontSize: 12.5, color: '#166534' }}>
-                    ✓ Công việc này sẽ tự động lặp lại hàng ngày (từ hôm nay {todayStr} đến 60 ngày tiếp theo). Nhân viên làm việc ngày nào sẽ thấy nhiệm vụ của ngày đó.
+                {/* Mode 1: Lặp mỗi ngày */}
+                {newRepeatMode === 1 && (
+                  <div style={{ padding: '12px 14px', background: '#f0fdf4', border: '1px dashed #86efac', borderRadius: 8, fontSize: 13, color: '#166534', lineHeight: 1.5 }}>
+                    ✓ <strong>Lặp mỗi ngày:</strong> Công việc sẽ tự động áp dụng cho các ca làm việc hàng ngày (được lập lịch sẵn cho 60 ngày tiếp theo). Nhân viên làm việc ca nào trong ngày đều sẽ nhận được nhiệm vụ.
                   </div>
-                ) : (
+                )}
+
+                {/* Mode 2: Lặp theo thứ hàng tuần */}
+                {newRepeatMode === 2 && (
+                  <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 10, padding: 12 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 700, color: '#5b21b6', marginBottom: 8 }}>
+                      Chọn một hoặc nhiều thứ trong tuần để lặp lại:
+                    </div>
+
+                    {/* Day-of-week buttons */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, marginBottom: 12 }}>
+                      {[
+                        { day: 1, label: 'Thứ 2' },
+                        { day: 2, label: 'Thứ 3' },
+                        { day: 3, label: 'Thứ 4' },
+                        { day: 4, label: 'Thứ 5' },
+                        { day: 5, label: 'Thứ 6' },
+                        { day: 6, label: 'Thứ 7' },
+                        { day: 7, label: 'Chủ Nhật' },
+                      ].map(({ day, label }) => {
+                        const isSelected = newRepeatDaysOfWeek.includes(day);
+                        return (
+                          <button
+                            key={day}
+                            type="button"
+                            onClick={() => handleToggleDayOfWeek(day)}
+                            style={{
+                              padding: '10px 4px',
+                              borderRadius: 8,
+                              fontSize: 12.5,
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              border: isSelected ? '1.5px solid #6366f1' : '1px solid #c7d2fe',
+                              background: isSelected ? '#6366f1' : 'white',
+                              color: isSelected ? 'white' : '#4338ca',
+                              transition: 'all 0.15s ease',
+                              textAlign: 'center',
+                            }}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Quick Presets */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                      <span style={{ fontSize: 11.5, color: '#6d28d9', fontWeight: 600 }}>Chọn nhanh:</span>
+                      {[
+                        { label: 'T2, T4, T6', days: [1, 3, 5] },
+                        { label: 'T3, T5, T7', days: [2, 4, 6] },
+                        { label: 'Cuối tuần (T7, CN)', days: [6, 7] },
+                        { label: 'Ngày thường (T2 - T6)', days: [1, 2, 3, 4, 5] },
+                        { label: 'Cả tuần', days: [1, 2, 3, 4, 5, 6, 7] },
+                      ].map((preset) => (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          onClick={() => setNewRepeatDaysOfWeek(preset.days)}
+                          style={{
+                            padding: '3px 8px',
+                            borderRadius: 6,
+                            background: '#ede9fe',
+                            color: '#5b21b6',
+                            fontSize: 11.5,
+                            fontWeight: 600,
+                            border: '1px solid #ddd6fe',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div style={{ fontSize: 12, color: '#6d28d9', marginTop: 10 }}>
+                      ✓ Đã chọn: <strong>{newRepeatDaysOfWeek.length > 0 ? newRepeatDaysOfWeek.map(d => d === 7 ? 'Chủ Nhật' : `Thứ ${d + 1}`).join(', ') : 'Chưa chọn thứ nào'}</strong>. Công việc sẽ tự động xuất hiện vào các ngày này hàng tuần.
+                    </div>
+                  </div>
+                )}
+
+                {/* Mode 0: Ngày cụ thể */}
+                {newRepeatMode === 0 && (
                   <>
                     <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 10 }}>
                       Bạn có thể chọn một hoặc nhiều ngày trong tương lai (Hôm nay, Ngày mai, Chủ Nhật, Thứ 4...).
@@ -1646,7 +1807,7 @@ export default function TasksPage() {
                       checked={newTargetType === 'allStore'}
                       onChange={() => {
                         setNewTargetType('allStore');
-                        setNewDepartmentId('');
+                        setNewDepartmentIds([]);
                       }}
                     />
                     <strong>Toàn bộ cửa hàng</strong> (Mọi nhân sự & quản lý)
@@ -1658,8 +1819,8 @@ export default function TasksPage() {
                       checked={newTargetType === 'department'}
                       onChange={() => {
                         setNewTargetType('department');
-                        if (!newDepartmentId && store?.departments && store.departments.length > 0) {
-                          setNewDepartmentId(store.departments[0].id);
+                        if (newDepartmentIds.length === 0 && store?.departments && store.departments.length > 0) {
+                          setNewDepartmentIds([store.departments[0].id]);
                         }
                       }}
                     />
@@ -1672,14 +1833,14 @@ export default function TasksPage() {
                       checked={newTargetType === 'individual'}
                       onChange={() => {
                         setNewTargetType('individual');
-                        setNewDepartmentId('');
+                        setNewDepartmentIds([]);
                       }}
                     />
                     <strong>Chỉ định cá nhân / nhóm</strong>
                   </label>
                 </div>
 
-                {/* Department selection */}
+                {/* Department selection (Multi-department support) */}
                 {newTargetType === 'department' && (
                   <div
                     style={{
@@ -1700,18 +1861,44 @@ export default function TasksPage() {
                     ) : (
                       <>
                         <div style={{ background: '#ede9fe', color: '#6d28d9', padding: '8px 12px', borderRadius: 8, fontSize: 12, marginBottom: 8, lineHeight: 1.4 }}>
-                          💡 <strong>Tự động theo ca:</strong> Công việc sẽ tự động giao cho các nhân sự có ca làm việc thuộc bộ phận này theo từng ngày (dựa theo Lịch làm việc tuần / Bộ phận của nhân viên).
+                          💡 <strong>Tự động theo ca:</strong> Cho phép chọn một hoặc NHIỀU bộ phận cùng lúc. Công việc sẽ tự động giao cho các nhân sự có ca làm việc thuộc các bộ phận này theo từng ngày (dựa theo Lịch làm việc tuần / Bộ phận của nhân viên).
                         </div>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: '#4b5563', marginBottom: 2 }}>
-                          Chọn bộ phận nhận việc:
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                          <span style={{ fontSize: 12.5, fontWeight: 700, color: '#4b5563' }}>
+                            Chọn các bộ phận nhận việc ({newDepartmentIds.length}/{store.departments.length}):
+                          </span>
+                          {store.departments.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (newDepartmentIds.length === store.departments!.length) {
+                                  setNewDepartmentIds([]);
+                                } else {
+                                  setNewDepartmentIds(store.departments!.map((d) => d.id));
+                                }
+                              }}
+                              style={{
+                                background: 'none',
+                                color: '#2563eb',
+                                fontSize: 12,
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                border: 'none',
+                                padding: '2px 4px',
+                              }}
+                            >
+                              {newDepartmentIds.length === store.departments.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+                            </button>
+                          )}
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 }}>
                           {store.departments.map((dept) => {
-                            const isSelected = newDepartmentId === dept.id;
+                            const isSelected = newDepartmentIds.includes(dept.id);
                             const deptMembers = members.filter(
                               (m) => m.department && (
                                 m.department.trim().toLowerCase() === dept.id.trim().toLowerCase() ||
-                                m.department.trim().toLowerCase() === dept.name.trim().toLowerCase()
+                                m.department.trim().toLowerCase() === dept.name.trim().toLowerCase() ||
+                                (dept.shortName && m.department.trim().toLowerCase() === dept.shortName.trim().toLowerCase())
                               )
                             );
                             return (
@@ -1731,10 +1918,15 @@ export default function TasksPage() {
                               >
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                   <input
-                                    type="radio"
-                                    name="departmentOption"
+                                    type="checkbox"
                                     checked={isSelected}
-                                    onChange={() => setNewDepartmentId(dept.id)}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setNewDepartmentIds((prev) => [...prev, dept.id]);
+                                      } else {
+                                        setNewDepartmentIds((prev) => prev.filter((id) => id !== dept.id));
+                                      }
+                                    }}
                                   />
                                   <div>
                                     <span style={{ fontWeight: 600, fontSize: 13.5, color: isSelected ? '#1e40af' : '#1f2937' }}>
@@ -2053,6 +2245,8 @@ function TaskSubmissionsModal({
         dateStr: selectedDate,
         targetDeptId: task.targetDepartmentId,
         targetDeptName: task.targetDepartmentName,
+        targetDeptIds: task.targetDepartmentIds,
+        targetDeptNames: task.targetDepartmentNames,
         allMembers: members,
         schedule,
         storeDepartments: store?.departments,
@@ -2128,7 +2322,7 @@ function TaskSubmissionsModal({
               )}
               {task.targetType === 'department' && (
                 <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6, background: '#ede9fe', color: '#6d28d9' }}>
-                  🏢 Bộ phận: {task.targetDepartmentName || 'Bộ phận'}
+                  🏢 Bộ phận: {task.targetDepartmentNames && task.targetDepartmentNames.length > 0 ? task.targetDepartmentNames.join(', ') : (task.targetDepartmentName || 'Bộ phận')}
                 </span>
               )}
               {task.targetType === 'individual' && (
@@ -2136,11 +2330,15 @@ function TaskSubmissionsModal({
                   👤 Chỉ định cá nhân
                 </span>
               )}
-              {task.repeatDaily && (
+              {task.repeatDaily ? (
                 <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6, background: '#ecfdf5', color: '#047857' }}>
                   🔁 Lặp mỗi ngày
                 </span>
-              )}
+              ) : task.repeatDaysOfWeek && task.repeatDaysOfWeek.length > 0 ? (
+                <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6, background: '#ecfdf5', color: '#047857' }}>
+                  🗓️ Lặp thứ {task.repeatDaysOfWeek.map(d => d === 7 ? 'CN' : `T${d + 1}`).join(', ')} hàng tuần
+                </span>
+              ) : null}
               {task.requirePhoto && (
                 <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 6, background: '#f3e8ff', color: '#6b21a8' }}>
                   📸 Bắt buộc ảnh
@@ -2331,9 +2529,22 @@ function EditTaskModal({
   const [description, setDescription] = useState(task.description || '');
   const [status, setStatus] = useState<TaskStatus>(task.status || 'active');
   const [targetType, setTargetType] = useState<TaskTargetType>(task.targetType || 'allStore');
-  const [departmentId, setDepartmentId] = useState<string>(task.targetDepartmentId || '');
+  const [departmentIds, setDepartmentIds] = useState<string[]>(() => {
+    if (task.targetDepartmentIds && task.targetDepartmentIds.length > 0) {
+      return task.targetDepartmentIds;
+    }
+    if (task.targetDepartmentId) {
+      return [task.targetDepartmentId];
+    }
+    return [];
+  });
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>(task.assignedUserIds || []);
-  const [repeatDaily, setRepeatDaily] = useState<boolean>(task.repeatDaily || false);
+  const [repeatMode, setRepeatMode] = useState<number>(() => {
+    if (task.repeatDaily) return 1;
+    if (task.repeatDaysOfWeek && task.repeatDaysOfWeek.length > 0) return 2;
+    return 0;
+  });
+  const [repeatDaysOfWeek, setRepeatDaysOfWeek] = useState<number[]>(task.repeatDaysOfWeek || []);
   const [dates, setDates] = useState<string[]>(task.executionDates || [todayStr]);
   const [customAddDate, setCustomAddDate] = useState<string>('');
   const [requirePhoto, setRequirePhoto] = useState<boolean>(task.requirePhoto || false);
@@ -2350,20 +2561,14 @@ function EditTaskModal({
     setDates((prev) => prev.filter((d) => d !== dateStr));
   };
 
-  const handleToggleRepeatDaily = (checked: boolean) => {
-    setRepeatDaily(checked);
-    if (checked) {
-      const genDates: string[] = [];
-      const base = new Date();
-      for (let i = 0; i < 60; i++) {
-        const d = new Date(base);
-        d.setDate(base.getDate() + i);
-        genDates.push(getVietnamDateString(d));
+  const handleToggleDayOfWeek = (day: number) => {
+    setRepeatDaysOfWeek((prev) => {
+      if (prev.includes(day)) {
+        return prev.filter((d) => d !== day);
+      } else {
+        return [...prev, day].sort((a, b) => a - b);
       }
-      setDates(genDates);
-    } else {
-      setDates(task.executionDates?.length ? task.executionDates : [todayStr]);
-    }
+    });
   };
 
   const getUpcomingDays = () => {
@@ -2390,17 +2595,17 @@ function EditTaskModal({
       return;
     }
 
-    let finalDates = [...dates];
-    if (repeatDaily && finalDates.length === 0) {
-      const base = new Date();
-      for (let i = 0; i < 60; i++) {
-        const d = new Date(base);
-        d.setDate(base.getDate() + i);
-        finalDates.push(getVietnamDateString(d));
-      }
-    }
-    if (!repeatDaily && finalDates.length === 0) {
+    const isRepeatDaily = repeatMode === 1;
+    const isRepeatDaysOfWeek = repeatMode === 2;
+    const sortedDaysOfWeek = isRepeatDaysOfWeek ? [...repeatDaysOfWeek].sort((a, b) => a - b) : [];
+
+    if (repeatMode === 0 && dates.length === 0) {
       alert('Vui lòng chọn ít nhất 1 ngày thực hiện');
+      return;
+    }
+
+    if (isRepeatDaysOfWeek && sortedDaysOfWeek.length === 0) {
+      alert('Vui lòng chọn ít nhất một thứ trong tuần để lặp lại');
       return;
     }
 
@@ -2409,32 +2614,66 @@ function EditTaskModal({
       return;
     }
 
-    if (targetType === 'department' && !departmentId) {
-      alert('Vui lòng chọn bộ phận nhận việc');
+    if (targetType === 'department' && departmentIds.length === 0) {
+      alert('Vui lòng chọn ít nhất một bộ phận nhận việc');
       return;
+    }
+
+    // Generate fallback executionDates for next 60 days
+    const finalDates: string[] = [];
+    const base = new Date();
+    if (isRepeatDaysOfWeek) {
+      for (let i = 0; i < 60; i++) {
+        const d = new Date(base);
+        d.setDate(base.getDate() + i);
+        const jsDay = d.getDay();
+        const isoDay = jsDay === 0 ? 7 : jsDay;
+        if (sortedDaysOfWeek.includes(isoDay)) {
+          finalDates.push(getVietnamDateString(d));
+        }
+      }
+    } else if (isRepeatDaily) {
+      for (let i = 0; i < 60; i++) {
+        const d = new Date(base);
+        d.setDate(base.getDate() + i);
+        finalDates.push(getVietnamDateString(d));
+      }
+    } else {
+      finalDates.push(...dates);
     }
 
     setSaving(true);
     try {
       let assignedNames: string[] = [];
       let assignedUserIds: string[] = [];
-      let targetDeptName = '';
+      const selectedDeptNames: string[] = [];
 
       if (targetType === 'allStore') {
         assignedNames = ['Toàn bộ cửa hàng'];
         assignedUserIds = [];
       } else if (targetType === 'department') {
-        const deptObj = store?.departments?.find((d: any) => d.id === departmentId);
-        targetDeptName = deptObj?.name || 'Bộ phận';
-        const deptMembers = members.filter(
-          (m) => m.department && deptObj && (
-            m.department.trim().toLowerCase() === deptObj.id.trim().toLowerCase() ||
-            m.department.trim().toLowerCase() === deptObj.name.trim().toLowerCase()
-          )
-        );
-        const combinedIds = Array.from(new Set([...deptMembers.map(m => m.userId), ...selectedMemberIds]));
+        const depts = store?.departments || [];
+        for (const dId of departmentIds) {
+          const d = depts.find((dept: any) => dept.id === dId);
+          if (d) selectedDeptNames.push(d.name);
+        }
+
+        const deptMembers = members.filter((m) => {
+          if (!m.department || !m.department.trim()) return false;
+          const mDept = m.department.trim().toLowerCase();
+          return departmentIds.some((dId) => {
+            const d = depts.find((dept: any) => dept.id === dId);
+            if (!d) return false;
+            const sId = d.id.trim().toLowerCase();
+            const sName = d.name.trim().toLowerCase();
+            const sShort = d.shortName?.trim().toLowerCase();
+            return mDept === sId || mDept === sName || (sShort && mDept === sShort);
+          });
+        });
+
+        const combinedIds = Array.from(new Set([...deptMembers.map((m) => m.userId), ...selectedMemberIds]));
         assignedUserIds = combinedIds;
-        assignedNames = combinedIds.map(uid => members.find(m => m.userId === uid)?.name || uid);
+        assignedNames = combinedIds.map((uid) => members.find((m) => m.userId === uid)?.name || uid);
       } else {
         assignedUserIds = selectedMemberIds;
         assignedNames = selectedMemberIds.map((uid) => {
@@ -2451,10 +2690,13 @@ function EditTaskModal({
         assignedUserIds,
         assignedNames,
         executionDates: finalDates,
-        repeatDaily,
+        repeatDaily: isRepeatDaily,
+        repeatDaysOfWeek: sortedDaysOfWeek,
         requirePhoto,
-        targetDepartmentId: targetType === 'department' ? departmentId : '',
-        targetDepartmentName: targetType === 'department' ? targetDeptName : '',
+        targetDepartmentId: targetType === 'department' ? (departmentIds[0] || '') : '',
+        targetDepartmentName: targetType === 'department' ? (selectedDeptNames[0] || '') : '',
+        targetDepartmentIds: targetType === 'department' ? departmentIds : [],
+        targetDepartmentNames: targetType === 'department' ? selectedDeptNames : [],
       };
 
       await updateTask(storeId, task.id, updateData);
@@ -2563,53 +2805,158 @@ function EditTaskModal({
             />
           </div>
 
-          {/* Thời gian thực hiện */}
+          {/* Thời gian thực hiện & Lặp lại */}
           <div style={{ background: '#f9fafb', padding: 14, borderRadius: 12, border: '1px solid #e5e7eb' }}>
             <label style={{ display: 'block', fontWeight: 700, fontSize: 14, marginBottom: 8, color: 'var(--text-primary)' }}>
-              📅 Thời gian thực hiện: <span style={{ color: '#ef4444' }}>*</span>
+              📅 Thời gian thực hiện & Lặp lại: <span style={{ color: '#ef4444' }}>*</span>
             </label>
 
-            {/* Switch Lặp mỗi ngày */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                background: repeatDaily ? '#ecfdf5' : '#ffffff',
-                border: repeatDaily ? '1.5px solid #10b981' : '1px solid #d1d5db',
-                borderRadius: 10,
-                padding: '10px 14px',
-                marginBottom: 12,
-              }}
-            >
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: 13.5, color: repeatDaily ? '#065f46' : 'var(--text-primary)' }}>
-                  <span>🔁 Lặp mỗi ngày</span>
-                  {repeatDaily && (
-                    <span style={{ fontSize: 10, fontWeight: 700, background: '#10b981', color: 'white', padding: '1px 6px', borderRadius: 4 }}>
-                      BẬT
-                    </span>
-                  )}
-                </div>
-                <div style={{ fontSize: 12, color: repeatDaily ? '#047857' : '#6b7280', marginTop: 2 }}>
-                  {repeatDaily
-                    ? 'Tự động áp dụng cho các ca làm việc mỗi ngày'
-                    : 'Giao việc cho các ngày cụ thể được chọn bên dưới'}
-                </div>
-              </div>
-              <input
-                type="checkbox"
-                checked={repeatDaily}
-                onChange={(e) => handleToggleRepeatDaily(e.target.checked)}
-                style={{ width: 18, height: 18, cursor: 'pointer' }}
-              />
+            {/* Segment buttons for repeat mode */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 14 }}>
+              <button
+                type="button"
+                onClick={() => setRepeatMode(0)}
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: 8,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  border: repeatMode === 0 ? '1.5px solid var(--primary)' : '1px solid #d1d5db',
+                  background: repeatMode === 0 ? 'var(--primary)' : 'white',
+                  color: repeatMode === 0 ? 'white' : '#374151',
+                }}
+              >
+                📅 Ngày cụ thể
+              </button>
+              <button
+                type="button"
+                onClick={() => setRepeatMode(1)}
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: 8,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  border: repeatMode === 1 ? '1.5px solid #10b981' : '1px solid #d1d5db',
+                  background: repeatMode === 1 ? '#10b981' : 'white',
+                  color: repeatMode === 1 ? 'white' : '#374151',
+                }}
+              >
+                🔁 Lặp mỗi ngày
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setRepeatMode(2);
+                  if (repeatDaysOfWeek.length === 0) {
+                    const jsDay = new Date().getDay();
+                    setRepeatDaysOfWeek([jsDay === 0 ? 7 : jsDay]);
+                  }
+                }}
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: 8,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  border: repeatMode === 2 ? '1.5px solid #6366f1' : '1px solid #d1d5db',
+                  background: repeatMode === 2 ? '#6366f1' : 'white',
+                  color: repeatMode === 2 ? 'white' : '#374151',
+                }}
+              >
+                🗓️ Lặp theo thứ
+              </button>
             </div>
 
-            {repeatDaily ? (
-              <div style={{ padding: '10px 14px', background: '#f0fdf4', border: '1px dashed #86efac', borderRadius: 8, fontSize: 12.5, color: '#166534' }}>
-                ✓ Công việc này tự động áp dụng hàng ngày.
+            {/* Mode 1: Lặp mỗi ngày */}
+            {repeatMode === 1 && (
+              <div style={{ padding: '12px 14px', background: '#f0fdf4', border: '1px dashed #86efac', borderRadius: 8, fontSize: 13, color: '#166534', lineHeight: 1.5 }}>
+                ✓ <strong>Lặp mỗi ngày:</strong> Công việc này tự động áp dụng hàng ngày (được lập lịch sẵn cho 60 ngày tiếp theo).
               </div>
-            ) : (
+            )}
+
+            {/* Mode 2: Lặp theo thứ hàng tuần */}
+            {repeatMode === 2 && (
+              <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 10, padding: 12 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: '#5b21b6', marginBottom: 8 }}>
+                  Chọn một hoặc nhiều thứ trong tuần để lặp lại:
+                </div>
+
+                {/* Day-of-week buttons */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, marginBottom: 12 }}>
+                  {[
+                    { day: 1, label: 'Thứ 2' },
+                    { day: 2, label: 'Thứ 3' },
+                    { day: 3, label: 'Thứ 4' },
+                    { day: 4, label: 'Thứ 5' },
+                    { day: 5, label: 'Thứ 6' },
+                    { day: 6, label: 'Thứ 7' },
+                    { day: 7, label: 'Chủ Nhật' },
+                  ].map(({ day, label }) => {
+                    const isSelected = repeatDaysOfWeek.includes(day);
+                    return (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => handleToggleDayOfWeek(day)}
+                        style={{
+                          padding: '10px 4px',
+                          borderRadius: 8,
+                          fontSize: 12.5,
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          border: isSelected ? '1.5px solid #6366f1' : '1px solid #c7d2fe',
+                          background: isSelected ? '#6366f1' : 'white',
+                          color: isSelected ? 'white' : '#4338ca',
+                          transition: 'all 0.15s ease',
+                          textAlign: 'center',
+                        }}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Quick Presets */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                  <span style={{ fontSize: 11.5, color: '#6d28d9', fontWeight: 600 }}>Chọn nhanh:</span>
+                  {[
+                    { label: 'T2, T4, T6', days: [1, 3, 5] },
+                    { label: 'T3, T5, T7', days: [2, 4, 6] },
+                    { label: 'Cuối tuần (T7, CN)', days: [6, 7] },
+                    { label: 'Ngày thường (T2 - T6)', days: [1, 2, 3, 4, 5] },
+                    { label: 'Cả tuần', days: [1, 2, 3, 4, 5, 6, 7] },
+                  ].map((preset) => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => setRepeatDaysOfWeek(preset.days)}
+                      style={{
+                        padding: '3px 8px',
+                        borderRadius: 6,
+                        background: '#ede9fe',
+                        color: '#5b21b6',
+                        fontSize: 11.5,
+                        fontWeight: 600,
+                        border: '1px solid #ddd6fe',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div style={{ fontSize: 12, color: '#6d28d9', marginTop: 10 }}>
+                  ✓ Đã chọn: <strong>{repeatDaysOfWeek.length > 0 ? repeatDaysOfWeek.map(d => d === 7 ? 'Chủ Nhật' : `Thứ ${d + 1}`).join(', ') : 'Chưa chọn thứ nào'}</strong>.
+                </div>
+              </div>
+            )}
+
+            {/* Mode 0: Ngày cụ thể */}
+            {repeatMode === 0 && (
               <>
                 {/* Quick Add Buttons */}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
@@ -2735,7 +3082,7 @@ function EditTaskModal({
                   checked={targetType === 'allStore'}
                   onChange={() => {
                     setTargetType('allStore');
-                    setDepartmentId('');
+                    setDepartmentIds([]);
                   }}
                 />
                 <strong>Toàn bộ cửa hàng</strong>
@@ -2747,8 +3094,8 @@ function EditTaskModal({
                   checked={targetType === 'department'}
                   onChange={() => {
                     setTargetType('department');
-                    if (!departmentId && store?.departments && store.departments.length > 0) {
-                      setDepartmentId(store.departments[0].id);
+                    if (departmentIds.length === 0 && store?.departments && store.departments.length > 0) {
+                      setDepartmentIds([store.departments[0].id]);
                     }
                   }}
                 />
@@ -2761,13 +3108,14 @@ function EditTaskModal({
                   checked={targetType === 'individual'}
                   onChange={() => {
                     setTargetType('individual');
+                    setDepartmentIds([]);
                   }}
                 />
                 <strong>Chỉ định cá nhân / nhóm</strong>
               </label>
             </div>
 
-            {/* Department selection */}
+            {/* Department selection (Multi-department support) */}
             {targetType === 'department' && (
               <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 10, padding: 12, marginBottom: 12 }}>
                 {!store?.departments || store.departments.length === 0 ? (
@@ -2777,45 +3125,90 @@ function EditTaskModal({
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <div style={{ background: '#ede9fe', color: '#6d28d9', padding: '8px 12px', borderRadius: 8, fontSize: 12, lineHeight: 1.4 }}>
-                      💡 <strong>Tự động theo ca:</strong> Công việc sẽ tự động giao cho các nhân sự có ca làm việc thuộc bộ phận này theo từng ngày (dựa theo Lịch làm việc tuần / Bộ phận của nhân viên).
+                      💡 <strong>Tự động theo ca:</strong> Cho phép chọn một hoặc NHIỀU bộ phận cùng lúc. Công việc sẽ tự động giao cho các nhân sự có ca làm việc thuộc các bộ phận này theo từng ngày (dựa theo Lịch làm việc tuần / Bộ phận của nhân viên).
                     </div>
-                    {store.departments.map((dept: any) => {
-                      const isSelected = departmentId === dept.id;
-                      const deptMembers = members.filter(
-                        (m) => m.department && (
-                          m.department.trim().toLowerCase() === dept.id.trim().toLowerCase() ||
-                          m.department.trim().toLowerCase() === dept.name.trim().toLowerCase()
-                        )
-                      );
-                      return (
-                        <label
-                          key={dept.id}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 700, color: '#4b5563' }}>
+                        Chọn các bộ phận nhận việc ({departmentIds.length}/{store.departments.length}):
+                      </span>
+                      {store.departments.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (departmentIds.length === store.departments!.length) {
+                              setDepartmentIds([]);
+                            } else {
+                              setDepartmentIds(store.departments!.map((d: any) => d.id));
+                            }
+                          }}
                           style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '8px 12px',
-                            borderRadius: 8,
-                            background: isSelected ? '#eff6ff' : '#ffffff',
-                            border: isSelected ? '1.5px solid #3b82f6' : '1px solid #e2e8f0',
+                            background: 'none',
+                            color: '#2563eb',
+                            fontSize: 12,
+                            fontWeight: 700,
                             cursor: 'pointer',
+                            border: 'none',
+                            padding: '2px 4px',
                           }}
                         >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <input
-                              type="radio"
-                              name="editDepartmentSelect"
-                              checked={isSelected}
-                              onChange={() => setDepartmentId(dept.id)}
-                            />
-                            <span>{dept.name}</span>
-                          </div>
-                          <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10, background: isSelected ? '#dbeafe' : '#f3f4f6', color: isSelected ? '#1e40af' : '#4b5563' }}>
-                            {deptMembers.length} NV
-                          </span>
-                        </label>
-                      );
-                    })}
+                          {departmentIds.length === store.departments.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+                        </button>
+                      )}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 }}>
+                      {store.departments.map((dept: any) => {
+                        const isSelected = departmentIds.includes(dept.id);
+                        const deptMembers = members.filter(
+                          (m) => m.department && (
+                            m.department.trim().toLowerCase() === dept.id.trim().toLowerCase() ||
+                            m.department.trim().toLowerCase() === dept.name.trim().toLowerCase() ||
+                            (dept.shortName && m.department.trim().toLowerCase() === dept.shortName.trim().toLowerCase())
+                          )
+                        );
+                        return (
+                          <label
+                            key={dept.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '8px 12px',
+                              borderRadius: 8,
+                              background: isSelected ? '#eff6ff' : '#ffffff',
+                              border: isSelected ? '1.5px solid #3b82f6' : '1px solid #e2e8f0',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setDepartmentIds((prev) => [...prev, dept.id]);
+                                  } else {
+                                    setDepartmentIds((prev) => prev.filter((id) => id !== dept.id));
+                                  }
+                                }}
+                              />
+                              <div>
+                                <span style={{ fontWeight: 600, fontSize: 13.5, color: isSelected ? '#1e40af' : '#1f2937' }}>
+                                  {dept.name}
+                                </span>
+                                {dept.shortName && (
+                                  <span style={{ fontSize: 12, color: '#6b7280', marginLeft: 4 }}>
+                                    ({dept.shortName})
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10, background: isSelected ? '#dbeafe' : '#f3f4f6', color: isSelected ? '#1e40af' : '#4b5563' }}>
+                              {deptMembers.length} NV
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>

@@ -289,10 +289,13 @@ export interface AssignedTask {
   targetType: TaskTargetType;
   targetDepartmentId?: string;
   targetDepartmentName?: string;
+  targetDepartmentIds?: string[];
+  targetDepartmentNames?: string[];
   assignedUserIds: string[];
   assignedNames: string[];
   executionDates: string[]; // YYYY-MM-DD
   repeatDaily?: boolean;
+  repeatDaysOfWeek?: number[]; // [1, 2, 3, 4, 5, 6, 7] - 1 = Thứ 2 ... 7 = Chủ Nhật
   requirePhoto: boolean;
   status: TaskStatus;
   createdAt: any;

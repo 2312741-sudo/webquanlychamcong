@@ -159,13 +159,42 @@ export function isDepartmentMatch({
 }
 
 /**
- * Kiểm tra xem user có làm việc tại bộ phận đích vào ngày dateStr hay không
+ * Kiểm tra xem ngày dateStr có thỏa mãn cấu hình lặp lại / ngày thực hiện của task hay không
+ * 1 = Thứ 2, 2 = Thứ 3, ..., 6 = Thứ 7, 7 = Chủ Nhật
+ */
+export function isDateMatchingTask(
+  dateStr: string,
+  task: {
+    repeatDaily?: boolean;
+    repeatDaysOfWeek?: number[];
+    executionDates?: string[];
+  }
+): boolean {
+  if (task.repeatDaily) return true;
+  if (Array.isArray(task.repeatDaysOfWeek) && task.repeatDaysOfWeek.length > 0) {
+    try {
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        const jsDay = d.getDay(); // 0 = Sun, 1 = Mon ... 6 = Sat
+        const isoWeekday = jsDay === 0 ? 7 : jsDay; // 1 = T2 ... 7 = CN
+        return task.repeatDaysOfWeek.includes(isoWeekday);
+      }
+    } catch (_) {}
+  }
+  return Array.isArray(task.executionDates) && task.executionDates.includes(dateStr);
+}
+
+/**
+ * Kiểm tra xem user có làm việc tại bộ phận đích vào ngày dateStr hay không (hỗ trợ nhiều bộ phận)
  */
 export function isUserInDepartmentOnDate({
   userId,
   dateStr,
   targetDeptId,
   targetDeptName,
+  targetDeptIds,
+  targetDeptNames,
   schedule,
   memberDepartment,
   storeDepartments,
@@ -174,11 +203,33 @@ export function isUserInDepartmentOnDate({
   dateStr: string;
   targetDeptId?: string | null;
   targetDeptName?: string | null;
+  targetDeptIds?: string[] | null;
+  targetDeptNames?: string[] | null;
   schedule?: ScheduleModel | null;
   memberDepartment?: string | null;
   storeDepartments?: Department[];
 }): boolean {
-  if (!targetDeptId && !targetDeptName) return false;
+  const allTargetIds = Array.from(new Set([
+    ...(targetDeptIds || []),
+    ...(targetDeptId ? [targetDeptId] : []),
+  ])).filter(Boolean);
+  const allTargetNames = Array.from(new Set([
+    ...(targetDeptNames || []),
+    ...(targetDeptName ? [targetDeptName] : []),
+  ])).filter(Boolean);
+
+  if (allTargetIds.length === 0 && allTargetNames.length === 0) return false;
+
+  const matchesAny = (candidate?: string | null): boolean => {
+    if (!candidate || !candidate.trim()) return false;
+    for (const tId of allTargetIds) {
+      if (isDepartmentMatch({ candidate, targetDeptId: tId, storeDepartments })) return true;
+    }
+    for (const tName of allTargetNames) {
+      if (isDepartmentMatch({ candidate, targetDeptName: tName, storeDepartments })) return true;
+    }
+    return false;
+  };
 
   // 1. Nếu có lịch làm việc trong tuần của ngày này
   if (schedule && schedule.shifts && schedule.shifts[userId]) {
@@ -202,22 +253,12 @@ export function isUserInDepartmentOnDate({
           }
           if (trimmed.includes('|')) {
             const shiftDeptId = trimmed.split('|')[1];
-            if (isDepartmentMatch({
-              candidate: shiftDeptId,
-              targetDeptId,
-              targetDeptName,
-              storeDepartments,
-            })) {
+            if (matchesAny(shiftDeptId)) {
               return true;
             }
           } else {
             // Ca không ghi đè bộ phận -> kế thừa bộ phận mặc định của thành viên
-            if (memberDepartment && isDepartmentMatch({
-              candidate: memberDepartment,
-              targetDeptId,
-              targetDeptName,
-              storeDepartments,
-            })) {
+            if (memberDepartment && matchesAny(memberDepartment)) {
               return true;
             }
           }
@@ -238,12 +279,7 @@ export function isUserInDepartmentOnDate({
   // 2. Fallback nếu không có lịch làm việc hoặc nhân viên không có lịch tuần:
   // So khớp trực tiếp với bộ phận của thành viên
   if (memberDepartment && memberDepartment.trim().length > 0) {
-    return isDepartmentMatch({
-      candidate: memberDepartment,
-      targetDeptId,
-      targetDeptName,
-      storeDepartments,
-    });
+    return matchesAny(memberDepartment);
   }
 
   return false;
@@ -256,6 +292,8 @@ export function getUserIdsInDepartmentOnDate({
   dateStr,
   targetDeptId,
   targetDeptName,
+  targetDeptIds,
+  targetDeptNames,
   allMembers,
   schedule,
   storeDepartments,
@@ -263,6 +301,8 @@ export function getUserIdsInDepartmentOnDate({
   dateStr: string;
   targetDeptId?: string | null;
   targetDeptName?: string | null;
+  targetDeptIds?: string[] | null;
+  targetDeptNames?: string[] | null;
   allMembers: Member[];
   schedule?: ScheduleModel | null;
   storeDepartments?: Department[];
@@ -274,6 +314,8 @@ export function getUserIdsInDepartmentOnDate({
       dateStr,
       targetDeptId,
       targetDeptName,
+      targetDeptIds,
+      targetDeptNames,
       schedule,
       memberDepartment: m.department,
       storeDepartments,
