@@ -14,6 +14,7 @@ import {
   uploadTaskPhotoWeb,
   getVietnamDateString,
   watchWeekSchedule,
+  watchUserActiveAttendance,
 } from '@/lib/firestore';
 import {
   AssignedTask,
@@ -23,6 +24,7 @@ import {
   Member,
   Store,
   ScheduleModel,
+  AttendanceRecord,
   getRoleLabel,
   normalizeRole,
 } from '@/lib/types';
@@ -63,8 +65,34 @@ export default function TasksPage() {
   // ──────────────────────────────────────────────────────────────────────────
   // TAB 1: VIỆC CỦA TÔI TRONG CA (My Tasks)
   // ──────────────────────────────────────────────────────────────────────────
+  const [activeAttendance, setActiveAttendance] = useState<AttendanceRecord | null>(null);
+  const [hasManuallySelectedDate, setHasManuallySelectedDate] = useState<boolean>(false);
   const [selectedMyDate, setSelectedMyDate] = useState<string>(todayStr);
   const [mySubmissions, setMySubmissions] = useState<Record<string, TaskSubmission>>({});
+
+  // Theo dõi ca làm việc đang mở (active shift)
+  useEffect(() => {
+    if (!storeId || !user) return;
+    const unsub = watchUserActiveAttendance(storeId, user.uid, (att) => {
+      setActiveAttendance(att);
+    });
+    return unsub;
+  }, [storeId, user]);
+
+  const isInActiveShift = !!(activeAttendance && !activeAttendance.checkOut);
+  const activeShiftDate = isInActiveShift ? (activeAttendance.date || todayStr) : null;
+  const isOvernightShift = isInActiveShift && activeShiftDate !== todayStr;
+
+  // Tự động neo ngày làm việc theo ca đang mở (chỉ khi out ca thì mới chuyển ngày mới)
+  useEffect(() => {
+    if (!hasManuallySelectedDate) {
+      if (isInActiveShift && activeShiftDate) {
+        setSelectedMyDate(activeShiftDate);
+      } else {
+        setSelectedMyDate(todayStr);
+      }
+    }
+  }, [isInActiveShift, activeShiftDate, todayStr, hasManuallySelectedDate]);
 
   // Form drafts for reporting each task: { [taskId]: { text: string, photos: string[], uploading: boolean } }
   const [taskDrafts, setTaskDrafts] = useState<
@@ -585,16 +613,45 @@ export default function TasksPage() {
               <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-secondary)' }}>
                 📅 Ngày làm việc:
               </span>
-              <div style={{ display: 'flex', gap: 6 }}>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {isInActiveShift && activeShiftDate && (
+                  <button
+                    onClick={() => {
+                      setSelectedMyDate(activeShiftDate);
+                      setHasManuallySelectedDate(false);
+                    }}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: 8,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      background: selectedMyDate === activeShiftDate ? 'var(--primary)' : '#eff6ff',
+                      color: selectedMyDate === activeShiftDate ? 'white' : '#2563eb',
+                      border: selectedMyDate === activeShiftDate ? 'none' : '1px solid #bfdbfe',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                  >
+                    {isOvernightShift ? '🌙' : '⚡'} Ca hiện tại ({activeShiftDate})
+                  </button>
+                )}
                 <button
-                  onClick={() => setSelectedMyDate(todayStr)}
+                  onClick={() => {
+                    setSelectedMyDate(todayStr);
+                    if (isInActiveShift && activeShiftDate !== todayStr) {
+                      setHasManuallySelectedDate(true);
+                    } else {
+                      setHasManuallySelectedDate(false);
+                    }
+                  }}
                   style={{
                     padding: '6px 12px',
                     borderRadius: 8,
                     fontSize: 13,
                     fontWeight: 600,
-                    background: selectedMyDate === todayStr ? 'var(--primary)' : '#f3f4f6',
-                    color: selectedMyDate === todayStr ? 'white' : '#4b5563',
+                    background: selectedMyDate === todayStr && (!isInActiveShift || activeShiftDate === todayStr) ? 'var(--primary)' : '#f3f4f6',
+                    color: selectedMyDate === todayStr && (!isInActiveShift || activeShiftDate === todayStr) ? 'white' : '#4b5563',
                   }}
                 >
                   Hôm nay
@@ -602,7 +659,10 @@ export default function TasksPage() {
                 <input
                   type="date"
                   value={selectedMyDate}
-                  onChange={(e) => setSelectedMyDate(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedMyDate(e.target.value);
+                    setHasManuallySelectedDate(true);
+                  }}
                   style={{
                     padding: '6px 12px',
                     borderRadius: 8,
@@ -637,8 +697,32 @@ export default function TasksPage() {
             </div>
           </div>
 
+          {/* Overnight Active Shift Alert */}
+          {isOvernightShift && selectedMyDate === activeShiftDate && (
+            <div
+              style={{
+                background: '#eff6ff',
+                border: '1px solid #bfdbfe',
+                borderRadius: 12,
+                padding: '12px 16px',
+                marginBottom: 20,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                color: '#1e40af',
+                fontSize: 13.5,
+              }}
+            >
+              <span style={{ fontSize: 20 }}>🌙</span>
+              <div>
+                <strong>Ca làm việc qua đêm:</strong> Bạn đang trong ca làm việc bắt đầu từ ngày <strong>{activeShiftDate}</strong>.
+                Danh sách công việc của ca này sẽ hiển thị xuyên suốt cho đến khi bạn bấm <strong>Ra ca</strong>.
+              </div>
+            </div>
+          )}
+
           {/* Unfinished warning alert if active workday */}
-          {myTotalCount > 0 && myCompletedCount < myTotalCount && selectedMyDate === todayStr && (
+          {myTotalCount > 0 && myCompletedCount < myTotalCount && (isInActiveShift ? selectedMyDate === activeShiftDate : selectedMyDate === todayStr) && (
             <div
               style={{
                 background: '#fffbeb',
