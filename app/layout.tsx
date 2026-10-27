@@ -13,9 +13,12 @@ export const metadata: Metadata = {
   title: 'Chấm Công Trạm - Quản lý',
   description: 'Hệ thống quản lý chấm công và ca làm việc cho chủ cửa hàng và nhân viên',
   icons: {
-    icon: '/favicon.ico?v=20261028',
-    shortcut: '/favicon.ico?v=20261028',
-    apple: '/logo.jpg?v=20261028',
+    icon: [
+      { url: '/icon.png?v=3', type: 'image/png' },
+      { url: '/favicon.ico?v=3' },
+    ],
+    shortcut: '/icon.png?v=3',
+    apple: '/apple-icon.png?v=3',
   },
   appleWebApp: {
     capable: true,
@@ -39,8 +42,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="vi" className={beVietnamPro.variable}>
       <head>
-        <link rel="icon" href="/favicon.ico?v=20261028" sizes="any" />
-        <link rel="apple-touch-icon" href="/logo.jpg?v=20261028" />
+        <link rel="icon" type="image/png" sizes="256x256" href="/icon.png?v=3" />
+        <link rel="icon" href="/favicon.ico?v=3" sizes="any" />
+        <link rel="apple-touch-icon" href="/apple-icon.png?v=3" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
