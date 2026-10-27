@@ -6,6 +6,12 @@
 
 ---
 
+## 📅 NGÀY 28/10/2026: ĐỒNG BỘ TRIỂN KHAI BẢN GỐC CHUẨN v1.1.9 TRÊN VERCEL
+- **Khôi phục hoàn toàn bản chuẩn v1.1.9:** Đồng bộ toàn diện hệ thống web quản lý Chấm Công Trạm về phiên bản phát hành chính thức v1.1.9.
+- **Kích hoạt quy trình Vercel Build:** Đẩy commit phát hành mới nhất lên nhánh `main` để kích hoạt Vercel tự động build và gán lại production alias `webquanlychamcong.vercel.app`.
+
+---
+
 ## 📅 NGÀY 25/10/2026: NEO CÔNG VIỆC THEO CA QUA ĐÊM, GIAO VIỆC ĐA BỘ PHẬN & LẶP THEO THỨ (v1.1.9)
 
 ### 1. [TÍNH NĂNG MỚI] Neo Công Việc Theo Ca Làm Việc Đang Mở (Overnight Shift Task Support)
