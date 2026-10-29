@@ -2,7 +2,22 @@
 
 **Dự án:** Chấm Công Trạm (`cham_cong_tram` Mobile App & `cham_cong_web` Web Dashboard)  
 **Tác giả:** Nguyễn Thanh Tâm ([nthanhtam.402@gmail.com](mailto:nthanhtam.402@gmail.com))  
-**Phiên bản hiện tại:** `v1.1.9` (Mobile: `1.1.9+29`, Web: `1.1.9`)
+**Phiên bản hiện tại:** `v1.2.0` (Mobile: `1.2.0+30`, Web: `1.2.0`)
+
+---
+
+## 📅 NGÀY 30/10/2026: RA MẮT PHÂN HỆ ĐẶT & SOẠN HÀNG, XUẤT BÁO CÁO EXCEL (v1.2.0)
+
+### 1. [TÍNH NĂNG MỚI] Quản Lý Đặt & Soạn Hàng Toàn Diện Trên Web (`/dashboard/supply`)
+- **Danh mục mặt hàng (`supply_items`):** Thêm mới, chỉnh sửa, nhóm mặt hàng theo phân loại, quy định đơn vị tính (kg, túi, hộp...) và kích hoạt/vô hiệu hóa mặt hàng.
+- **Đặt hàng ngày mai (`supply_orders`):** Cấp quản lý và nhân viên có thể xem và đặt hàng trước cho các ngày tiếp theo với giao diện bảng trực quan, lọc thông minh.
+- **Theo dõi trạng thái soạn hàng:** Cập nhật real-time các món đã được soạn xong theo ca, hiển thị người soạn và thời điểm hoàn tất.
+- **Cấu hình giờ chốt linh hoạt (`supply_settings`):** Tùy chỉnh giờ chốt đặt hàng theo từng cửa hàng trực tiếp trên giao diện quản trị Web.
+- **Xuất báo cáo Excel chuyên nghiệp:** Tích hợp bộ thư viện `exceljs` xuất báo cáo lịch sử và bảng tổng hợp đặt hàng theo khoảng ngày với định dạng chuẩn form, màu sắc thương hiệu và tự động tính tổng.
+
+### 2. [ĐỒNG BỘ ĐA NỀN TẢNG & KIỂM THỬ]
+- **Đồng bộ thời gian thực:** Dữ liệu đặt & soạn hàng được đồng bộ tức thời giữa Web Quản lý và Mobile App.
+- **Biên dịch & Tối ưu:** 24/24 static & dynamic pages của Next.js biên dịch hoàn tất 100% không cảnh báo lỗi. Build Vercel Production sẵn sàng.
 
 ---
 
