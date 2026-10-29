@@ -27,6 +27,7 @@ const NAV = [
   { href: '/dashboard/attendance', icon: '📅', label: 'Bảng công' },
   { href: '/dashboard/salary', icon: '💰', label: 'Báo cáo lương' },
   { href: '/dashboard/members', icon: '👥', label: 'Nhân viên' },
+  { href: '/dashboard/supply', icon: '📦', label: 'Đặt & soạn hàng' },
   { href: '/dashboard/production', icon: '🏭', label: 'Sản xuất' },
   { href: '/dashboard/performance', icon: '⚡', label: 'Đo hiệu năng' },
   { href: '/dashboard/settings', icon: '⚙️', label: 'Cài đặt' },
@@ -133,17 +134,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (!role) return;
     const norm = normalizeRole(role);
     if (norm === 'employee') {
-      const allowed = ['/dashboard/checkin', '/dashboard/schedule', '/dashboard/tasks', '/dashboard/attendance'];
+      const allowed = ['/dashboard/checkin', '/dashboard/schedule', '/dashboard/tasks', '/dashboard/attendance', '/dashboard/supply'];
       if (!allowed.some(p => pathname === p || pathname.startsWith(p))) {
         router.replace('/dashboard/checkin');
       }
     } else if (norm === 'manager2') {
-      const allowed = ['/dashboard/checkin', '/dashboard/schedule', '/dashboard/tasks', '/dashboard/attendance'];
+      const allowed = ['/dashboard/checkin', '/dashboard/schedule', '/dashboard/tasks', '/dashboard/attendance', '/dashboard/supply'];
       if (!allowed.some(p => pathname === p || pathname.startsWith(p))) {
         router.replace('/dashboard/schedule');
       }
     } else if (norm === 'manager1') {
-      const allowed = ['/dashboard', '/dashboard/checkin', '/dashboard/schedule', '/dashboard/tasks', '/dashboard/members', '/dashboard/attendance'];
+      const allowed = ['/dashboard', '/dashboard/checkin', '/dashboard/schedule', '/dashboard/tasks', '/dashboard/members', '/dashboard/attendance', '/dashboard/supply'];
       if (!allowed.some(p => pathname === p || pathname.startsWith(p))) {
         router.replace('/dashboard/schedule');
       }
@@ -208,13 +209,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const filteredNav = NAV.filter(item => {
     if (normRole === 'employee') {
-      return item.href === '/dashboard/checkin' || item.href === '/dashboard/schedule' || item.href === '/dashboard/tasks' || item.href === '/dashboard/attendance';
+      return item.href === '/dashboard/checkin' || item.href === '/dashboard/schedule' || item.href === '/dashboard/tasks' || item.href === '/dashboard/attendance' || item.href === '/dashboard/supply';
     }
     if (normRole === 'manager2') {
-      return item.href === '/dashboard/checkin' || item.href === '/dashboard/schedule' || item.href === '/dashboard/tasks' || item.href === '/dashboard/attendance';
+      return item.href === '/dashboard/checkin' || item.href === '/dashboard/schedule' || item.href === '/dashboard/tasks' || item.href === '/dashboard/attendance' || item.href === '/dashboard/supply';
     }
     if (normRole === 'manager1') {
-      return item.href === '/dashboard' || item.href === '/dashboard/checkin' || item.href === '/dashboard/schedule' || item.href === '/dashboard/tasks' || item.href === '/dashboard/members' || item.href === '/dashboard/attendance';
+      return item.href === '/dashboard' || item.href === '/dashboard/checkin' || item.href === '/dashboard/schedule' || item.href === '/dashboard/tasks' || item.href === '/dashboard/members' || item.href === '/dashboard/attendance' || item.href === '/dashboard/supply';
     }
     return true; // owner has full access
   });
