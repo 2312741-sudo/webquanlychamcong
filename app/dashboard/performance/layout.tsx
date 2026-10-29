@@ -38,7 +38,6 @@ export default function PerformanceLayout({ children }: { children: React.ReactN
     return (
       <div className="performance-shell performance-restricted" style={{ padding: 40, textAlign: 'center' }}>
         <div className="card" style={{ maxWidth: 480, margin: '60px auto', padding: 32 }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
           <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8, color: 'var(--neutral)' }}>
             Khu vực dành riêng cho Chủ cửa hàng
           </h2>

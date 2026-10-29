@@ -132,12 +132,12 @@ export default function CheckInPage() {
           if (matchedLoc) {
             const distRound = Math.round(minDistance);
             const inRange = minDistance <= matchedLoc.radiusMeters;
-            setGpsDistanceText(`Cách "${matchedLoc.name}" khoảng ${distRound}m (Bán kính: ${matchedLoc.radiusMeters}m) - ${inRange ? '✅ Hợp lệ' : '⚠️ Ngoài phạm vi'}`);
+            setGpsDistanceText(`Cách "${matchedLoc.name}" khoảng ${distRound}m (Bán kính: ${matchedLoc.radiusMeters}m) - ${inRange ? 'Hợp lệ' : 'Ngoài phạm vi'}`);
           }
         } else if (store?.latitude && store?.longitude) {
           const dist = Math.round(getDistanceMeters(latitude, longitude, store.latitude, store.longitude));
           const inRange = dist <= (store.radiusMeters || 100);
-          setGpsDistanceText(`Cách cửa hàng khoảng ${dist}m (Bán kính: ${store.radiusMeters || 100}m) - ${inRange ? '✅ Hợp lệ' : '⚠️ Ngoài phạm vi'}`);
+          setGpsDistanceText(`Cách cửa hàng khoảng ${dist}m (Bán kính: ${store.radiusMeters || 100}m) - ${inRange ? 'Hợp lệ' : 'Ngoài phạm vi'}`);
         } else {
           setGpsDistanceText(`Đã nhận toạ độ GPS: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
         }
@@ -197,7 +197,7 @@ export default function CheckInPage() {
     try {
       const memberName = currentMember?.name || user.displayName || user.email?.split('@')[0] || 'Nhân viên';
       await webCheckIn(storeId, user.uid, method, store?.name, memberName);
-      setSuccessMsg('🎉 Chúc bạn một ca làm việc tràn đầy năng lượng! Đã chấm vào ca thành công.');
+      setSuccessMsg('Chúc bạn một ca làm việc tràn đầy năng lượng! Đã chấm vào ca thành công.');
     } catch (err: any) {
       setErrorMsg(err.message || 'Chấm vào thất bại. Vui lòng thử lại.');
     } finally {
@@ -243,7 +243,7 @@ export default function CheckInPage() {
     try {
       const memberName = currentMember?.name || user.displayName || user.email?.split('@')[0] || 'Nhân viên';
       const hours = await webCheckOut(storeId, activeAttendance.id, user.uid, store?.name, memberName);
-      setSuccessMsg(`👏 Đã ra ca thành công! Tổng giờ làm của ca này: ${hours.toFixed(2)} giờ.`);
+      setSuccessMsg(`Đã ra ca thành công! Tổng giờ làm của ca này: ${hours.toFixed(2)} giờ.`);
     } catch (err: any) {
       setErrorMsg(err.message || 'Chấm ra thất bại. Vui lòng thử lại.');
     } finally {
@@ -263,10 +263,10 @@ export default function CheckInPage() {
 
   const getMethodLabel = (m: string) => {
     switch (m) {
-      case 'wifi': return '📶 WiFi / Web';
-      case 'gps': return '📍 GPS Vị trí';
-      case 'qr': return '📷 Mã QR';
-      case 'manual': return '✏️ Thủ công';
+      case 'wifi': return 'WiFi / Web';
+      case 'gps': return 'GPS Vị trí';
+      case 'qr': return 'Mã QR';
+      case 'manual': return 'Thủ công';
       default: return m;
     }
   };
@@ -292,7 +292,7 @@ export default function CheckInPage() {
       }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, opacity: 0.9, fontSize: 13, marginBottom: 4 }}>
-            <span>🏪 {store?.name || 'Cửa hàng'}</span>
+            <span>{store?.name || 'Cửa hàng'}</span>
             <span>·</span>
             <span>Mã: <strong>{store?.code}</strong></span>
           </div>
@@ -333,7 +333,6 @@ export default function CheckInPage() {
           alignItems: 'center',
           gap: 10
         }}>
-          <span style={{ fontSize: 20 }}>⚠️</span>
           <span>{errorMsg}</span>
         </div>
       )}
@@ -350,7 +349,6 @@ export default function CheckInPage() {
           alignItems: 'center',
           gap: 10
         }}>
-          <span style={{ fontSize: 20 }}>🎉</span>
           <span>{successMsg}</span>
         </div>
       )}
@@ -429,7 +427,7 @@ export default function CheckInPage() {
                 fontWeight: 700,
                 marginBottom: 10
               }}>
-                <span>🌙</span> Ca làm việc qua đêm (Bắt đầu từ ngày {activeAttendance.date})
+                Ca làm việc qua đêm (Bắt đầu từ ngày {activeAttendance.date})
               </div>
             )}
             <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 8 }}>
@@ -505,7 +503,7 @@ export default function CheckInPage() {
                 ) : loading ? (
                   <span className="spinner spinner-white" />
                 ) : (
-                  '🛑 RA CA (KẾT THÚC CA)'
+                  'RA CA (KẾT THÚC CA)'
                 )}
               </button>
             </div>
@@ -537,7 +535,6 @@ export default function CheckInPage() {
                     transition: 'all 0.15s'
                   }}
                 >
-                  <span style={{ fontSize: 22 }}>📶</span>
                   <span>WiFi / Web</span>
                   <span className="hide-on-mobile" style={{ fontSize: 11, fontWeight: 400, opacity: 0.7 }}>Trực tuyến tiện lợi</span>
                 </button>
@@ -561,7 +558,6 @@ export default function CheckInPage() {
                     transition: 'all 0.15s'
                   }}
                 >
-                  <span style={{ fontSize: 22 }}>📍</span>
                   <span>Định vị GPS</span>
                   <span className="hide-on-mobile" style={{ fontSize: 11, fontWeight: 400, opacity: 0.7 }}>Xác thực vị trí</span>
                 </button>
@@ -585,7 +581,6 @@ export default function CheckInPage() {
                     transition: 'all 0.15s'
                   }}
                 >
-                  <span style={{ fontSize: 22 }}>✏️</span>
                   <span>Thủ công</span>
                   <span className="hide-on-mobile" style={{ fontSize: 11, fontWeight: 400, opacity: 0.7 }}>Ghi nhận ca nhanh</span>
                 </button>
@@ -594,8 +589,8 @@ export default function CheckInPage() {
               {/* GPS status feedback */}
               {method === 'gps' && (
                 <div style={{ marginTop: 14, padding: '12px 16px', borderRadius: 10, background: 'var(--surface)', fontSize: 13, border: '1px solid var(--border)' }}>
-                  {gpsLoading && <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span>🔄</span> Đang tìm kiếm toạ độ vị trí hiện tại của bạn...</div>}
-                  {gpsError && <div style={{ color: 'var(--danger)' }}>❌ {gpsError}</div>}
+                  {gpsLoading && <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>Đang tìm kiếm toạ độ vị trí hiện tại của bạn...</div>}
+                  {gpsError && <div style={{ color: 'var(--danger)' }}>{gpsError}</div>}
                   {gpsDistanceText && !gpsLoading && <div>{gpsDistanceText}</div>}
                 </div>
               )}
@@ -626,7 +621,7 @@ export default function CheckInPage() {
                   maxWidth: 360
                 }}
               >
-                {loading ? <span className="spinner spinner-white" /> : '🟢 VÀO CA NGAY'}
+                {loading ? <span className="spinner spinner-white" /> : 'VÀO CA NGAY'}
               </button>
               <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 10 }}>
                 Hệ thống sẽ lưu lại thời gian và thông báo tới quản lý cửa hàng
@@ -639,7 +634,7 @@ export default function CheckInPage() {
       {/* Today's & Ongoing Sessions */}
       <div className="card">
         <h3 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span>📋</span> Các ca làm việc hôm nay / hiện tại ({displayedAttendances.length})
+          Các ca làm việc hôm nay / hiện tại ({displayedAttendances.length})
         </h3>
 
         {displayedAttendances.length === 0 ? (
@@ -682,7 +677,7 @@ export default function CheckInPage() {
                         <span>Phương thức: {getMethodLabel(att.checkInMethod)}</span>
                         {isOvernight && (
                           <span style={{ background: '#fff3e0', color: '#e65100', padding: '1px 8px', borderRadius: 6, fontWeight: 700, fontSize: 11 }}>
-                            🌙 Ca đêm từ hôm qua
+                            Ca đêm từ hôm qua
                           </span>
                         )}
                       </div>
@@ -711,7 +706,7 @@ export default function CheckInPage() {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
           <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span>📅</span> Lịch sử công tháng
+            Lịch sử công tháng
           </h3>
           <input
             type="month"
@@ -783,7 +778,6 @@ export default function CheckInPage() {
               <button className="modal-close" onClick={() => setShowCheckOutConfirm(false)}>×</button>
             </div>
             <div style={{ padding: '16px 0', textAlign: 'center' }}>
-              <div style={{ fontSize: 48, marginBottom: 12 }}>🏁</div>
               <p style={{ fontSize: 15, margin: 0, color: 'var(--neutral)', lineHeight: 1.5 }}>
                 Bạn đã làm việc được <strong>{getElapsedDuration(activeAttendance.checkIn)}</strong>
                 {activeAttendance.date !== todayStr && ` (bắt đầu từ ngày ${activeAttendance.date})`}.
@@ -819,7 +813,6 @@ export default function CheckInPage() {
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
             <div className="modal-header" style={{ borderBottom: '1px solid #fed7aa', paddingBottom: 12 }}>
               <div className="modal-title" style={{ color: '#c2410c', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span>📋</span>
                 <span>Công việc chưa hoàn thành trong ca</span>
               </div>
               <button className="modal-close" onClick={() => setShowTaskWarningModal(false)}>×</button>
@@ -852,7 +845,7 @@ export default function CheckInPage() {
                   fontSize: 13,
                   color: '#475569'
                 }}>
-                  <span>⏱️ Thời gian ca làm: <strong style={{ color: '#16a34a' }}>{getElapsedDuration(activeAttendance.checkIn)}</strong></span>
+                  <span>Thời gian ca làm: <strong style={{ color: '#16a34a' }}>{getElapsedDuration(activeAttendance.checkIn)}</strong></span>
                   <span>Vào ca: {formatTime(activeAttendance.checkIn)}</span>
                 </div>
               )}
@@ -885,7 +878,7 @@ export default function CheckInPage() {
                           fontWeight: 500,
                           whiteSpace: 'nowrap'
                         }}>
-                          📸 Bắt buộc ảnh
+                          Bắt buộc ảnh
                         </span>
                       )}
                     </div>
@@ -920,7 +913,6 @@ export default function CheckInPage() {
                 }}
                 onClick={() => setShowTaskWarningModal(false)}
               >
-                <span>📋</span>
                 <span>Tới trang Giao việc</span>
               </Link>
               <button

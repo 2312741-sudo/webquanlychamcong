@@ -68,10 +68,10 @@ export default function PerformanceSettingsPage() {
     setStandardsMsg(null);
     try {
       await updateStorePerformanceStandards(storeId, standards);
-      setStandardsMsg({ type: 'success', text: '✅ Đã lưu tiêu chuẩn hiệu năng thành công!' });
+      setStandardsMsg({ type: 'success', text: 'Đã lưu tiêu chuẩn hiệu năng thành công!' });
       setTimeout(() => setStandardsMsg(null), 3000);
     } catch (err) {
-      setStandardsMsg({ type: 'error', text: '❌ Lỗi khi lưu tiêu chuẩn: ' + String(err) });
+      setStandardsMsg({ type: 'error', text: 'Lỗi khi lưu tiêu chuẩn: ' + String(err) });
     } finally {
       setSavingStandards(false);
     }
@@ -103,10 +103,10 @@ export default function PerformanceSettingsPage() {
     setCriteriaMsg(null);
     try {
       await updateStoreEndSessionCriteria(storeId, criteria);
-      setCriteriaMsg({ type: 'success', text: '✅ Đã lưu tiêu chí khảo sát cuối ca!' });
+      setCriteriaMsg({ type: 'success', text: 'Đã lưu tiêu chí khảo sát cuối ca!' });
       setTimeout(() => setCriteriaMsg(null), 3000);
     } catch (err) {
-      setCriteriaMsg({ type: 'error', text: '❌ Lỗi lưu tiêu chí: ' + String(err) });
+      setCriteriaMsg({ type: 'error', text: 'Lỗi lưu tiêu chí: ' + String(err) });
     } finally {
       setSavingCriteria(false);
     }
@@ -176,7 +176,7 @@ export default function PerformanceSettingsPage() {
             {/* Drink */}
             <div style={{ border: '1px solid var(--border)', padding: 16, borderRadius: 10 }}>
               <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#2D2A4A', marginBottom: 6 }}>
-                🥤 Tiêu chuẩn Làm nước (giây / ly)
+                Tiêu chuẩn Làm nước (giây / ly)
               </label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <input
@@ -206,7 +206,7 @@ export default function PerformanceSettingsPage() {
             {/* Cake */}
             <div style={{ border: '1px solid var(--border)', padding: 16, borderRadius: 10 }}>
               <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#805214', marginBottom: 6 }}>
-                🍰 Tiêu chuẩn Nướng bánh (giây / bánh)
+                Tiêu chuẩn Nướng bánh (giây / bánh)
               </label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <input
@@ -236,7 +236,7 @@ export default function PerformanceSettingsPage() {
             {/* Order */}
             <div style={{ border: '1px solid var(--border)', padding: 16, borderRadius: 10 }}>
               <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#2D2A4A', marginBottom: 6 }}>
-                📦 Tiêu chuẩn SOS đơn hàng (giây / đơn)
+                Tiêu chuẩn SOS đơn hàng (giây / đơn)
               </label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <input
@@ -392,7 +392,6 @@ export default function PerformanceSettingsPage() {
       <div className="card" style={{ padding: 24, border: '1px solid #FECACA', background: '#FFFDFD' }}>
         <div style={{ marginBottom: 18 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 20 }}>🗑️</span>
             <h2 style={{ fontSize: 16, fontWeight: 800, color: '#B91C1C' }}>
               3. Công Cụ Dọn Dẹp & Xóa Dữ Liệu Đo Lường
             </h2>
@@ -473,7 +472,6 @@ export default function PerformanceSettingsPage() {
               gap: 8,
             }}
           >
-            <span>⚠️</span>
             Tiến Hành Xóa Dữ Liệu Đo
           </button>
         </div>
@@ -506,7 +504,6 @@ export default function PerformanceSettingsPage() {
           >
             {deleteResult ? (
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 48, marginBottom: 12 }}>🎉</div>
                 <h3 style={{ fontSize: 18, fontWeight: 800, color: '#166534', marginBottom: 8 }}>
                   Dọn Dẹp Dữ Liệu Thành Công!
                 </h3>
@@ -527,7 +524,6 @@ export default function PerformanceSettingsPage() {
             ) : (
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                  <span style={{ fontSize: 26 }}>🚨</span>
                   <h3 style={{ fontSize: 18, fontWeight: 800, color: '#B91C1C' }}>
                     Xác Nhận Xóa Vĩnh Viễn Dữ Liệu
                   </h3>

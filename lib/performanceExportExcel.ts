@@ -130,10 +130,10 @@ export async function exportSessionPerformanceExcel(
   const orderStatus = report.orderAverageSeconds <= orderStd ? 'Đạt chuẩn' : `Vượt +${report.orderAverageSeconds - orderStd}s`;
 
   const metricRows = [
-    ['🥤 Làm nước', `${report.drinkMeasurementCount} lượt (${report.drinkTotalQuantity} ly)`, `${formatSecondsToMMSS(report.drinkAverageSeconds)} / ly`, `${formatSecondsToMMSS(drinkStd)} / ly`, drinkStatus],
-    ['🍰 Nướng bánh', `${report.cakeMeasurementCount} lượt (${report.cakeTotalQuantity} bánh)`, `${formatSecondsToMMSS(report.cakeAverageSeconds)} / bánh`, `${formatSecondsToMMSS(cakeStd)} / bánh`, cakeStatus],
-    ['📦 SOS đơn hàng', `${report.orderCount} đơn hàng`, `${formatSecondsToMMSS(report.orderAverageSeconds)} / đơn`, `${formatSecondsToMMSS(orderStd)} / đơn`, orderStatus],
-    ['⚠️ Sự cố trong ca', `${report.incidents?.length || 0} vụ việc`, '-', '-', (report.incidents?.length || 0) === 0 ? 'Tốt' : 'Cần lưu ý']
+    ['Làm nước', `${report.drinkMeasurementCount} lượt (${report.drinkTotalQuantity} ly)`, `${formatSecondsToMMSS(report.drinkAverageSeconds)} / ly`, `${formatSecondsToMMSS(drinkStd)} / ly`, drinkStatus],
+    ['Nướng bánh', `${report.cakeMeasurementCount} lượt (${report.cakeTotalQuantity} bánh)`, `${formatSecondsToMMSS(report.cakeAverageSeconds)} / bánh`, `${formatSecondsToMMSS(cakeStd)} / bánh`, cakeStatus],
+    ['SOS đơn hàng', `${report.orderCount} đơn hàng`, `${formatSecondsToMMSS(report.orderAverageSeconds)} / đơn`, `${formatSecondsToMMSS(orderStd)} / đơn`, orderStatus],
+    ['Sự cố trong ca', `${report.incidents?.length || 0} vụ việc`, '-', '-', (report.incidents?.length || 0) === 0 ? 'Tốt' : 'Cần lưu ý']
   ];
 
   metricRows.forEach((rowVals) => {
@@ -356,7 +356,7 @@ export async function exportSessionPerformanceExcel(
     responses.forEach(([k, v], idx) => {
       const row = wsIncidents.getRow(curRow);
       let valStr = String(v);
-      if (typeof v === 'boolean') valStr = v ? '✅ Đạt / Có' : '❌ Chưa đạt / Không';
+      if (typeof v === 'boolean') valStr = v ? 'Đạt / Có' : 'Chưa đạt / Không';
       row.values = ['', idx + 1, k, valStr];
       for (let c = 2; c <= 4; c++) applyCellBorders(row.getCell(c));
       curRow++;

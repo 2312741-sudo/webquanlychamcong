@@ -198,7 +198,7 @@ function PerformanceReportsContent() {
               }}
             />
             <span style={{ position: 'absolute', left: 10, top: 9, color: 'var(--text-secondary)', fontSize: 14 }}>
-              🔍
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>
             </span>
           </div>
 
@@ -235,7 +235,6 @@ function PerformanceReportsContent() {
           className="btn btn-secondary"
           style={{ padding: '8px 14px', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}
         >
-          <span>📥</span>
           Xuất Excel ({filteredReports.length} ca)
         </button>
       </div>
@@ -511,7 +510,7 @@ function PerformanceReportsContent() {
               {/* KPI Mini-cards */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
                 <div style={{ border: '1px solid #BAE6FD', background: '#E9E6ED', padding: 12, borderRadius: 10 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#2D2A4A' }}>🥤 LÀM NƯỚC</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#2D2A4A' }}>LÀM NƯỚC</div>
                   <div style={{ fontSize: 20, fontWeight: 800, color: '#2D2A4A', marginTop: 4 }}>
                     {selectedReport.drinkAverageSeconds ? `${selectedReport.drinkAverageSeconds}s` : '--'}
                   </div>
@@ -521,7 +520,7 @@ function PerformanceReportsContent() {
                 </div>
 
                 <div style={{ border: '1px solid #FDE68A', background: '#FBEFD4', padding: 12, borderRadius: 10 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#805214' }}>🍰 NƯỚNG BÁNH</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#805214' }}>NƯỚNG BÁNH</div>
                   <div style={{ fontSize: 20, fontWeight: 800, color: '#805214', marginTop: 4 }}>
                     {selectedReport.cakeAverageSeconds ? `${selectedReport.cakeAverageSeconds}s` : '--'}
                   </div>
@@ -531,7 +530,7 @@ function PerformanceReportsContent() {
                 </div>
 
                 <div style={{ border: '1px solid #CBD5E1', background: '#F6EFDF', padding: 12, borderRadius: 10 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#2D2A4A' }}>📦 SOS ĐƠN HÀNG</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#2D2A4A' }}>SOS ĐƠN HÀNG</div>
                   <div style={{ fontSize: 20, fontWeight: 800, color: '#2D2A4A', marginTop: 4 }}>
                     {selectedReport.orderAverageSeconds ? `${selectedReport.orderAverageSeconds}s` : '--'}
                   </div>
@@ -622,7 +621,7 @@ function PerformanceReportsContent() {
                               </td>
                               <td style={{ padding: '8px 12px' }}>
                                 {isPass ? (
-                                  <span style={{ color: '#146A65', fontWeight: 600 }}>✅ Đạt</span>
+                                  <span style={{ color: '#146A65', fontWeight: 600 }}>Đạt</span>
                                 ) : (
                                   <span style={{ color: '#7E2930', fontWeight: 700 }}>+{avgSec - std}s</span>
                                 )}
@@ -643,7 +642,7 @@ function PerformanceReportsContent() {
                 </h3>
                 {!selectedReport.incidents || selectedReport.incidents.length === 0 ? (
                   <div style={{ padding: '12px 16px', background: '#E4F2EC', color: '#166534', borderRadius: 8, fontSize: 12 }}>
-                    ✅ Ca làm việc diễn ra suôn sẻ, không có sự cố nào phát sinh.
+                    Ca làm việc diễn ra suôn sẻ, không có sự cố nào phát sinh.
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -692,7 +691,7 @@ function PerformanceReportsContent() {
                       >
                         <span style={{ color: 'var(--text-secondary)', maxWidth: '65%' }}>{k}</span>
                         <strong style={{ color: 'var(--neutral)' }}>
-                          {typeof v === 'boolean' ? (v ? '✅ Đạt' : '❌ Chưa đạt') : String(v)}
+                          {typeof v === 'boolean' ? (v ? 'Đạt' : 'Chưa đạt') : String(v)}
                         </strong>
                       </div>
                     ))}

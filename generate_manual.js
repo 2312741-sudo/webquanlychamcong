@@ -217,7 +217,7 @@ const doc = new Document({
         createSubtitle('Dành cho Chủ Cửa Hàng (Owner), Quản Lý (Manager) và Nhân Viên (Employee)\nÁp dụng trên cả Ứng dụng Mobile App và Bảng điều khiển Web Dashboard'),
 
         createCallout(
-          '📌 THÔNG TIN HỆ THỐNG',
+          'THÔNG TIN HỆ THỐNG',
           '• Tên ứng dụng Mobile: Chấm Công Trạm (iOS & Android)\n• Địa chỉ Web Dashboard: https://webquanlychamcong.vercel.app\n• Cơ chế dữ liệu: Đồng bộ thời gian thực 100% qua Google Firebase Cloud Firestore.',
           'info'
         ),
@@ -229,9 +229,9 @@ const doc = new Document({
         createParagraph('Hệ thống Chấm Công Trạm được thiết kế chuyên biệt để quản lý nhân sự, chấm công thông minh qua WiFi/GPS, xếp lịch làm việc, tính lương tự động và đo lường năng suất sản xuất theo thời gian thực.'),
 
         createHeading2('1.1. Bảng phân quyền tài khoản:'),
-        createBullet('Có toàn quyền cao nhất trên cả App Mobile và Web Dashboard. Được tạo cửa hàng, cấu hình WiFi (tối đa 10 điểm), tạo ca làm việc, phân bộ phận (Sản xuất, Bán hàng...), xếp lịch làm, duyệt/xóa nhân viên, cấu hình lương, quản lý checklist sản xuất, chỉnh sửa giờ công, tạm ứng lương và xuất các báo cáo Excel chuẩn.', '👑 Chủ Cửa Hàng (Owner):'),
-        createBullet('Được xem danh sách nhân viên, hỗ trợ theo dõi chấm công, tham gia đăng ký lịch làm việc và truy cập tab Lịch làm việc trên Web Dashboard để xếp lịch cho đội nhóm.', '👔 Quản Lý (Manager):'),
-        createBullet('Sử dụng App Mobile để chấm công vào/ra (Check-in / Check-out), hoàn thành checklist sản xuất khi out ca, đăng ký lịch làm việc tuần, theo dõi chi tiết bảng công và dự tính tiền lương cá nhân.', '👤 Nhân Viên (Employee):'),
+        createBullet('Có toàn quyền cao nhất trên cả App Mobile và Web Dashboard. Được tạo cửa hàng, cấu hình WiFi (tối đa 10 điểm), tạo ca làm việc, phân bộ phận (Sản xuất, Bán hàng...), xếp lịch làm, duyệt/xóa nhân viên, cấu hình lương, quản lý checklist sản xuất, chỉnh sửa giờ công, tạm ứng lương và xuất các báo cáo Excel chuẩn.', 'Chủ Cửa Hàng (Owner):'),
+        createBullet('Được xem danh sách nhân viên, hỗ trợ theo dõi chấm công, tham gia đăng ký lịch làm việc và truy cập tab Lịch làm việc trên Web Dashboard để xếp lịch cho đội nhóm.', 'Quản Lý (Manager):'),
+        createBullet('Sử dụng App Mobile để chấm công vào/ra (Check-in / Check-out), hoàn thành checklist sản xuất khi out ca, đăng ký lịch làm việc tuần, theo dõi chi tiết bảng công và dự tính tiền lương cá nhân.', 'Nhân Viên (Employee):'),
 
         new Paragraph({ spacing: { before: 180, after: 180 } }),
 
@@ -265,29 +265,29 @@ const doc = new Document({
         createHeading2('2.5. Xếp lịch làm việc tuần & Xuất Excel Lịch làm'),
         createBullet('Truy cập tab "Lịch làm việc". Chọn tuần cần phân ca.', 'Bước 1:'),
         createBullet('Nhấp vào từng ô ngày của nhân viên -> Tích chọn ca làm việc tương ứng -> Chọn bộ phận hoặc tích chọn "Chở hàng / Giao hàng" nếu có.', 'Bước 2:'),
-        createBullet('Bấm nút "💾 Lưu lịch" để lưu lên hệ thống (nhân viên sẽ thấy lịch ngay trên điện thoại).', 'Bước 3:'),
-        createBullet('Bấm "📥 Xuất Excel" để tải file lịch làm việc chuẩn gồm 4 cột chi tiết/ngày (Giờ vào, Giờ ra, Tên ca/Bộ phận in đậm, Số giờ làm) và cột Tổng giờ trong tuần.', 'Bước 4:'),
+        createBullet('Bấm nút "Lưu lịch" để lưu lên hệ thống (nhân viên sẽ thấy lịch ngay trên điện thoại).', 'Bước 3:'),
+        createBullet('Bấm "Xuất Excel" để tải file lịch làm việc chuẩn gồm 4 cột chi tiết/ngày (Giờ vào, Giờ ra, Tên ca/Bộ phận in đậm, Số giờ làm) và cột Tổng giờ trong tuần.', 'Bước 4:'),
 
         createHeading2('2.6. Quản lý Checklist & Đo lường Hiệu quả Sản xuất (Mới)'),
         createCallout(
-          '✨ TÍNH NĂNG MỚI: ĐƠN VỊ ĐO LƯỜNG TÙY CHỈNH & TÙY CHỌN',
+          'TÍNH NĂNG MỚI: ĐƠN VỊ ĐO LƯỜNG TÙY CHỈNH & TÙY CHỌN',
           'Chủ cửa hàng có thể bật/tắt đơn vị đo lường linh hoạt cho từng đầu việc. Đơn vị có thể chọn từ mẫu (Kg, Phút, Sản phẩm, Ca, Gói, Thùng, Ly, Hộp...) hoặc tự do nhập bất kỳ tên đơn vị nào theo nhu cầu thực tế.',
           'success'
         ),
-        createBullet('Truy cập tab "Sản xuất" trên Web Dashboard -> Chọn "📋 Quản lý công việc".', 'Quản lý đầu việc:'),
+        createBullet('Truy cập tab "Sản xuất" trên Web Dashboard -> Chọn "Quản lý công việc".', 'Quản lý đầu việc:'),
         createBullet('Bấm "+ Thêm công việc". Điền tên công việc.', 'Thêm công việc:'),
         createBullet('Nếu cần đo lường số lượng: Tích bật "Yêu cầu nhập số lượng khi out ca" và chọn/gõ đơn vị đo (VD: Kg, Gói, Thùng, Ly...). Nếu chỉ cần tích hoàn thành: Bỏ tích để tạo Checklist thuần túy.', 'Cấu hình đo lường:'),
-        createBullet('Chuyển sang tab "📊 Báo cáo sản xuất" để xem toàn bộ lịch sử gửi báo cáo của nhân sự khi out ca theo từng tháng, kèm nút "⬇️ Xuất Excel" tổng hợp.', 'Xem báo cáo:'),
+        createBullet('Chuyển sang tab "Báo cáo sản xuất" để xem toàn bộ lịch sử gửi báo cáo của nhân sự khi out ca theo từng tháng, kèm nút "Xuất Excel" tổng hợp.', 'Xem báo cáo:'),
 
         createHeading2('2.7. Quản lý Bảng chấm công & Chỉnh sửa công'),
         createBullet('Xem bảng công tổng hợp toàn bộ nhân viên theo từng ngày trong tháng.', 'Theo dõi:'),
         createBullet('Nếu nhân viên quên chấm công hoặc vào muộn có lý do chính đáng: Chủ nhấp vào ô ngày của nhân viên đó -> Sửa lại giờ vào/giờ ra thực tế -> Điền lý do chỉnh sửa -> Bấm Lưu.', 'Sửa giờ công:'),
-        createBullet('Bấm "📥 Xuất Excel" để xuất Bảng công tổng hợp (kiểu số Numeric) hoặc Chi tiết Vào/Ra.', 'Xuất dữ liệu:'),
+        createBullet('Bấm "Xuất Excel" để xuất Bảng công tổng hợp (kiểu số Numeric) hoặc Chi tiết Vào/Ra.', 'Xuất dữ liệu:'),
 
         createHeading2('2.8. Quản lý Bảng Lương, Tạm Ứng & Xuất Báo Cáo Lương'),
         createBullet('Truy cập tab "Bảng lương". Hệ thống tự động tính: Lương cơ bản theo giờ thực tế + Phụ cấp chở/giao hàng - Tiền tạm ứng = Lương thực lĩnh.', 'Tính lương tự động:'),
         createBullet('Bấm "Tạm ứng" để ghi nhận các khoản nhân viên đã ứng trước trong tháng.', 'Quản lý tạm ứng:'),
-        createBullet('Bấm "📥 Xuất Excel" để tải file Bảng thanh toán lương chi tiết, hỗ trợ lọc theo cả cửa hàng hoặc riêng từng nhân viên.', 'Xuất báo cáo lương:'),
+        createBullet('Bấm "Xuất Excel" để tải file Bảng thanh toán lương chi tiết, hỗ trợ lọc theo cả cửa hàng hoặc riêng từng nhân viên.', 'Xuất báo cáo lương:'),
 
         new Paragraph({ spacing: { before: 180, after: 180 } }),
 
@@ -361,7 +361,7 @@ const doc = new Document({
 
         new Paragraph({ spacing: { before: 240, after: 120 } }),
         createCallout(
-          '📞 HỖ TRỢ KỸ THUẬT',
+          'HỖ TRỢ KỸ THUẬT',
           'Nếu gặp khó khăn trong quá trình sử dụng hoặc cần hỗ trợ cấu hình hệ thống, vui lòng liên hệ Bộ phận Kỹ thuật Quản lý Hệ thống Chấm Công Trạm.',
           'info'
         ),

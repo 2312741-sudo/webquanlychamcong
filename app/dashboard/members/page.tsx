@@ -330,7 +330,7 @@ export default function MembersPage() {
                               color: '#0369A1',
                               border: '1px solid #BAE6FD'
                             }}>
-                              🏢 {deptName}
+                              {deptName}
                             </span>
                           );
                         }
@@ -385,7 +385,7 @@ export default function MembersPage() {
                             cursor: 'pointer'
                           }}
                         >
-                          {isHidden ? '🙈 Đã ẩn lịch' : '👁️ Hiện lịch'}
+                          {isHidden ? 'Đã ẩn lịch' : 'Hiện lịch'}
                         </button>
                       </td>
                     )}
@@ -434,7 +434,6 @@ export default function MembersPage() {
           ))}
           {pendingMembers.length === 0 && (
             <div className="empty-state" style={{ gridColumn: '1 / -1' }}>
-              <div className="empty-state-icon">✅</div>
               <div className="empty-state-text">Không có yêu cầu nào đang chờ</div>
             </div>
           )}
@@ -489,7 +488,7 @@ export default function MembersPage() {
                 </select>
                 {(!store?.departments || store.departments.length === 0) && (
                   <div style={{ fontSize: 12, color: '#b45309', marginTop: 4 }}>
-                    ⚠️ Cửa hàng chưa thiết lập danh mục bộ phận. Bạn có thể vào Cài đặt cửa hàng để thêm các bộ phận (Pha chế, Bếp, Thu ngân...).
+                    Cửa hàng chưa thiết lập danh mục bộ phận. Bạn có thể vào Cài đặt cửa hàng để thêm các bộ phận (Pha chế, Bếp, Thu ngân...).
                   </div>
                 )}
               </div>

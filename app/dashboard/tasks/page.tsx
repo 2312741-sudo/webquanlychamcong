@@ -234,7 +234,7 @@ export default function TasksPage() {
     };
 
     if (isCompleted && task.requirePhoto && draft.photos.length === 0) {
-      alert('⚠️ Công việc này bắt buộc phải chụp ít nhất 1 ảnh minh chứng trước khi bấm Hoàn thành!');
+      alert('Công việc này bắt buộc phải chụp ít nhất 1 ảnh minh chứng trước khi bấm Hoàn thành!');
       return;
     }
 
@@ -261,9 +261,9 @@ export default function TasksPage() {
       }));
 
       if (isCompleted) {
-        alert('🎉 Đã xác nhận HOÀN THÀNH công việc!');
+        alert('Đã xác nhận HOÀN THÀNH công việc!');
       } else {
-        alert('💾 Đã lưu bản nháp báo cáo thành công.');
+        alert('Đã lưu bản nháp báo cáo thành công.');
       }
     } catch (err: any) {
       console.error('Lỗi khi lưu báo cáo:', err);
@@ -487,7 +487,7 @@ export default function TasksPage() {
       };
 
       await createTask(storeId, taskData);
-      alert('✅ Đã tạo và giao công việc thành công!');
+      alert('Đã tạo và giao công việc thành công!');
       setShowCreateModal(false);
       resetCreateForm();
     } catch (err: any) {
@@ -537,7 +537,6 @@ export default function TasksPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
         <div>
           <h1 style={{ fontSize: 26, fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span>📋</span>
             <span>Giao việc & Báo cáo công việc</span>
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginTop: 4 }}>
@@ -563,7 +562,6 @@ export default function TasksPage() {
                 gap: 6,
               }}
             >
-              <span>📋</span>
               <span>Giao việc & Quản lý ({allTasks.length})</span>
             </button>
             <button
@@ -581,7 +579,6 @@ export default function TasksPage() {
                 gap: 6,
               }}
             >
-              <span>📝</span>
               <span>Việc của tôi trong ca ({myTotalCount})</span>
             </button>
           </div>
@@ -611,7 +608,7 @@ export default function TasksPage() {
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-secondary)' }}>
-                📅 Ngày làm việc:
+                Ngày làm việc:
               </span>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {isInActiveShift && activeShiftDate && (
@@ -633,7 +630,7 @@ export default function TasksPage() {
                       gap: 4,
                     }}
                   >
-                    {isOvernightShift ? '🌙' : '⚡'} Ca hiện tại ({activeShiftDate})
+                    Ca hiện tại ({activeShiftDate})
                   </button>
                 )}
                 <button
@@ -713,7 +710,6 @@ export default function TasksPage() {
                 fontSize: 13.5,
               }}
             >
-              <span style={{ fontSize: 20 }}>🌙</span>
               <div>
                 <strong>Ca làm việc qua đêm:</strong> Bạn đang trong ca làm việc bắt đầu từ ngày <strong>{activeShiftDate}</strong>.
                 Danh sách công việc của ca này sẽ hiển thị xuyên suốt cho đến khi bạn bấm <strong>Ra ca</strong>.
@@ -737,7 +733,6 @@ export default function TasksPage() {
                 fontSize: 14,
               }}
             >
-              <span style={{ fontSize: 20 }}>⚠️</span>
               <div>
                 <strong>Lưu ý quan trọng:</strong> Hệ thống yêu cầu hoàn thành tất cả công việc được giao
                 trước khi bạn có thể thực hiện <strong>RA CA (KẾT THÚC CA)</strong>.
@@ -762,7 +757,6 @@ export default function TasksPage() {
                 color: 'var(--text-secondary)',
               }}
             >
-              <div style={{ fontSize: 48, marginBottom: 12 }}>🎉</div>
               <h3 style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 }}>
                 Không có công việc nào được giao trong ngày {selectedMyDate}
               </h3>
@@ -820,7 +814,7 @@ export default function TasksPage() {
                                 borderRadius: 6,
                               }}
                             >
-                              🔁 Lặp mỗi ngày
+                              Lặp mỗi ngày
                             </span>
                           ) : task.repeatDaysOfWeek && task.repeatDaysOfWeek.length > 0 ? (
                             <span
@@ -833,7 +827,7 @@ export default function TasksPage() {
                                 borderRadius: 6,
                               }}
                             >
-                              🗓️ Lặp thứ {task.repeatDaysOfWeek.map(d => d === 7 ? 'CN' : `T${d + 1}`).join(', ')}
+                              Lặp thứ {task.repeatDaysOfWeek.map(d => d === 7 ? 'CN' : `T${d + 1}`).join(', ')}
                             </span>
                           ) : null}
                           {task.targetType === 'department' && (
@@ -847,7 +841,7 @@ export default function TasksPage() {
                                 borderRadius: 6,
                               }}
                             >
-                              🏢 {(task.targetDepartmentNames && task.targetDepartmentNames.length > 0 ? task.targetDepartmentNames.join(', ') : task.targetDepartmentName) || 'Bộ phận'}
+                              {(task.targetDepartmentNames && task.targetDepartmentNames.length > 0 ? task.targetDepartmentNames.join(', ') : task.targetDepartmentName) || 'Bộ phận'}
                             </span>
                           )}
                           {task.requirePhoto && (
@@ -861,7 +855,7 @@ export default function TasksPage() {
                                 borderRadius: 6,
                               }}
                             >
-                              📸 Bắt buộc ảnh chụp
+                              Bắt buộc ảnh chụp
                             </span>
                           )}
                           <span
@@ -917,7 +911,6 @@ export default function TasksPage() {
                               fontSize: 13,
                             }}
                           >
-                            <span>⏳</span>
                             <span>Đang thực hiện</span>
                           </div>
                         )}
@@ -928,7 +921,7 @@ export default function TasksPage() {
                     <div style={{ padding: 20 }}>
                       <div style={{ marginBottom: 16 }}>
                         <label style={{ display: 'block', fontWeight: 600, fontSize: 14, marginBottom: 6, color: 'var(--text-primary)' }}>
-                          📝 Báo cáo kết quả / Tiến độ công việc:
+                          Báo cáo kết quả / Tiến độ công việc:
                         </label>
                         <textarea
                           rows={3}
@@ -960,7 +953,7 @@ export default function TasksPage() {
                       <div style={{ marginBottom: 20 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                           <label style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)' }}>
-                            📸 Hình ảnh minh chứng ({draft.photos.length}):
+                            Hình ảnh minh chứng ({draft.photos.length}):
                             {task.requirePhoto && <span style={{ color: '#ef4444', marginLeft: 4 }}>* (Bắt buộc)</span>}
                           </label>
 
@@ -981,7 +974,6 @@ export default function TasksPage() {
                             }}
                             title="Bắt buộc chụp ảnh trực tiếp tại thời điểm hoàn thành"
                           >
-                            <span>📷</span>
                             <span>{draft.uploading ? 'Đang tải ảnh...' : 'Chụp ảnh trực tiếp'}</span>
                             <input
                               type="file"
@@ -1010,7 +1002,6 @@ export default function TasksPage() {
                             marginBottom: 10,
                           }}
                         >
-                          <span>🔒</span>
                           <span>
                             <strong>Đã khóa chọn từ thư viện:</strong> Bắt buộc chụp ảnh trực tiếp từ camera tại thời điểm hoàn thành để xác thực.
                           </span>
@@ -1104,7 +1095,7 @@ export default function TasksPage() {
                             border: '1px solid #d1d5db',
                           }}
                         >
-                          💾 Lưu nháp
+                          Lưu nháp
                         </button>
 
                         <button
@@ -1247,7 +1238,6 @@ export default function TasksPage() {
                   boxShadow: '0 4px 14px rgba(0,0,0,0.12)',
                 }}
               >
-                <span>➕</span>
                 <span>Giao việc mới</span>
               </button>
             </div>
@@ -1286,7 +1276,7 @@ export default function TasksPage() {
               <div style={{ minWidth: 240 }}>
                 <input
                   type="text"
-                  placeholder="🔍 Tìm theo tiêu đề hoặc mô tả..."
+                  placeholder="Tìm theo tiêu đề hoặc mô tả..."
                   value={searchKeyword}
                   onChange={(e) => setSearchKeyword(e.target.value)}
                   style={{
@@ -1314,7 +1304,6 @@ export default function TasksPage() {
                 color: 'var(--text-secondary)',
               }}
             >
-              <div style={{ fontSize: 44, marginBottom: 12 }}>📋</div>
               <h3 style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 }}>
                 Không tìm thấy công việc nào
               </h3>
@@ -1358,10 +1347,10 @@ export default function TasksPage() {
                             }}
                           >
                             {isAllStore
-                              ? '🏪 Toàn cửa hàng'
+                              ? 'Toàn cửa hàng'
                               : isDept
-                              ? `🏢 Bộ phận: ${task.targetDepartmentNames && task.targetDepartmentNames.length > 0 ? task.targetDepartmentNames.join(', ') : (task.targetDepartmentName || 'Bộ phận')}`
-                              : `👤 ${task.assignedNames?.length || 0} nhân sự`}
+                              ? `Bộ phận: ${task.targetDepartmentNames && task.targetDepartmentNames.length > 0 ? task.targetDepartmentNames.join(', ') : (task.targetDepartmentName || 'Bộ phận')}`
+                              : `${task.assignedNames?.length || 0} nhân sự`}
                           </span>
 
                           {task.repeatDaily ? (
@@ -1375,7 +1364,7 @@ export default function TasksPage() {
                                 color: '#047857',
                               }}
                             >
-                              🔁 Lặp mỗi ngày
+                              Lặp mỗi ngày
                             </span>
                           ) : task.repeatDaysOfWeek && task.repeatDaysOfWeek.length > 0 ? (
                             <span
@@ -1388,7 +1377,7 @@ export default function TasksPage() {
                                 color: '#047857',
                               }}
                             >
-                              🗓️ Lặp thứ {task.repeatDaysOfWeek.map(d => d === 7 ? 'CN' : `T${d + 1}`).join(', ')}
+                              Lặp thứ {task.repeatDaysOfWeek.map(d => d === 7 ? 'CN' : `T${d + 1}`).join(', ')}
                             </span>
                           ) : null}
                         </div>
@@ -1406,7 +1395,7 @@ export default function TasksPage() {
                               }}
                               title="Bắt buộc chụp ảnh minh chứng"
                             >
-                              📸 Bắt buộc ảnh
+                              Bắt buộc ảnh
                             </span>
                           )}
                           <span
@@ -1454,11 +1443,11 @@ export default function TasksPage() {
                         </div>
                         {task.repeatDaily ? (
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#047857', background: '#ecfdf5', padding: '3px 8px', borderRadius: 6 }}>
-                            <span>🔁 Tự động lặp lại mỗi ngày</span>
+                            <span>Tự động lặp lại mỗi ngày</span>
                           </div>
                         ) : task.repeatDaysOfWeek && task.repeatDaysOfWeek.length > 0 ? (
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#047857', background: '#ecfdf5', padding: '3px 8px', borderRadius: 6 }}>
-                            <span>🗓️ Lặp vào thứ {task.repeatDaysOfWeek.map(d => d === 7 ? 'CN' : `T${d + 1}`).join(', ')} hàng tuần</span>
+                            <span>Lặp vào thứ {task.repeatDaysOfWeek.map(d => d === 7 ? 'CN' : `T${d + 1}`).join(', ')} hàng tuần</span>
                           </div>
                         ) : (
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
@@ -1474,7 +1463,7 @@ export default function TasksPage() {
                                   borderRadius: 4,
                                 }}
                               >
-                                {d === todayStr ? `🔥 Hôm nay (${d})` : d}
+                                {d === todayStr ? `Hôm nay (${d})` : d}
                               </span>
                             ))}
                           </div>
@@ -1507,7 +1496,7 @@ export default function TasksPage() {
                           }}
                           title="Chỉnh sửa công việc này"
                         >
-                          ✏️ Sửa việc
+                          Sửa việc
                         </button>
                         <button
                           type="button"
@@ -1521,7 +1510,7 @@ export default function TasksPage() {
                             fontWeight: 700,
                           }}
                         >
-                          👁️ Xem báo cáo
+                          Xem báo cáo
                         </button>
                         <button
                           type="button"
@@ -1536,7 +1525,7 @@ export default function TasksPage() {
                           }}
                           title="Xoá việc này"
                         >
-                          🗑️
+                          Xoá
                         </button>
                       </div>
                     </div>
@@ -1560,7 +1549,6 @@ export default function TasksPage() {
           >
             <div className="modal-header">
               <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span>➕</span>
                 <span>Giao công việc mới</span>
               </div>
               <button className="modal-close" onClick={() => setShowCreateModal(false)}>✕</button>
@@ -1613,7 +1601,7 @@ export default function TasksPage() {
               {/* Ngày thực hiện & Lặp lại */}
               <div style={{ background: '#f9fafb', padding: 14, borderRadius: 12, border: '1px solid #e5e7eb' }}>
                 <label style={{ display: 'block', fontWeight: 700, fontSize: 14, marginBottom: 8, color: 'var(--text-primary)' }}>
-                  📅 Thời gian thực hiện & Lặp lại: <span style={{ color: '#ef4444' }}>*</span>
+                  Thời gian thực hiện & Lặp lại: <span style={{ color: '#ef4444' }}>*</span>
                 </label>
 
                 {/* Segment buttons for repeat mode */}
@@ -1632,7 +1620,7 @@ export default function TasksPage() {
                       color: newRepeatMode === 0 ? 'white' : '#374151',
                     }}
                   >
-                    📅 Ngày cụ thể
+                    Ngày cụ thể
                   </button>
                   <button
                     type="button"
@@ -1648,7 +1636,7 @@ export default function TasksPage() {
                       color: newRepeatMode === 1 ? 'white' : '#374151',
                     }}
                   >
-                    🔁 Lặp mỗi ngày
+                    Lặp mỗi ngày
                   </button>
                   <button
                     type="button"
@@ -1670,7 +1658,7 @@ export default function TasksPage() {
                       color: newRepeatMode === 2 ? 'white' : '#374151',
                     }}
                   >
-                    🗓️ Lặp theo thứ
+                    Lặp theo thứ
                   </button>
                 </div>
 
@@ -1881,7 +1869,7 @@ export default function TasksPage() {
               {/* Đối tượng nhận việc */}
               <div>
                 <label style={{ display: 'block', fontWeight: 600, fontSize: 14, marginBottom: 8 }}>
-                  👥 Đối tượng nhận việc:
+                  Đối tượng nhận việc:
                 </label>
                 <div style={{ display: 'flex', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 14 }}>
@@ -1940,12 +1928,12 @@ export default function TasksPage() {
                   >
                     {(!store?.departments || store.departments.length === 0) ? (
                       <div style={{ fontSize: 13, color: '#b45309', padding: '6px 0' }}>
-                        ⚠️ Cửa hàng chưa có danh sách bộ phận. Vui lòng vào Cài đặt cửa hàng để thiết lập bộ phận (ví dụ: Pha chế, Thu ngân, Bếp, Phục vụ...).
+                        Cửa hàng chưa có danh sách bộ phận. Vui lòng vào Cài đặt cửa hàng để thiết lập bộ phận (ví dụ: Pha chế, Thu ngân, Bếp, Phục vụ...).
                       </div>
                     ) : (
                       <>
                         <div style={{ background: '#ede9fe', color: '#6d28d9', padding: '8px 12px', borderRadius: 8, fontSize: 12, marginBottom: 8, lineHeight: 1.4 }}>
-                          💡 <strong>Tự động theo ca:</strong> Cho phép chọn một hoặc NHIỀU bộ phận cùng lúc. Công việc sẽ tự động giao cho các nhân sự có ca làm việc thuộc các bộ phận này theo từng ngày (dựa theo Lịch làm việc tuần / Bộ phận của nhân viên).
+                          <strong>Tự động theo ca:</strong> Cho phép chọn một hoặc NHIỀU bộ phận cùng lúc. Công việc sẽ tự động giao cho các nhân sự có ca làm việc thuộc các bộ phận này theo từng ngày (dựa theo Lịch làm việc tuần / Bộ phận của nhân viên).
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                           <span style={{ fontSize: 12.5, fontWeight: 700, color: '#4b5563' }}>
@@ -2134,7 +2122,7 @@ export default function TasksPage() {
                   style={{ width: 18, height: 18, cursor: 'pointer' }}
                 />
                 <label htmlFor="requirePhotoSwitch" style={{ fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-                  📸 Bắt buộc nhân viên phải chụp ảnh minh chứng trước khi bấm Hoàn thành
+                  Bắt buộc nhân viên phải chụp ảnh minh chứng trước khi bấm Hoàn thành
                 </label>
               </div>
 
@@ -2367,7 +2355,7 @@ function TaskSubmissionsModal({
       >
         <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div className="modal-title">
-            <span>📋 Báo cáo công việc: {task.title}</span>
+            <span>Báo cáo công việc: {task.title}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {onEditTask && (
@@ -2388,7 +2376,7 @@ function TaskSubmissionsModal({
                   gap: 4,
                 }}
               >
-                ✏️ Sửa việc
+                Sửa việc
               </button>
             )}
             <button className="modal-close" onClick={onClose}>✕</button>
@@ -2401,31 +2389,31 @@ function TaskSubmissionsModal({
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
               {task.targetType === 'allStore' && (
                 <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6, background: '#dbeafe', color: '#1e40af' }}>
-                  🏪 Toàn cửa hàng
+                  Toàn cửa hàng
                 </span>
               )}
               {task.targetType === 'department' && (
                 <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6, background: '#ede9fe', color: '#6d28d9' }}>
-                  🏢 Bộ phận: {task.targetDepartmentNames && task.targetDepartmentNames.length > 0 ? task.targetDepartmentNames.join(', ') : (task.targetDepartmentName || 'Bộ phận')}
+                  Bộ phận: {task.targetDepartmentNames && task.targetDepartmentNames.length > 0 ? task.targetDepartmentNames.join(', ') : (task.targetDepartmentName || 'Bộ phận')}
                 </span>
               )}
               {task.targetType === 'individual' && (
                 <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6, background: '#fef3c7', color: '#92400e' }}>
-                  👤 Chỉ định cá nhân
+                  Chỉ định cá nhân
                 </span>
               )}
               {task.repeatDaily ? (
                 <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6, background: '#ecfdf5', color: '#047857' }}>
-                  🔁 Lặp mỗi ngày
+                  Lặp mỗi ngày
                 </span>
               ) : task.repeatDaysOfWeek && task.repeatDaysOfWeek.length > 0 ? (
                 <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6, background: '#ecfdf5', color: '#047857' }}>
-                  🗓️ Lặp thứ {task.repeatDaysOfWeek.map(d => d === 7 ? 'CN' : `T${d + 1}`).join(', ')} hàng tuần
+                  Lặp thứ {task.repeatDaysOfWeek.map(d => d === 7 ? 'CN' : `T${d + 1}`).join(', ')} hàng tuần
                 </span>
               ) : null}
               {task.requirePhoto && (
                 <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 6, background: '#f3e8ff', color: '#6b21a8' }}>
-                  📸 Bắt buộc ảnh
+                  Bắt buộc ảnh
                 </span>
               )}
             </div>
@@ -2517,7 +2505,7 @@ function TaskSubmissionsModal({
                           borderRadius: 12,
                         }}
                       >
-                        ⏳ Chưa nộp / Chưa xong
+                        Chưa nộp / Chưa xong
                       </span>
                     )}
                   </div>
@@ -2784,7 +2772,7 @@ function EditTaskModal({
       };
 
       await updateTask(storeId, task.id, updateData);
-      alert('✅ Cập nhật công việc thành công!');
+      alert('Cập nhật công việc thành công!');
       onSuccess();
     } catch (err: any) {
       console.error('Lỗi khi cập nhật công việc:', err);
@@ -2803,7 +2791,6 @@ function EditTaskModal({
       >
         <div className="modal-header">
           <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span>✏️</span>
             <span>Chỉnh sửa công việc: {task.title}</span>
           </div>
           <button className="modal-close" onClick={onClose}>✕</button>
@@ -2817,10 +2804,10 @@ function EditTaskModal({
             </label>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {[
-                { val: 'active', label: '⚡ Đang thực hiện', color: '#16a34a', bg: '#f0fdf4' },
+                { val: 'active', label: 'Đang thực hiện', color: '#16a34a', bg: '#f0fdf4' },
                 { val: 'completed', label: '✓ Đã hoàn thành', color: '#2563eb', bg: '#eff6ff' },
                 { val: 'cancelled', label: '✕ Đã hủy', color: '#dc2626', bg: '#fef2f2' },
-                { val: 'archived', label: '📁 Lưu trữ', color: '#6b7280', bg: '#f3f4f6' },
+                { val: 'archived', label: 'Lưu trữ', color: '#6b7280', bg: '#f3f4f6' },
               ].map((s) => {
                 const isSelected = status === s.val;
                 return (
@@ -2892,7 +2879,7 @@ function EditTaskModal({
           {/* Thời gian thực hiện & Lặp lại */}
           <div style={{ background: '#f9fafb', padding: 14, borderRadius: 12, border: '1px solid #e5e7eb' }}>
             <label style={{ display: 'block', fontWeight: 700, fontSize: 14, marginBottom: 8, color: 'var(--text-primary)' }}>
-              📅 Thời gian thực hiện & Lặp lại: <span style={{ color: '#ef4444' }}>*</span>
+              Thời gian thực hiện & Lặp lại: <span style={{ color: '#ef4444' }}>*</span>
             </label>
 
             {/* Segment buttons for repeat mode */}
@@ -2911,7 +2898,7 @@ function EditTaskModal({
                   color: repeatMode === 0 ? 'white' : '#374151',
                 }}
               >
-                📅 Ngày cụ thể
+                Ngày cụ thể
               </button>
               <button
                 type="button"
@@ -2927,7 +2914,7 @@ function EditTaskModal({
                   color: repeatMode === 1 ? 'white' : '#374151',
                 }}
               >
-                🔁 Lặp mỗi ngày
+                Lặp mỗi ngày
               </button>
               <button
                 type="button"
@@ -2949,7 +2936,7 @@ function EditTaskModal({
                   color: repeatMode === 2 ? 'white' : '#374151',
                 }}
               >
-                🗓️ Lặp theo thứ
+                Lặp theo thứ
               </button>
             </div>
 
@@ -3156,7 +3143,7 @@ function EditTaskModal({
           {/* Đối tượng nhận việc */}
           <div>
             <label style={{ display: 'block', fontWeight: 600, fontSize: 14, marginBottom: 8 }}>
-              👥 Đối tượng nhận việc:
+              Đối tượng nhận việc:
             </label>
             <div style={{ display: 'flex', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 14 }}>
@@ -3209,7 +3196,7 @@ function EditTaskModal({
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <div style={{ background: '#ede9fe', color: '#6d28d9', padding: '8px 12px', borderRadius: 8, fontSize: 12, lineHeight: 1.4 }}>
-                      💡 <strong>Tự động theo ca:</strong> Cho phép chọn một hoặc NHIỀU bộ phận cùng lúc. Công việc sẽ tự động giao cho các nhân sự có ca làm việc thuộc các bộ phận này theo từng ngày (dựa theo Lịch làm việc tuần / Bộ phận của nhân viên).
+                      <strong>Tự động theo ca:</strong> Cho phép chọn một hoặc NHIỀU bộ phận cùng lúc. Công việc sẽ tự động giao cho các nhân sự có ca làm việc thuộc các bộ phận này theo từng ngày (dựa theo Lịch làm việc tuần / Bộ phận của nhân viên).
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                       <span style={{ fontSize: 12.5, fontWeight: 700, color: '#4b5563' }}>
@@ -3380,7 +3367,7 @@ function EditTaskModal({
             }}
           >
             <div>
-              <div style={{ fontWeight: 600, fontSize: 13.5 }}>📸 Bắt buộc chụp ảnh minh chứng</div>
+              <div style={{ fontWeight: 600, fontSize: 13.5 }}>Bắt buộc chụp ảnh minh chứng</div>
               <div style={{ fontSize: 12, color: '#6b7280' }}>
                 Khi bật, người làm việc phải chụp ảnh minh chứng thì mới được hoàn thành.
               </div>

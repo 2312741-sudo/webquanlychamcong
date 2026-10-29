@@ -326,19 +326,19 @@ export default function PerformanceOverviewPage() {
       }
       const complianceRate = tested > 0 ? Math.round((passed / tested) * 100) : 100;
 
-      let rating = '✅ Đạt chuẩn';
+      let rating = 'Đạt chuẩn';
       let ratingBg = '#E6F4EA';
       let ratingColor = '#137333';
       if (complianceRate === 100 && item.incidents === 0) {
-        rating = '🌟 Xuất sắc';
+        rating = 'Xuất sắc';
         ratingBg = '#E4F2EC';
         ratingColor = '#03543F';
       } else if (complianceRate < 70 || item.incidents >= 2) {
-        rating = '⚠️ Cần cải thiện';
+        rating = 'Cần cải thiện';
         ratingBg = '#FDE8E8';
         ratingColor = '#9B1C1C';
       } else if (complianceRate < 100 || item.incidents > 0) {
-        rating = '⚡ Khá tốt';
+        rating = 'Khá tốt';
         ratingBg = '#FBEFD4';
         ratingColor = '#92400E';
       }
@@ -459,7 +459,7 @@ export default function PerformanceOverviewPage() {
         {/* NƯỚC */}
         <div className="card" style={{ borderLeft: '4px solid #2D2A4A', padding: '16px 20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>🥤 LÀM NƯỚC</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>LÀM NƯỚC</span>
             <span style={{ fontSize: 11, background: '#E9E6ED', color: '#2D2A4A', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
               Chuẩn: {standards.drink}s
             </span>
@@ -478,7 +478,7 @@ export default function PerformanceOverviewPage() {
         {/* BÁNH */}
         <div className="card" style={{ borderLeft: '4px solid #805214', padding: '16px 20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>🍰 NƯỚNG BÁNH</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>NƯỚNG BÁNH</span>
             <span style={{ fontSize: 11, background: '#FBEFD4', color: '#805214', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
               Chuẩn: {standards.cake}s
             </span>
@@ -497,7 +497,7 @@ export default function PerformanceOverviewPage() {
         {/* ĐƠN HÀNG */}
         <div className="card" style={{ borderLeft: '4px solid #2D2A4A', padding: '16px 20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>📦 SOS ĐƠN HÀNG</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>SOS ĐƠN HÀNG</span>
             <span style={{ fontSize: 11, background: '#E9E6ED', color: '#2D2A4A', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
               Chuẩn: {standards.order}s
             </span>
@@ -516,7 +516,7 @@ export default function PerformanceOverviewPage() {
         {/* TỶ LỆ ĐẠT CHUẨN */}
         <div className="card" style={{ borderLeft: '4px solid #146A65', padding: '16px 20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>🎯 ĐẠT TIÊU CHUẨN</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>ĐẠT TIÊU CHUẨN</span>
             <span style={{ fontSize: 11, background: '#E4F2EC', color: '#146A65', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
               Mục tiêu &ge; 85%
             </span>
@@ -525,14 +525,14 @@ export default function PerformanceOverviewPage() {
             {stats.complianceRate}%
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 6 }}>
-            {stats.complianceRate >= 85 ? '✅ Đạt mục tiêu vận hành' : '⚠️ Cần đôn đốc cải thiện tốc độ'}
+            {stats.complianceRate >= 85 ? 'Đạt mục tiêu vận hành' : 'Cần đôn đốc cải thiện tốc độ'}
           </div>
         </div>
 
         {/* SỰ CỐ */}
         <div className="card" style={{ borderLeft: '4px solid #7E2930', padding: '16px 20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>⚠️ SỰ CỐ PHÁT SINH</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>SỰ CỐ PHÁT SINH</span>
             <span style={{ fontSize: 11, background: '#FEE2E2', color: '#B91C1C', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
               Trong ca
             </span>
@@ -646,7 +646,7 @@ export default function PerformanceOverviewPage() {
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#047857' }}>🏆 NGÀY HIỆU SUẤT CAO NHẤT</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#047857' }}>NGÀY HIỆU SUẤT CAO NHẤT</span>
                   <span style={{ fontSize: 11, background: '#E4F2EC', color: '#03543F', padding: '2px 8px', borderRadius: 8, fontWeight: 700 }}>
                     SLA {dayHighlights.bestDay.complianceRate}%
                   </span>
@@ -669,7 +669,7 @@ export default function PerformanceOverviewPage() {
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#2D2A4A' }}>🚀 NGÀY CAO ĐIỂM SẢN LƯỢNG</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#2D2A4A' }}>NGÀY CAO ĐIỂM SẢN LƯỢNG</span>
                   <span style={{ fontSize: 11, background: '#E9E6ED', color: '#2D2A4A', padding: '2px 8px', borderRadius: 8, fontWeight: 700 }}>
                     {dayHighlights.peakDay.totalVolume} món/đơn
                   </span>
@@ -692,7 +692,7 @@ export default function PerformanceOverviewPage() {
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#805214' }}>⚠️ NGÀY CẦN CHÚ Ý VẬN HÀNH</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#805214' }}>NGÀY CẦN CHÚ Ý VẬN HÀNH</span>
                   <span style={{ fontSize: 11, background: dayHighlights.attentionDay.incidents > 0 ? '#FEE2E2' : '#FBEFD4', color: dayHighlights.attentionDay.incidents > 0 ? '#B91C1C' : '#92400E', padding: '2px 8px', borderRadius: 8, fontWeight: 700 }}>
                     {dayHighlights.attentionDay.incidents > 0 ? `${dayHighlights.attentionDay.incidents} sự cố` : `SLA ${dayHighlights.attentionDay.complianceRate}%`}
                   </span>
@@ -897,7 +897,7 @@ export default function PerformanceOverviewPage() {
 
         {attentionSessions.length === 0 ? (
           <div style={{ padding: '24px 0', textAlign: 'center', color: '#146A65', fontSize: 13 }}>
-            🎉 Tất cả các ca đo trong kỳ đều đạt chuẩn tốt và không phát sinh sự cố!
+            Tất cả các ca đo trong kỳ đều đạt chuẩn tốt và không phát sinh sự cố!
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
@@ -931,15 +931,15 @@ export default function PerformanceOverviewPage() {
                       </td>
                       <td style={{ padding: '10px 12px', color: isSlowDrink ? 'var(--primary)' : 'inherit', fontWeight: isSlowDrink ? 700 : 400 }}>
                         {rep.drinkAverageSeconds ? `${rep.drinkAverageSeconds}s` : '-'}
-                        {isSlowDrink && <span style={{ fontSize: 10, marginLeft: 4 }}>⚠️</span>}
+                        {isSlowDrink && <span style={{ fontSize: 10, marginLeft: 4 }}>(chậm)</span>}
                       </td>
                       <td style={{ padding: '10px 12px', color: isSlowCake ? 'var(--primary)' : 'inherit', fontWeight: isSlowCake ? 700 : 400 }}>
                         {rep.cakeAverageSeconds ? `${rep.cakeAverageSeconds}s` : '-'}
-                        {isSlowCake && <span style={{ fontSize: 10, marginLeft: 4 }}>⚠️</span>}
+                        {isSlowCake && <span style={{ fontSize: 10, marginLeft: 4 }}>(chậm)</span>}
                       </td>
                       <td style={{ padding: '10px 12px', color: isSlowOrder ? 'var(--primary)' : 'inherit', fontWeight: isSlowOrder ? 700 : 400 }}>
                         {rep.orderAverageSeconds ? `${rep.orderAverageSeconds}s` : '-'}
-                        {isSlowOrder && <span style={{ fontSize: 10, marginLeft: 4 }}>⚠️</span>}
+                        {isSlowOrder && <span style={{ fontSize: 10, marginLeft: 4 }}>(chậm)</span>}
                       </td>
                       <td style={{ padding: '10px 12px' }}>
                         {hasInc ? (

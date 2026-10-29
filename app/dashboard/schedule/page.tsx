@@ -470,9 +470,9 @@ function ScheduleContent() {
     const hasGiaoHang = arr.includes('giaohang');
     
     if (actualShifts.length === 0) {
-      if (hasDelivery && hasGiaoHang) return '📦 Chở + 🛵 Giao';
-      if (hasDelivery) return '📦 Chở hàng';
-      if (hasGiaoHang) return '🛵 Giao hàng';
+      if (hasDelivery && hasGiaoHang) return 'Chở + Giao';
+      if (hasDelivery) return 'Chở hàng';
+      if (hasGiaoHang) return 'Giao hàng';
       return 'Nghỉ';
     }
 
@@ -485,8 +485,8 @@ function ScheduleContent() {
       return dept ? `[${dept.shortName}] ${shiftName}` : shiftName;
     });
     
-    if (hasDelivery) names.push('📦 Chở');
-    if (hasGiaoHang) names.push('🛵 Giao');
+    if (hasDelivery) names.push('Chở');
+    if (hasGiaoHang) names.push('Giao');
     
     return names.join(' + ');
   };
@@ -588,7 +588,6 @@ function ScheduleContent() {
               transition: 'all 0.15s'
             }}
           >
-            <span>✏️</span>
             <span>Đăng ký lịch</span>
             {isDirty && <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ff6b6b' }} />}
           </button>
@@ -613,23 +612,22 @@ function ScheduleContent() {
               transition: 'all 0.15s'
             }}
           >
-            <span>🏪</span>
             <span>Lịch cửa hàng</span>
           </button>
         </div>
 
         <div className="flex gap-2 flex-wrap">
           <button onClick={goToCurrentWeek} className="btn btn-secondary btn-sm">
-            📅 Tuần này
+            Tuần này
           </button>
           {activeTab === 'store' && (
             <button onClick={handleExport} className="btn btn-primary btn-sm" style={{ background: 'var(--success)' }}>
-              📥 Xuất Excel
+              Xuất Excel
             </button>
           )}
           {activeTab === 'store' && (canInteract || !pastDeadline) && (
             <button onClick={saveChanges} className="btn btn-primary btn-sm" disabled={saving || loading || (!canInteract && pastDeadline)}>
-              {saving ? 'Đang lưu...' : '💾 Lưu lịch'}
+              {saving ? 'Đang lưu...' : 'Lưu lịch'}
             </button>
           )}
           {activeTab === 'register' && (
@@ -643,7 +641,7 @@ function ScheduleContent() {
                 cursor: isBlocked ? 'not-allowed' : 'pointer'
               }}
             >
-              {registerSaving ? 'Đang lưu...' : (isBlocked ? '🔒 Hết hạn' : (isDirty ? '💾 Lưu đăng ký *' : '💾 Lưu đăng ký'))}
+              {registerSaving ? 'Đang lưu...' : (isBlocked ? 'Hết hạn' : (isDirty ? 'Lưu đăng ký *' : 'Lưu đăng ký'))}
             </button>
           )}
         </div>
@@ -677,7 +675,7 @@ function ScheduleContent() {
                     cursor: 'pointer'
                   }}
                 >
-                  📅 Về tuần này
+                  Về tuần này
                 </button>
               )}
             </div>
@@ -703,7 +701,6 @@ function ScheduleContent() {
               gap: 12,
               color: '#D9480F'
             }}>
-              <span style={{ fontSize: 20 }}>⚠️</span>
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 700, fontSize: 13.5 }}>
                   Đã qua hạn đăng ký ({formatDeadline(currentWeek)}). Vui lòng liên hệ quản lý.
@@ -740,7 +737,6 @@ function ScheduleContent() {
               color: '#0CA678',
               fontSize: 13
             }}>
-              <span>⏰</span>
               <div>
                 Hạn chót đăng ký tuần này: <strong>{formatDeadline(currentWeek)}</strong> (Thứ 6 tuần trước khi bắt đầu tuần làm).
               </div>
@@ -788,7 +784,7 @@ function ScheduleContent() {
                   cursor: isBlocked ? 'not-allowed' : 'pointer'
                 }}
               >
-                {registerSaving ? 'Đang lưu...' : (isBlocked ? '🔒 Hết hạn đăng ký' : (isDirty ? '💾 Lưu đăng ký *' : '💾 Lưu đăng ký của bạn'))}
+                {registerSaving ? 'Đang lưu...' : (isBlocked ? 'Hết hạn đăng ký' : (isDirty ? 'Lưu đăng ký *' : 'Lưu đăng ký của bạn'))}
               </button>
             </div>
 
@@ -958,7 +954,7 @@ function ScheduleContent() {
                             style={{ transform: 'scale(1.1)', cursor: (hasNormal && !isBlocked) ? 'pointer' : 'not-allowed' }}
                           />
                           <span style={{ fontSize: 12.5, fontWeight: 600, color: hasDelivery ? '#D9480F' : 'var(--neutral)' }}>
-                            📦 Chở hàng
+                            Chở hàng
                           </span>
                         </div>
                         <span style={{ fontSize: 11, fontWeight: 700, color: '#D9480F' }}>
@@ -987,7 +983,7 @@ function ScheduleContent() {
                             style={{ transform: 'scale(1.1)', cursor: (hasNormal && !isBlocked) ? 'pointer' : 'not-allowed' }}
                           />
                           <span style={{ fontSize: 12.5, fontWeight: 600, color: hasGiaoHang ? '#D9480F' : 'var(--neutral)' }}>
-                            🛵 Giao hàng
+                            Giao hàng
                           </span>
                         </div>
                         <span style={{ fontSize: 11, fontWeight: 700, color: '#D9480F' }}>
@@ -1013,12 +1009,12 @@ function ScheduleContent() {
                       alignItems: 'center',
                       color: isOff ? 'var(--text-secondary)' : 'var(--primary)'
                     }}>
-                      <span>{isOff ? '💤 Nghỉ' : `Đã chọn: ${normalShifts.length} ca`}</span>
+                      <span>{isOff ? 'Nghỉ' : `Đã chọn: ${normalShifts.length} ca`}</span>
                       {!isOff && (
                         <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
-                          {hasDelivery && <span style={{ fontSize: 10, background: '#FFF9DB', color: '#D9480F', padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>📦 Chở</span>}
-                          {hasGiaoHang && <span style={{ fontSize: 10, background: '#FFF9DB', color: '#D9480F', padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>🛵 Giao</span>}
-                          <span>⏱️ {calculateDayHours(selectedShifts)}h</span>
+                          {hasDelivery && <span style={{ fontSize: 10, background: '#FFF9DB', color: '#D9480F', padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>Chở</span>}
+                          {hasGiaoHang && <span style={{ fontSize: 10, background: '#FFF9DB', color: '#D9480F', padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>Giao</span>}
+                          <span>{calculateDayHours(selectedShifts)}h</span>
                         </div>
                       )}
                     </div>
@@ -1055,17 +1051,17 @@ function ScheduleContent() {
                 </div>
                 {DAY_KEYS.some(k => registerDraft[k]?.includes('delivery')) && (
                   <div style={{ fontSize: 12, color: '#D9480F', fontWeight: 600 }}>
-                    📦 {DAY_KEYS.filter(k => registerDraft[k]?.includes('delivery')).length} ca chở
+                    {DAY_KEYS.filter(k => registerDraft[k]?.includes('delivery')).length} ca chở
                   </div>
                 )}
                 {DAY_KEYS.some(k => registerDraft[k]?.includes('giaohang')) && (
                   <div style={{ fontSize: 12, color: '#D9480F', fontWeight: 600 }}>
-                    🛵 {DAY_KEYS.filter(k => registerDraft[k]?.includes('giaohang')).length} ca giao
+                    {DAY_KEYS.filter(k => registerDraft[k]?.includes('giaohang')).length} ca giao
                   </div>
                 )}
                 {isDirty && (
                   <span style={{ fontSize: 12, background: '#FFF3BF', color: '#D9480F', padding: '3px 8px', borderRadius: 6, fontWeight: 700 }}>
-                    ⚠️ Có thay đổi chưa lưu
+                    Có thay đổi chưa lưu
                   </span>
                 )}
               </div>
@@ -1082,7 +1078,7 @@ function ScheduleContent() {
                   cursor: isBlocked ? 'not-allowed' : 'pointer'
                 }}
               >
-                {registerSaving ? 'Đang lưu...' : (isBlocked ? '🔒 ĐÃ HẾT HẠN ĐĂNG KÝ' : (isDirty ? '💾 LƯU ĐĂNG KÝ (CÓ THAY ĐỔI CHƯA LƯU)' : '💾 LƯU ĐĂNG KÝ LỊCH LÀM'))}
+                {registerSaving ? 'Đang lưu...' : (isBlocked ? 'ĐÃ HẾT HẠN ĐĂNG KÝ' : (isDirty ? 'LƯU ĐĂNG KÝ (CÓ THAY ĐỔI CHƯA LƯU)' : 'LƯU ĐĂNG KÝ LỊCH LÀM'))}
               </button>
             </div>
           </div>
@@ -1118,7 +1114,6 @@ function ScheduleContent() {
                 >
                   <td style={{ padding: '10px 14px', borderRadius: '8px 0 0 8px', minWidth: 190, position: 'sticky', left: 0, zIndex: 8, background: '#F8F9FA', boxShadow: '2px 0 6px rgba(0,0,0,0.06)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontSize: 15 }}>📊</span>
                       <div>
                         <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--neutral)' }}>Tổng giờ theo ngày</div>
                         <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Cộng dồn tất cả NV</div>
@@ -1279,11 +1274,11 @@ function ScheduleContent() {
                               <span>{getRoleLabel(m.role)}</span>
                               <span>•</span>
                               <span style={{ fontWeight: 600, color: 'var(--neutral)' }}>
-                                ⏱️ {memberHours > 0 ? (memberHours % 1 === 0 ? `${memberHours}h` : `${memberHours.toFixed(1)}h`) : '0h'}
+                                {memberHours > 0 ? (memberHours % 1 === 0 ? `${memberHours}h` : `${memberHours.toFixed(1)}h`) : '0h'}
                               </span>
                               {memberDelivery > 0 && (
                                 <span style={{ fontWeight: 600, color: '#D9480F' }}>
-                                  • 📦 {memberDelivery}
+                                  • {memberDelivery}
                                 </span>
                               )}
                             </div>
@@ -1304,7 +1299,7 @@ function ScheduleContent() {
                               fontSize: 13
                             }}
                           >
-                            {isHidden ? '🙈' : '👁️'}
+                            {isHidden ? 'Hiện' : 'Ẩn'}
                           </button>
                         )}
                       </div>
@@ -1434,7 +1429,6 @@ function ScheduleContent() {
                 <>
                   {isSelf && !canEditSchedule && pastDeadline && (
                     <div style={{ fontSize: 12, color: '#C92A2A', background: '#FFF5F5', padding: '8px 12px', borderRadius: 8, marginBottom: 14, fontWeight: 600, border: '1px solid #FFC9C9', display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span>🔒</span>
                       <span>Đã qua hạn đăng ký ({formatDeadline(currentWeek)}). Bạn chỉ có thể xem ca làm việc này.</span>
                     </div>
                   )}
@@ -1541,7 +1535,7 @@ function ScheduleContent() {
                         onChange={() => canEditDelivery && toggleShiftForCell('delivery')}
                         style={{ transform: 'scale(1.2)', cursor: canTickDelivery ? 'pointer' : 'not-allowed' }}
                       />
-                      📦 Chở hàng (được nhận phụ cấp)
+                      Chở hàng (được nhận phụ cấp)
                     </label>
                   </div>
                   
@@ -1554,7 +1548,7 @@ function ScheduleContent() {
                         onChange={() => canEditDelivery && toggleShiftForCell('giaohang')}
                         style={{ transform: 'scale(1.2)', cursor: canTickDelivery ? 'pointer' : 'not-allowed' }}
                       />
-                      🛵 Giao hàng (được nhận phụ cấp)
+                      Giao hàng (được nhận phụ cấp)
                     </label>
                   </div>
 
@@ -1599,7 +1593,6 @@ function ScheduleContent() {
           gap: 10,
           transition: 'all 0.3s ease'
         }}>
-          <span>{toastMessage.startsWith('Lỗi') ? '❌' : '✅'}</span>
           {toastMessage}
         </div>
       )}

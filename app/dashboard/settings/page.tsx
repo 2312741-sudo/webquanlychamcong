@@ -702,7 +702,7 @@ export default function SettingsPage() {
               disabled={saving}
               style={{ color: 'white', background: 'var(--primary)', borderColor: 'var(--primary)', marginBottom: 12 }}
             >
-              🗑️ Xóa toàn bộ dữ liệu lịch làm
+              Xóa toàn bộ dữ liệu lịch làm
             </button>
             <br/>
             <button 
@@ -711,11 +711,11 @@ export default function SettingsPage() {
               disabled={saving}
               style={{ color: 'white', background: 'var(--primary)', borderColor: 'var(--primary)' }}
             >
-              🗑️ Xóa toàn bộ dữ liệu IN/OUT (Chấm công)
+              Xóa toàn bộ dữ liệu IN/OUT (Chấm công)
             </button>
             <br/>
             <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid #FFC9C9', background: '#FFF5F5', padding: 16, borderRadius: 8 }}>
-              <h4 style={{ fontSize: 14, fontWeight: 700, color: '#C8102E', marginBottom: 8 }}>⚠️ Vùng nguy hiểm: Xóa cửa hàng</h4>
+              <h4 style={{ fontSize: 14, fontWeight: 700, color: '#C8102E', marginBottom: 8 }}>Vùng nguy hiểm: Xóa cửa hàng</h4>
               <p style={{ fontSize: 12, color: '#495057', marginBottom: 12, lineHeight: 1.5 }}>
                 Hành động này sẽ xóa vĩnh viễn cửa hàng <b>{store?.name}</b> cùng toàn bộ cấu hình, lịch làm và thành viên. Xác nhận bảo mật 2 bước là bắt buộc.
               </p>
@@ -751,7 +751,7 @@ export default function SettingsPage() {
                 disabled={saving}
                 style={{ color: 'white', background: '#C8102E', border: 'none', fontWeight: 700, padding: '10px 20px', borderRadius: 8, cursor: 'pointer' }}
               >
-                🚨 Xóa vĩnh viễn cửa hàng này (2 Bước)
+                Xóa vĩnh viễn cửa hàng này (2 Bước)
               </button>
             </div>
         </div>

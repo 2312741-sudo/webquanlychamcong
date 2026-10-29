@@ -220,7 +220,7 @@ export default function SalaryPage() {
           />
           {!isOwner && (
             <button onClick={() => setShowAdvanceModal(true)} className="btn btn-secondary">
-              💵 Xin ứng lương
+              Xin ứng lương
             </button>
           )}
           <button onClick={handleExportClick} className="btn btn-primary" style={{ background: 'var(--success)' }}>
@@ -231,21 +231,18 @@ export default function SalaryPage() {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16 }}>
         <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ width: 48, height: 48, borderRadius: 14, background: 'var(--info-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>👥</div>
           <div>
             <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>NHÂN VIÊN</div>
             <div style={{ fontSize: 22, fontWeight: 800 }}>{activeMembers.length}</div>
           </div>
         </div>
         <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ width: 48, height: 48, borderRadius: 14, background: 'var(--accent-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>⏱️</div>
           <div>
             <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>GIỜ CÔNG</div>
             <div style={{ fontSize: 22, fontWeight: 800 }}>{totalHoursAll.toFixed(1)}h</div>
           </div>
         </div>
           <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{ width: 48, height: 48, borderRadius: 14, background: '#FFF3CD', color: '#856404', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>📦</div>
             <div>
               <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>CHỞ HÀNG</div>
               <div style={{ fontSize: 22, fontWeight: 800 }}>{totalDeliveries} ca</div>
@@ -261,7 +258,6 @@ export default function SalaryPage() {
             </div>
           </div>
         <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ width: 48, height: 48, borderRadius: 14, background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>💰</div>
           <div>
             <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>TỔNG LƯƠNG TRẢ</div>
             <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--primary)' }}>
@@ -399,7 +395,7 @@ export default function SalaryPage() {
               
               {advances.filter(a => a.userId === currentUser?.uid && a.status === 'pending').length > 0 && (
                 <div style={{ color: 'var(--warning)', fontSize: 13, padding: 8, background: '#fff3cd', borderRadius: 4 }}>
-                  ⚠️ Bạn đang có 1 yêu cầu chờ duyệt, gửi thêm sẽ tạo yêu cầu mới.
+                  Bạn đang có 1 yêu cầu chờ duyệt, gửi thêm sẽ tạo yêu cầu mới.
                 </div>
               )}
               

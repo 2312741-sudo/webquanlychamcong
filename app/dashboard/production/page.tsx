@@ -182,8 +182,8 @@ export default function ProductionPage() {
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', borderBottom: '2px solid #eee', paddingBottom: '0' }}>
         {[
-          { key: 'tasks', label: '📋 Danh mục Checklist' },
-          { key: 'reports', label: '📊 Báo cáo hàng ngày' },
+          { key: 'tasks', label: 'Danh mục Checklist' },
+          { key: 'reports', label: 'Báo cáo hàng ngày' },
         ].map(tab => (
           <button
             key={tab.key}
@@ -230,7 +230,6 @@ export default function ProductionPage() {
               background: '#fff', borderRadius: '12px', border: '1px solid #eee',
               padding: '60px', textAlign: 'center',
             }}>
-              <div style={{ fontSize: '48px', marginBottom: '16px' }}>📋</div>
               <h3 style={{ color: '#999', fontWeight: 500 }}>Chưa có công việc nào</h3>
               <p style={{ color: '#bbb', fontSize: '14px' }}>
                 {isOwner ? 'Bấm "Thêm công việc" để tạo danh sách checklist cho nhân viên' : 'Chưa có danh mục checklist sản xuất nào được tạo'}
@@ -302,7 +301,7 @@ export default function ProductionPage() {
                               background: '#f0f4ff', color: '#3b5bdb',
                               padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
                             }}>
-                              🏷️ {task.unitLabel}
+                              {task.unitLabel}
                             </span>
                           ) : (
                             <span style={{
@@ -348,13 +347,13 @@ export default function ProductionPage() {
                                 onClick={() => openEditTask(task)}
                                 style={{ background: '#f0f4ff', color: '#3b5bdb', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}
                               >
-                                ✏️ Sửa
+                                Sửa
                               </button>
                               <button
                                 onClick={() => deleteTask(task)}
                                 style={{ background: '#fff5f5', color: 'var(--danger)', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}
                               >
-                                🗑️ Xóa
+                                Xóa
                               </button>
                             </div>
                           </td>
@@ -369,7 +368,7 @@ export default function ProductionPage() {
 
           {/* Hướng dẫn */}
           <div style={{ marginTop: '24px', background: '#fffbf0', border: '1px solid #f5c842', borderRadius: '10px', padding: '16px' }}>
-            <h4 style={{ margin: '0 0 8px', color: '#856404', fontSize: '14px' }}>💡 Hướng dẫn cài đặt Checklist & Đơn vị đo lường</h4>
+            <h4 style={{ margin: '0 0 8px', color: '#856404', fontSize: '14px' }}>Hướng dẫn cài đặt Checklist & Đơn vị đo lường</h4>
             <ul style={{ margin: 0, paddingLeft: '20px', color: '#856404', fontSize: '13px', lineHeight: '1.8' }}>
               <li><b>Đơn vị đo lường là tùy chọn:</b> Bạn có thể bật hoặc tắt đơn vị đo lường cho từng công việc.</li>
               <li><b>Tùy chỉnh đơn vị tự do:</b> Bạn có thể chọn nhanh các đơn vị có sẵn (Kg, Phút, Sản phẩm, Ca, Gói, Thùng, Ly, Hộp...) hoặc tự gõ bất kỳ đơn vị nào theo nhu cầu thực tế.</li>
@@ -413,7 +412,7 @@ export default function ProductionPage() {
                 onClick={fetchReports}
                 style={{ background: '#f0f4ff', color: '#3b5bdb', border: 'none', padding: '10px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '14px' }}
               >
-                🔄 Tải lại
+                Tải lại
               </button>
               <button
                 onClick={handleExport}
@@ -424,7 +423,7 @@ export default function ProductionPage() {
                   fontWeight: 600, fontSize: '14px', opacity: (exporting || filteredReports.length === 0) ? 0.6 : 1,
                 }}
               >
-                {exporting ? '⏳ Đang xuất...' : '⬇️ Xuất Excel'}
+                {exporting ? 'Đang xuất...' : 'Xuất Excel'}
               </button>
             </div>
           </div>
@@ -460,12 +459,10 @@ export default function ProductionPage() {
           {/* Bảng báo cáo */}
           {reportLoading ? (
             <div style={{ textAlign: 'center', padding: '60px', color: '#999' }}>
-              <div style={{ fontSize: '32px', marginBottom: '12px' }}>⏳</div>
               <p>Đang tải dữ liệu...</p>
             </div>
           ) : filteredReports.length === 0 ? (
             <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #eee', padding: '60px', textAlign: 'center' }}>
-              <div style={{ fontSize: '48px', marginBottom: '16px' }}>📭</div>
               <h3 style={{ color: '#999', fontWeight: 500 }}>Chưa có báo cáo nào</h3>
               <p style={{ color: '#bbb', fontSize: '14px' }}>Nhân viên chưa gửi báo cáo công việc cho tháng này</p>
               <p style={{ color: '#bbb', fontSize: '13px', marginTop: '8px' }}>
@@ -524,7 +521,7 @@ export default function ProductionPage() {
                           style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', fontSize: '16px' }}
                           title="Xóa báo cáo"
                         >
-                          🗑️
+                          Xoá
                         </button>
                       </td>
                     </tr>
@@ -547,7 +544,7 @@ export default function ProductionPage() {
             width: '480px', maxWidth: '90vw', boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
           }}>
             <h2 style={{ margin: '0 0 20px', fontSize: '18px', fontWeight: 700 }}>
-              {editingTask ? '✏️ Sửa công việc / Checklist' : '+ Thêm công việc / Checklist mới'}
+              {editingTask ? 'Sửa công việc / Checklist' : '+ Thêm công việc / Checklist mới'}
             </h2>
 
             <div style={{ marginBottom: '18px' }}>

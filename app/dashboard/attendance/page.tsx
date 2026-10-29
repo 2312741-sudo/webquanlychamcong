@@ -255,7 +255,6 @@ export default function AttendancePage() {
               boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
             }}
           >
-            <span>⏰</span>
             <span>Chấm công ngay →</span>
           </Link>
         </div>
@@ -347,14 +346,14 @@ export default function AttendancePage() {
                             <td style={{ fontWeight: 600 }}>{dateStr} ({dayName}) {dayAtts.length > 1 ? `(Ca ${aIdx + 1})` : ''}</td>
                             <td>
                               {!att.checkOut ? (
-                                <span style={{ color: 'var(--primary)', fontWeight: 700 }}>🟢 Đang làm</span>
+                                <span style={{ color: 'var(--primary)', fontWeight: 700 }}>Đang làm</span>
                               ) : (
                                 <span style={{ color: 'var(--success)', fontWeight: 600 }}>✓ Hoàn thành</span>
                               )}
                             </td>
                             <td>{inStr}</td>
                             <td>{outStr}</td>
-                            <td>{att.checkInMethod === 'wifi' ? '📶 WiFi' : att.checkInMethod === 'gps' ? '📍 GPS' : att.checkInMethod === 'manual' ? '✏️ Thủ công' : att.checkInMethod}</td>
+                            <td>{att.checkInMethod === 'wifi' ? 'WiFi' : att.checkInMethod === 'gps' ? 'GPS' : att.checkInMethod === 'manual' ? 'Thủ công' : att.checkInMethod}</td>
                             <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--primary)' }}>
                               {(att.totalHours || 0).toFixed(2)}h
                             </td>
@@ -370,14 +369,13 @@ export default function AttendancePage() {
               <div className="hide-on-desktop" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {myAtts.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--text-secondary)' }}>
-                    <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
                     <div style={{ fontWeight: 600, fontSize: 14 }}>Chưa có lượt chấm công nào trong tháng {currentMonth}</div>
                     <Link
                       href="/dashboard/checkin"
                       className="btn btn-primary btn-sm"
                       style={{ marginTop: 12, display: 'inline-flex' }}
                     >
-                      ⏰ Vào ca chấm công ngay
+                      Vào ca chấm công ngay
                     </Link>
                   </div>
                 ) : (
@@ -408,7 +406,7 @@ export default function AttendancePage() {
                           </div>
                           {!att.checkOut ? (
                             <span style={{ background: '#e8f5e9', color: '#2e7d32', padding: '3px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700 }}>
-                              🟢 Đang làm
+                              Đang làm
                             </span>
                           ) : (
                             <span style={{ background: '#e0f2fe', color: '#0369a1', padding: '3px 8px', borderRadius: 12, fontSize: 11, fontWeight: 600 }}>
@@ -429,7 +427,7 @@ export default function AttendancePage() {
                         </div>
 
                         <div style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: 6 }}>
-                          <span>PT: {att.checkInMethod === 'wifi' ? '📶 WiFi' : att.checkInMethod === 'gps' ? '📍 GPS' : '✏️ Thủ công'}</span>
+                          <span>PT: {att.checkInMethod === 'wifi' ? 'WiFi' : att.checkInMethod === 'gps' ? 'GPS' : 'Thủ công'}</span>
                           {att.editNote && <span style={{ fontStyle: 'italic' }}>Ghi chú: {att.editNote}</span>}
                         </div>
                       </div>
@@ -455,7 +453,7 @@ export default function AttendancePage() {
         </div>
         <div className="flex gap-3 items-center flex-wrap">
           <Link href="/dashboard/checkin" className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span>⏰</span> Chấm công của bạn
+            Chấm công của bạn
           </Link>
           <input 
             type="month" 
@@ -508,7 +506,7 @@ export default function AttendancePage() {
                       <td style={{ textAlign: 'center', fontWeight: 700, color: 'var(--primary)', background: 'var(--primary-light)' }}>
                         <div>{totalHours.toFixed(1)}h</div>
                         {activeShift && (
-                          <div style={{ fontSize: 10, color: '#2e7d32', fontWeight: 700, marginTop: 2 }}>🟢 Đang làm</div>
+                          <div style={{ fontSize: 10, color: '#2e7d32', fontWeight: 700, marginTop: 2 }}>Đang làm</div>
                         )}
                       </td>
                       {daysArray.map(dateStr => {

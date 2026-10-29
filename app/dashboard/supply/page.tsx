@@ -108,11 +108,11 @@ export default function SupplyPage() {
   if (!storeId || !user) return null;
 
   const tabs: { id: Tab; label: string; show: boolean }[] = [
-    { id: 'order', label: '📝 Đặt hàng', show: true },
-    { id: 'prep', label: `✅ Soạn hàng${order.lines.length ? ` (${prepared}/${order.lines.length})` : ''}`, show: true },
-    { id: 'history', label: '📚 Lịch sử & Excel', show: true },
-    { id: 'items', label: '📦 Danh mục', show: isManager },
-    { id: 'settings', label: '⚙️ Cài đặt', show: isManager },
+    { id: 'order', label: 'Đặt hàng', show: true },
+    { id: 'prep', label: `Soạn hàng${order.lines.length ? ` (${prepared}/${order.lines.length})` : ''}`, show: true },
+    { id: 'history', label: 'Lịch sử & Excel', show: true },
+    { id: 'items', label: 'Danh mục', show: isManager },
+    { id: 'settings', label: 'Cài đặt', show: isManager },
   ];
 
   const dateChips = [-1, 0, 1, 2].map(d => supplyAddDays(today, d));
@@ -120,7 +120,7 @@ export default function SupplyPage() {
   return (
     <div style={{ padding: 24, maxWidth: 1000, margin: '0 auto' }}>
       <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, color: '#1a1a1a', margin: '0 0 6px' }}>📦 Đặt & soạn hàng</h1>
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: '#1a1a1a', margin: '0 0 6px' }}>Đặt & soạn hàng</h1>
         <p style={{ color: '#666', margin: 0, fontSize: 14 }}>
           Đặt hàng hoá / bao bì cho ngày hôm sau. Người vào ca hôm đó kiểm và tích &quot;Đã soạn&quot;.
         </p>
@@ -212,8 +212,8 @@ function OrderTab({ storeId, date, items, order, locked, cutoff, uid, userName, 
       {cutoff && (
         <div style={{ ...box, background: locked ? '#fff4f4' : '#f6faf6', borderColor: locked ? '#f5c2c2' : '#cfe8cf' }}>
           {locked
-            ? <>🔒 Đã quá giờ chốt đặt (<b>{cutoff}</b>). Liên hệ quản lý nếu cần thêm hàng.</>
-            : <>⏰ Giờ chốt đặt cho phiếu này: <b>{cutoff}</b>{isManager ? ' (quản lý vẫn sửa được sau giờ chốt)' : ''}</>}
+            ? <>Đã quá giờ chốt đặt (<b>{cutoff}</b>). Liên hệ quản lý nếu cần thêm hàng.</>
+            : <>Giờ chốt đặt cho phiếu này: <b>{cutoff}</b>{isManager ? ' (quản lý vẫn sửa được sau giờ chốt)' : ''}</>}
         </div>
       )}
 
@@ -301,14 +301,13 @@ function PrepTab({ storeId, date, order, canPrep, preparerNames, filtered, uid, 
     <>
       <div style={box}>
         {filtered
-          ? <>🧺 Người soạn hàng {supplyDisplay(date)} (theo lịch làm): <b>{preparerNames.length ? preparerNames.join(', ') : 'chưa có ai trong lịch'}</b></>
-          : <>🧺 Chưa giới hạn bộ phận soạn hàng — ai vào ca cũng tích được.</>}
+          ? <>Người soạn hàng {supplyDisplay(date)} (theo lịch làm): <b>{preparerNames.length ? preparerNames.join(', ') : 'chưa có ai trong lịch'}</b></>
+          : <>Chưa giới hạn bộ phận soạn hàng — ai vào ca cũng tích được.</>}
         {!canPrep && <div style={{ marginTop: 6, color: 'var(--danger)', fontSize: 13 }}>Bạn không thuộc bộ phận soạn hàng ngày này nên chỉ xem được.</div>}
       </div>
       <div style={box}>
         <div style={{ fontWeight: 700, marginBottom: 8 }}>
-          Đã soạn {done}/{order.lines.length}{order.lines.length > 0 && done === order.lines.length ? ' 🎉' : ''}
-        </div>
+          Đã soạn {done}/{order.lines.length}        </div>
         {order.lines.length === 0 && <p style={{ color: '#888', margin: 0 }}>Phiếu ngày này trống.</p>}
         {groupBy(order.lines, l => l.group).map(([g, list]) => (
           <div key={g}>
@@ -361,7 +360,7 @@ function HistoryTab({ storeId, storeName, today }: { storeId: string; storeName:
         Từ <input type="date" className="input" style={{ width: 170 }} value={from} onChange={e => { setFrom(e.target.value); setOrders(null); }} />
         đến <input type="date" className="input" style={{ width: 170 }} value={to} onChange={e => { setTo(e.target.value); setOrders(null); }} />
         <button className="btn btn-secondary" disabled={loading || !from || !to || from > to} onClick={load}>{loading ? 'Đang tải…' : 'Xem'}</button>
-        <button className="btn btn-primary" disabled={exporting || !from || !to || from > to} onClick={doExport}>{exporting ? 'Đang xuất…' : '⬇️ Xuất Excel'}</button>
+        <button className="btn btn-primary" disabled={exporting || !from || !to || from > to} onClick={doExport}>{exporting ? 'Đang xuất…' : 'Xuất Excel'}</button>
       </div>
       {orders?.length === 0 && <div style={box}>Không có phiếu nào.</div>}
       {orders?.map(o => {

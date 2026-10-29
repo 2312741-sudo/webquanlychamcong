@@ -256,7 +256,6 @@ export default function PerformanceLeaderboardPage() {
                 padding: '24px 20px',
               }}
             >
-              <div style={{ fontSize: 32, marginBottom: 4 }}>👑 🥇</div>
               <div style={{ fontSize: 11, fontWeight: 800, color: '#805214', letterSpacing: 1 }}>
                 QUÁN QUÂN HIỆU NĂNG
               </div>
@@ -283,7 +282,6 @@ export default function PerformanceLeaderboardPage() {
                 padding: '24px 20px',
               }}
             >
-              <div style={{ fontSize: 30, marginBottom: 4 }}>🥈</div>
               <div style={{ fontSize: 11, fontWeight: 800, color: '#475569', letterSpacing: 1 }}>
                 Á QUÂN 1
               </div>
@@ -310,7 +308,6 @@ export default function PerformanceLeaderboardPage() {
                 padding: '24px 20px',
               }}
             >
-              <div style={{ fontSize: 30, marginBottom: 4 }}>🥉</div>
               <div style={{ fontSize: 11, fontWeight: 800, color: '#C2410C', letterSpacing: 1 }}>
                 Á QUÂN 2
               </div>
@@ -367,7 +364,7 @@ export default function PerformanceLeaderboardPage() {
               ) : (
                 staffStats.map((staff, idx) => {
                   const rank = idx + 1;
-                  const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`;
+                  const medal = `#${rank}`;
                   const isDrinkPass = staff.avgDrinkSec > 0 && staff.avgDrinkSec <= standards.drink;
 
                   return (

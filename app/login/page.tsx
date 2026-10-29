@@ -414,7 +414,7 @@ export default function LoginPage() {
                   marginBottom: 20,
                 }}>
                   <div style={{ fontWeight: 700, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6, color: '#92400E' }}>
-                    <span>⚠️ Lưu ý quan trọng:</span>
+                    <span>Lưu ý quan trọng:</span>
                   </div>
                   <ul style={{ paddingLeft: 16, margin: 0 }}>
                     <li>Hãy kiểm tra kỹ mục <b>Thư rác (Spam / Junk)</b> hoặc <b>Quảng cáo</b> nếu không thấy ở Hộp thư đến.</li>

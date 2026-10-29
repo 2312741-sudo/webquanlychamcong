@@ -20,17 +20,17 @@ const AppContext = createContext<AppCtx>({ user: null, storeId: null, store: nul
 export const useApp = () => useContext(AppContext);
 
 const NAV = [
-  { href: '/dashboard', icon: '📊', label: 'Tổng quan' },
-  { href: '/dashboard/checkin', icon: '⏰', label: 'Chấm công' },
-  { href: '/dashboard/schedule', icon: '🗓️', label: 'Lịch làm' },
-  { href: '/dashboard/tasks', icon: '📋', label: 'Giao việc' },
-  { href: '/dashboard/attendance', icon: '📅', label: 'Bảng công' },
-  { href: '/dashboard/salary', icon: '💰', label: 'Báo cáo lương' },
-  { href: '/dashboard/members', icon: '👥', label: 'Nhân viên' },
-  { href: '/dashboard/supply', icon: '📦', label: 'Đặt & soạn hàng' },
-  { href: '/dashboard/production', icon: '🏭', label: 'Sản xuất' },
-  { href: '/dashboard/performance', icon: '⚡', label: 'Đo hiệu năng' },
-  { href: '/dashboard/settings', icon: '⚙️', label: 'Cài đặt' },
+  { href: '/dashboard', label: 'Tổng quan' },
+  { href: '/dashboard/checkin', label: 'Chấm công' },
+  { href: '/dashboard/schedule', label: 'Lịch làm' },
+  { href: '/dashboard/tasks', label: 'Giao việc' },
+  { href: '/dashboard/attendance', label: 'Bảng công' },
+  { href: '/dashboard/salary', label: 'Báo cáo lương' },
+  { href: '/dashboard/members', label: 'Nhân viên' },
+  { href: '/dashboard/supply', label: 'Đặt & soạn hàng' },
+  { href: '/dashboard/production', label: 'Sản xuất' },
+  { href: '/dashboard/performance', label: 'Đo hiệu năng' },
+  { href: '/dashboard/settings', label: 'Cài đặt' },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -222,15 +222,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const bottomNavItems = (normRole === 'employee' || normRole === 'manager2')
     ? [
-        { href: '/dashboard/checkin', icon: '⏰', label: 'Chấm công' },
-        { href: '/dashboard/schedule', icon: '🗓️', label: 'Lịch làm' },
-        { href: '/dashboard/attendance', icon: '📅', label: 'Bảng công' },
+        { href: '/dashboard/checkin', label: 'Chấm công' },
+        { href: '/dashboard/schedule', label: 'Lịch làm' },
+        { href: '/dashboard/attendance', label: 'Bảng công' },
       ]
     : [
-        { href: '/dashboard', icon: '📊', label: 'Tổng quan' },
-        { href: '/dashboard/checkin', icon: '⏰', label: 'Chấm công' },
-        { href: '/dashboard/schedule', icon: '🗓️', label: 'Lịch làm' },
-        { href: '/dashboard/attendance', icon: '📅', label: 'Bảng công' },
+        { href: '/dashboard', label: 'Tổng quan' },
+        { href: '/dashboard/checkin', label: 'Chấm công' },
+        { href: '/dashboard/schedule', label: 'Lịch làm' },
+        { href: '/dashboard/attendance', label: 'Bảng công' },
       ];
 
 
@@ -257,20 +257,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     catch { setNotificationError('Không thể cập nhật trạng thái đã đọc. Vui lòng thử lại.'); }
   };
 
-  const getNotificationIcon = (type: string) => {
-    switch (type) {
-      case 'birthday': return '🎂';
-      case 'join_request': return '👤';
-      case 'join_approved': return '✅';
-      case 'advance_request': return '💵';
-      case 'advance_approved': return '💰';
-      case 'schedule_changed': return '🗓️';
-      case 'schedule_registration_reminder': return '⏰';
-      case 'checklist_reminder': return '📋';
-      case 'delivery_update': return '📦';
-      default: return '🔔';
-    }
-  };
 
   const formatNotifTime = (createdAt: any) => {
     if (!createdAt) return '';
@@ -346,7 +332,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   transition:'all 0.15s',
                   textDecoration:'none',
                 }}>
-                  <span style={{ fontSize:16 }}>{item.icon}</span>
                   {item.label}
                   {active && <div style={{ marginLeft:'auto', width:6, height:6, borderRadius:'50%', background:'rgba(255,255,255,0.8)' }} />}
                 </Link>
@@ -371,7 +356,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   {user?.displayName || user?.email}
                 </div>
                 <div style={{ fontSize:11, color:'var(--sidebar-role)' }}>
-                  {normRole === 'owner' ? '👑 Chủ cửa hàng' : normRole === 'manager1' ? '👔 Quản lý 1' : normRole === 'manager2' ? '👔 Quản lý 2' : '👤 Nhân viên'}
+                  {normRole === 'owner' ? 'Chủ cửa hàng' : normRole === 'manager1' ? 'Quản lý 1' : normRole === 'manager2' ? 'Quản lý 2' : 'Nhân viên'}
                 </div>
               </div>
               <button onClick={() => signOut().then(() => router.replace('/login'))} title="Đăng xuất" style={{
@@ -428,7 +413,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   }}
                   title="Chuyển cửa hàng"
                 >
-                  <span>🏪</span>
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{store.name}</span>
                   <span style={{ fontSize: 9, opacity: 0.6 }}>▾</span>
                 </button>
@@ -447,7 +431,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 }}
                 title="Thông báo"
               >
-                🔔
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg>
                 {unreadCount > 0 && (
                   <span style={{
                     position: 'absolute', top: -2, right: -2,
@@ -492,7 +476,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     {notifications.length >= notificationLimit && <button onClick={() => setNotificationLimit(value => value + 50)}>Xem thông báo cũ hơn</button>}
                     {notifications.length === 0 && !notificationError ? (
                       <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-secondary)' }}>
-                        <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
                         <p style={{ fontSize: 13, margin: 0 }}>Không có thông báo nào</p>
                       </div>
                     ) : (
@@ -509,9 +492,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                               transition: 'background 0.15s'
                             }}
                           >
-                            <span style={{ fontSize: 20, flexShrink: 0, marginTop: 2 }}>
-                              {getNotificationIcon(notif.type)}
-                            </span>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontWeight: isRead ? 600 : 700, fontSize: 13, color: 'var(--neutral)', marginBottom: 2 }}>
                                 {notif.title}
@@ -545,7 +525,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <main className="dashboard-main-content">
             {!storeId ? (
               <div className="empty-state">
-                <div className="empty-state-icon">🏪</div>
                 <div className="empty-state-text">Bạn chưa tham gia cửa hàng nào</div>
                 <div className="empty-state-sub">Vui lòng mở app điện thoại để tạo hoặc tham gia cửa hàng</div>
               </div>
@@ -563,7 +542,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 href={item.href}
                 className={`mobile-bottom-nav-item ${active ? 'active' : ''}`}
               >
-                <span className="mobile-bottom-nav-icon">{item.icon}</span>
                 <span className="mobile-bottom-nav-label">{item.label}</span>
               </Link>
             );
