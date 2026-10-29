@@ -20,6 +20,14 @@ const box: React.CSSProperties = { background: '#fff', border: '1px solid #eee',
 const groupTitle: React.CSSProperties = { fontSize: 13, fontWeight: 700, color: '#666', margin: '12px 0 6px', textTransform: 'uppercase' };
 const row: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid #f3f3f3' };
 
+/** Báo lỗi lưu cho người dùng (không để lỗi im lặng) */
+function alertError(e: unknown) {
+  const code = (e as { code?: string })?.code;
+  alert(code === 'permission-denied'
+    ? 'Không lưu được: không có quyền. Kiểm tra quyền của bạn hoặc Firestore rules chưa được cập nhật.'
+    : 'Không lưu được: ' + ((e as Error)?.message || String(e)));
+}
+
 function groupBy<T>(list: T[], key: (t: T) => string): [string, T[]][] {
   const m = new Map<string, T[]>();
   for (const x of list) {
@@ -183,7 +191,7 @@ function OrderTab({ storeId, date, items, order, locked, cutoff, uid, userName, 
       setDraft({});
       setMsg(`Đã thêm ${filled.length} món vào phiếu ${supplyDisplay(date)}`);
     } catch (e) {
-      setMsg('Lỗi: ' + (e as Error).message);
+      setMsg((e as { code?: string })?.code === 'permission-denied' ? 'Lỗi: không có quyền lưu (Firestore rules chưa cập nhật?)' : 'Lỗi: ' + (e as Error).message);
     } finally {
       setSaving(false);
     }
@@ -193,8 +201,10 @@ function OrderTab({ storeId, date, items, order, locked, cutoff, uid, userName, 
     if (!editing) return;
     const q = parseQty(editing.qty);
     if (q === null) { setMsg('Số lượng không hợp lệ'); return; }
-    await updateSupplyLine(storeId, date, editing.itemId, q, editing.note, uid, userName);
-    setEditing(null);
+    try {
+      await updateSupplyLine(storeId, date, editing.itemId, q, editing.note, uid, userName);
+      setEditing(null);
+    } catch (e) { alertError(e); }
   };
 
   return (
@@ -269,7 +279,7 @@ function OrderTab({ storeId, date, items, order, locked, cutoff, uid, userName, 
                 )}
                 {isManager && (
                   <button className="btn btn-sm btn-ghost" style={{ color: 'var(--danger)' }}
-                    onClick={() => confirm(`Xoá "${l.name}" khỏi phiếu?`) && removeSupplyLine(storeId, date, l.itemId)}>Xoá</button>
+                    onClick={() => confirm(`Xoá "${l.name}" khỏi phiếu?`) && removeSupplyLine(storeId, date, l.itemId).catch(alertError)}>Xoá</button>
                 )}
               </>
             )}
@@ -306,7 +316,7 @@ function PrepTab({ storeId, date, order, canPrep, preparerNames, filtered, uid, 
             {list.map(l => (
               <label key={l.itemId} style={{ ...row, cursor: canPrep ? 'pointer' : 'default', opacity: l.prepared ? 0.7 : 1 }}>
                 <input type="checkbox" checked={l.prepared} disabled={!canPrep} style={{ width: 18, height: 18 }}
-                  onChange={e => setSupplyPrepared(storeId, date, l.itemId, e.target.checked, uid, userName)} />
+                  onChange={e => setSupplyPrepared(storeId, date, l.itemId, e.target.checked, uid, userName).catch(alertError)} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 600, textDecoration: l.prepared ? 'line-through' : 'none' }}>{l.name}</div>
                   {l.note && <div style={{ fontSize: 12, color: '#888' }}>Ghi chú: {l.note}</div>}
@@ -395,7 +405,7 @@ function ItemsTab({ storeId, items }: { storeId: string; items: SupplyItem[] }) 
     try {
       await saveSupplyItem(storeId, { ...form, id: form.id || undefined });
       setForm(null);
-    } finally { setSaving(false); }
+    } catch (e) { alertError(e); } finally { setSaving(false); }
   };
 
   return (
@@ -429,7 +439,7 @@ function ItemsTab({ storeId, items }: { storeId: string; items: SupplyItem[] }) 
             <div key={i.id} style={{ ...row, opacity: i.active ? 1 : 0.5 }}>
               <div style={{ flex: 1 }}><b>{i.name}</b> <span style={{ color: '#888' }}>· {i.unit}</span>{!i.active && ' (đã ẩn)'}</div>
               <button className="btn btn-sm btn-ghost" onClick={() => setForm(i)}>Sửa</button>
-              <button className="btn btn-sm btn-ghost" onClick={() => setSupplyItemActive(storeId, i.id, !i.active)}>
+              <button className="btn btn-sm btn-ghost" onClick={() => setSupplyItemActive(storeId, i.id, !i.active).catch(alertError)}>
                 {i.active ? 'Ẩn' : 'Hiện lại'}
               </button>
             </div>
@@ -456,7 +466,7 @@ function SettingsTab({ storeId, settings, departments }: {
     try {
       await saveSupplySettings(storeId, { cutoffTime: cutoffOn ? cutoff : null, preparerDepartmentIds: deps });
       setSaved(true);
-    } finally { setSaving(false); }
+    } catch (e) { alertError(e); } finally { setSaving(false); }
   };
 
   return (
