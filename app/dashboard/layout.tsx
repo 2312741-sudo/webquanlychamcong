@@ -7,6 +7,43 @@ import { watchStore, watchMembers, watchCurrentMember, getUserStoresData, switch
 import { Store, Member, UserRole, AppNotification, getRoleLabel, normalizeRole, canManageSchedule, canApproveMembers, canAccessWeb } from '@/lib/types';
 import { User } from 'firebase/auth';
 import { notificationDestination } from '@/lib/notifications';
+import {
+  LayoutDashboard, Clock, CalendarDays, ClipboardList, Sheet, Wallet, Users, Package, Factory, Gauge, Settings,
+  Bell, Menu, Cake, UserPlus, UserCheck, HandCoins, CircleDollarSign, CalendarClock, ListChecks, Truck, Info,
+  type LucideIcon,
+} from 'lucide-react';
+
+// Icon menu (bộ Lucide, cùng bộ với web POS)
+const NAV_ICONS: Record<string, LucideIcon> = {
+  '/dashboard': LayoutDashboard,
+  '/dashboard/checkin': Clock,
+  '/dashboard/schedule': CalendarDays,
+  '/dashboard/tasks': ClipboardList,
+  '/dashboard/attendance': Sheet,
+  '/dashboard/salary': Wallet,
+  '/dashboard/members': Users,
+  '/dashboard/supply': Package,
+  '/dashboard/production': Factory,
+  '/dashboard/performance': Gauge,
+  '/dashboard/settings': Settings,
+};
+
+const NOTIFICATION_ICONS: Record<string, LucideIcon> = {
+  birthday: Cake,
+  join_request: UserPlus,
+  join_approved: UserCheck,
+  advance_request: HandCoins,
+  advance_approved: CircleDollarSign,
+  schedule_changed: CalendarDays,
+  schedule_registration_reminder: CalendarClock,
+  checklist_reminder: ListChecks,
+  delivery_update: Truck,
+};
+
+function NavIcon({ href, size = 18 }: { href: string; size?: number }) {
+  const Icon = NAV_ICONS[href];
+  return Icon ? <Icon size={size} strokeWidth={1.75} aria-hidden="true" /> : null;
+}
 
 interface AppCtx {
   user: User | null;
@@ -332,6 +369,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   transition:'all 0.15s',
                   textDecoration:'none',
                 }}>
+                  <NavIcon href={item.href} />
                   {item.label}
                   {active && <div style={{ marginLeft:'auto', width:6, height:6, borderRadius:'50%', background:'rgba(255,255,255,0.8)' }} />}
                 </Link>
@@ -431,7 +469,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 }}
                 title="Thông báo"
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg>
+                <Bell size={18} strokeWidth={1.75} aria-hidden="true" />
                 {unreadCount > 0 && (
                   <span style={{
                     position: 'absolute', top: -2, right: -2,
@@ -492,6 +530,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                               transition: 'background 0.15s'
                             }}
                           >
+                            {(() => {
+                              const Icon = NOTIFICATION_ICONS[notif.type] ?? Info;
+                              return <Icon size={18} strokeWidth={1.75} aria-hidden="true" style={{ flexShrink: 0, marginTop: 2, color: 'var(--primary)' }} />;
+                            })()}
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontWeight: isRead ? 600 : 700, fontSize: 13, color: 'var(--neutral)', marginBottom: 2 }}>
                                 {notif.title}
@@ -542,6 +584,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 href={item.href}
                 className={`mobile-bottom-nav-item ${active ? 'active' : ''}`}
               >
+                <span className="mobile-bottom-nav-icon"><NavIcon href={item.href} size={20} /></span>
                 <span className="mobile-bottom-nav-label">{item.label}</span>
               </Link>
             );
@@ -552,7 +595,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             className="mobile-bottom-nav-item"
             title="Mở menu"
           >
-            <span className="mobile-bottom-nav-icon">☰</span>
+            <span className="mobile-bottom-nav-icon"><Menu size={20} strokeWidth={1.75} aria-hidden="true" /></span>
             <span className="mobile-bottom-nav-label">Menu</span>
           </button>
         </nav>

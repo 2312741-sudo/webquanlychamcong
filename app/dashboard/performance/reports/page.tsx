@@ -1,6 +1,7 @@
 // app/dashboard/performance/reports/page.tsx
 'use client';
 import { useState, useEffect, useMemo, Suspense } from 'react';
+import { Search } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { useApp } from '../layout';
 import {
@@ -198,7 +199,7 @@ function PerformanceReportsContent() {
               }}
             />
             <span style={{ position: 'absolute', left: 10, top: 9, color: 'var(--text-secondary)', fontSize: 14 }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>
+              <Search size={14} strokeWidth={1.75} aria-hidden="true" />
             </span>
           </div>
 
