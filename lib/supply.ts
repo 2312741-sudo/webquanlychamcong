@@ -1,5 +1,5 @@
 // Đặt hàng ngày mai & soạn hàng khi vào ca — cùng schema Firestore với app (lib/models/supply_order_model.dart):
-//   stores/{storeId}/supply_items/{id}       danh mục: name, unit, group, order, active
+//   stores/{storeId}/supply_items/{id}       danh mục: code, name, unit, group, order, active
 //   stores/{storeId}/supply_settings/config  cutoffTime ("HH:mm" | null), preparerDepartmentIds
 //   stores/{storeId}/supply_orders/{yyyy-MM-dd}  date, updatedAt, lines.{itemId}
 import { db } from './firebase';
@@ -11,6 +11,8 @@ import { sanitize } from './exportExcel';
 
 export interface SupplyItem {
   id: string;
+  /** Mã hàng (VD: BB001), tuỳ chọn, không trùng trong cửa hàng */
+  code: string;
   name: string;
   unit: string;
   group: string;
@@ -27,6 +29,7 @@ export interface SupplyContribution {
 
 export interface SupplyOrderLine {
   itemId: string;
+  code: string;
   name: string;
   unit: string;
   group: string;
@@ -111,6 +114,21 @@ export function cutoffLabel(date: string, cutoff: string | null | undefined): st
   return `${cutoff!.trim()} ngày ${supplyDisplay(supplyAddDays(date, -1))}`;
 }
 
+/** Chuẩn hoá mã hàng: viết hoa, bỏ khoảng trắng (giống app) */
+export function normalizeSupplyCode(raw: string): string {
+  return (raw ?? '').trim().toUpperCase().replace(/\s+/g, '');
+}
+
+/** Mã hàng hợp lệ? Trả câu lỗi hoặc null. Rỗng = không bắt buộc. */
+export function validateSupplyCode(code: string, items: SupplyItem[], exceptId?: string): string | null {
+  const c = normalizeSupplyCode(code);
+  if (!c) return null;
+  if (c.length > 20) return 'Mã hàng tối đa 20 ký tự';
+  if (!/^[A-Z0-9._-]+$/.test(c)) return 'Mã hàng chỉ gồm chữ không dấu, số và - _ .';
+  const dup = items.find(i => i.id !== exceptId && normalizeSupplyCode(i.code) === c);
+  return dup ? `Mã "${c}" đã dùng cho "${dup.name}"` : null;
+}
+
 export function contributorNames(line: SupplyOrderLine): string[] {
   const out: string[] = [];
   for (const c of line.contributors) {
@@ -135,6 +153,7 @@ function toMs(v: unknown): number | null {
 export function parseSupplyItem(id: string, data: Record<string, unknown>): SupplyItem {
   return {
     id,
+    code: str(data.code),
     name: str(data.name),
     unit: str(data.unit),
     group: str(data.group),
@@ -149,6 +168,7 @@ export function parseSupplyOrder(date: string, data: Record<string, unknown> | u
     .filter(([, v]) => v && typeof v === 'object')
     .map(([itemId, v]) => ({
       itemId,
+      code: str(v.code),
       name: str(v.name),
       unit: str(v.unit),
       group: str(v.group),
@@ -197,7 +217,7 @@ export function watchSupplyItems(storeId: string, cb: (items: SupplyItem[]) => v
 
 export async function saveSupplyItem(storeId: string, item: Omit<SupplyItem, 'id'> & { id?: string }) {
   const data = {
-    name: item.name.trim(), unit: item.unit.trim(), group: item.group.trim(),
+    code: normalizeSupplyCode(item.code), name: item.name.trim(), unit: item.unit.trim(), group: item.group.trim(),
     order: item.order, active: item.active, updatedAt: serverTimestamp(),
   };
   if (!item.id) await addDoc(itemsRef(storeId), { ...data, createdAt: serverTimestamp() });
@@ -243,7 +263,7 @@ export async function addManySupplies(
   const lines: Record<string, unknown> = {};
   for (const { item, qty } of entries) {
     lines[item.id] = {
-      name: item.name, unit: item.unit, group: item.group,
+      code: item.code, name: item.name, unit: item.unit, group: item.group,
       qty: increment(qty),
       contributors: arrayUnion({ uid, name: userName, qty, at }),
       prepared: false,
@@ -287,7 +307,7 @@ export async function setSupplyPrepared(
 // ==================== EXCEL ====================
 
 export const SUPPLY_EXPORT_HEADERS = [
-  'Ngày nhận', 'Nhóm', 'Mặt hàng', 'Đơn vị', 'Số lượng', 'Người đặt', 'Ghi chú', 'Đã soạn', 'Người soạn', 'Giờ soạn',
+  'Ngày nhận', 'Nhóm', 'Mã hàng', 'Mặt hàng', 'Đơn vị', 'Số lượng', 'Người đặt', 'Ghi chú', 'Đã soạn', 'Người soạn', 'Giờ soạn',
 ];
 
 function vnTime(ms: number | null): string {
@@ -299,7 +319,7 @@ function vnTime(ms: number | null): string {
 /** Mỗi món của mỗi phiếu một dòng (cùng cột với bản xuất trên app) */
 export function supplyExportRows(orders: SupplyOrder[]): (string | number)[][] {
   return orders.flatMap(o => o.lines.map(l => [
-    supplyDisplay(o.date), l.group, l.name, l.unit, l.qty,
+    supplyDisplay(o.date), l.group, l.code, l.name, l.unit, l.qty,
     contributorNames(l).join(', '), l.note,
     l.prepared ? 'Đã soạn' : 'Chưa soạn',
     l.prepared ? (l.preparedByName || l.preparedBy) : '',
@@ -323,7 +343,7 @@ export async function exportSupplyOrders(orders: SupplyOrder[], from: string, to
   header.font = { bold: true, color: { argb: 'FFFFFFFF' } };
   header.eachCell(c => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E7D32' } }; });
   for (const r of supplyExportRows(orders)) ws.addRow(r);
-  [12, 14, 28, 10, 10, 30, 24, 12, 18, 14].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+  [12, 14, 12, 28, 10, 10, 30, 24, 12, 18, 14].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
 
   const buf = await wb.xlsx.writeBuffer();
   saveAs(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),

@@ -11,13 +11,14 @@ import {
   addManySupplies, updateSupplyLine, removeSupplyLine, setSupplyPrepared,
   getSupplyOrdersInRange, exportSupplyOrders,
   supplyToday, supplyAddDays, supplyLabel, supplyDisplay, parseQty, formatQty,
-  isOrderLocked, cutoffLabel, contributorNames,
+  isOrderLocked, cutoffLabel, contributorNames, validateSupplyCode,
 } from '@/lib/supply';
 
 type Tab = 'order' | 'prep' | 'items' | 'history' | 'settings';
 
 const box: React.CSSProperties = { background: '#fff', border: '1px solid #eee', borderRadius: 12, padding: 16, marginBottom: 16 };
 const groupTitle: React.CSSProperties = { fontSize: 13, fontWeight: 700, color: '#666', margin: '12px 0 6px', textTransform: 'uppercase' };
+const codeTag: React.CSSProperties = { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 11.5, color: '#555', background: '#f1f1f1', borderRadius: 4, padding: '1px 5px', marginRight: 6, fontWeight: 600 };
 const row: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid #f3f3f3' };
 
 /** Báo lỗi lưu cho người dùng (không để lỗi im lặng) */
@@ -178,6 +179,9 @@ function OrderTab({ storeId, date, items, order, locked, cutoff, uid, userName, 
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
   const [editing, setEditing] = useState<{ itemId: string; qty: string; note: string } | null>(null);
+  const [query, setQuery] = useState('');
+  const q = query.trim().toLowerCase();
+  const shown = q ? items.filter(i => i.name.toLowerCase().includes(q) || i.code.toLowerCase().includes(q)) : items;
 
   const ordered = new Map(order.lines.map(l => [l.itemId, l]));
   const filled = items.map(item => ({ item, qty: parseQty(draft[item.id] ?? '') ?? 0 })).filter(e => e.qty > 0);
@@ -222,7 +226,12 @@ function OrderTab({ storeId, date, items, order, locked, cutoff, uid, userName, 
           <div style={{ fontWeight: 700, marginBottom: 4 }}>Nhập số lượng / trọng lượng cần đặt</div>
           <div style={{ fontSize: 13, color: '#888' }}>Nhiều người cùng đặt sẽ được cộng dồn vào một phiếu.</div>
           {items.length === 0 && <p style={{ color: '#888' }}>Chưa có danh mục hàng. Quản lý thêm ở tab &quot;Danh mục&quot;.</p>}
-          {groupBy(items, i => i.group).map(([g, list]) => (
+          {items.length > 8 && (
+            <input className="input" style={{ width: '100%', margin: '10px 0 0' }} placeholder="Tìm theo tên hoặc mã hàng"
+              value={query} onChange={e => setQuery(e.target.value)} />
+          )}
+          {q && shown.length === 0 && <p style={{ color: '#888' }}>Không có mặt hàng khớp &quot;{query}&quot;.</p>}
+          {groupBy(shown, i => i.group).map(([g, list]) => (
             <div key={g}>
               <div style={groupTitle}>{g}</div>
               {list.map(item => {
@@ -230,7 +239,7 @@ function OrderTab({ storeId, date, items, order, locked, cutoff, uid, userName, 
                 return (
                   <div key={item.id} style={row}>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600 }}>{item.name}</div>
+                      <div style={{ fontWeight: 600 }}>{item.code && <span style={codeTag}>{item.code}</span>}{item.name}</div>
                       {cur && <div style={{ fontSize: 12, color: 'var(--primary)' }}>Đã đặt: {formatQty(cur.qty)} {cur.unit}</div>}
                     </div>
                     <input className="input" inputMode="decimal" placeholder="0" style={{ width: 100, textAlign: 'right' }}
@@ -257,7 +266,7 @@ function OrderTab({ storeId, date, items, order, locked, cutoff, uid, userName, 
         {order.lines.map(l => (
           <div key={l.itemId} style={row}>
             <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 600 }}>{l.name} <span style={{ color: '#888', fontWeight: 400 }}>· {l.group}</span></div>
+              <div style={{ fontWeight: 600 }}>{l.code && <span style={codeTag}>{l.code}</span>}{l.name} <span style={{ color: '#888', fontWeight: 400 }}>· {l.group}</span></div>
               <div style={{ fontSize: 12, color: '#888' }}>Người đặt: {contributorNames(l).join(', ')}{l.note ? ` · Ghi chú: ${l.note}` : ''}</div>
             </div>
             {editing?.itemId === l.itemId ? (
@@ -317,7 +326,7 @@ function PrepTab({ storeId, date, order, canPrep, preparerNames, filtered, uid, 
                 <input type="checkbox" checked={l.prepared} disabled={!canPrep} style={{ width: 18, height: 18 }}
                   onChange={e => setSupplyPrepared(storeId, date, l.itemId, e.target.checked, uid, userName).catch(alertError)} />
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, textDecoration: l.prepared ? 'line-through' : 'none' }}>{l.name}</div>
+                  <div style={{ fontWeight: 600, textDecoration: l.prepared ? 'line-through' : 'none' }}>{l.code && <span style={codeTag}>{l.code}</span>}{l.name}</div>
                   {l.note && <div style={{ fontSize: 12, color: '#888' }}>Ghi chú: {l.note}</div>}
                   {l.prepared && <div style={{ fontSize: 12, color: 'var(--primary)' }}>✓ {l.preparedByName || l.preparedBy}</div>}
                 </div>
@@ -374,7 +383,7 @@ function HistoryTab({ storeId, storeName, today }: { storeId: string; storeName:
               <tbody>
                 {o.lines.map(l => (
                   <tr key={l.itemId}>
-                    <td>{l.name}</td>
+                    <td>{l.code && <span style={codeTag}>{l.code}</span>}{l.name}</td>
                     <td style={{ textAlign: 'right' }}>{formatQty(l.qty)} {l.unit}</td>
                     <td style={{ color: '#888', fontSize: 13 }}>{contributorNames(l).join(', ')}</td>
                     <td>{l.prepared ? `✓ ${l.preparedByName || l.preparedBy}` : <span style={{ color: 'var(--danger)' }}>Chưa soạn</span>}</td>
@@ -391,15 +400,19 @@ function HistoryTab({ storeId, storeName, today }: { storeId: string; storeName:
 
 // ==================== DANH MỤC ====================
 
-const emptyItem = { id: '', name: '', unit: '', group: '', order: 0, active: true };
+const emptyItem = { id: '', code: '', name: '', unit: '', group: '', order: 0, active: true };
 
 function ItemsTab({ storeId, items }: { storeId: string; items: SupplyItem[] }) {
   const [form, setForm] = useState<SupplyItem | null>(null);
   const [saving, setSaving] = useState(false);
+  const [codeError, setCodeError] = useState<string | null>(null);
   const groups = [...new Set(items.map(i => i.group).filter(Boolean))];
 
   const save = async () => {
     if (!form || !form.name.trim() || !form.unit.trim()) return;
+    const err = validateSupplyCode(form.code, items, form.id || undefined);
+    setCodeError(err);
+    if (err) return;
     setSaving(true);
     try {
       await saveSupplyItem(storeId, { ...form, id: form.id || undefined });
@@ -416,6 +429,8 @@ function ItemsTab({ storeId, items }: { storeId: string; items: SupplyItem[] }) 
 
       {form && (
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: 12, background: '#fafafa', borderRadius: 8, marginBottom: 12 }}>
+          <input className="input" style={{ width: 110, textTransform: 'uppercase' }} placeholder="Mã (BB001)" title="Mã hàng, không bắt buộc" value={form.code}
+            onChange={e => { setForm({ ...form, code: e.target.value }); setCodeError(null); }} />
           <input className="input" style={{ flex: 2, minWidth: 160 }} placeholder="Tên món *" value={form.name}
             onChange={e => setForm({ ...form, name: e.target.value })} />
           <input className="input" style={{ width: 100 }} placeholder="Đơn vị * (kg, gói…)" value={form.unit}
@@ -426,7 +441,8 @@ function ItemsTab({ storeId, items }: { storeId: string; items: SupplyItem[] }) 
           <input className="input" style={{ width: 80 }} type="number" title="Thứ tự" value={form.order}
             onChange={e => setForm({ ...form, order: Number(e.target.value) || 0 })} />
           <button className="btn btn-sm btn-primary" disabled={saving || !form.name.trim() || !form.unit.trim()} onClick={save}>Lưu</button>
-          <button className="btn btn-sm btn-ghost" onClick={() => setForm(null)}>Huỷ</button>
+          <button className="btn btn-sm btn-ghost" onClick={() => { setForm(null); setCodeError(null); }}>Huỷ</button>
+          {codeError && <div style={{ width: '100%', color: 'var(--danger)', fontSize: 13 }}>{codeError}</div>}
         </div>
       )}
 
@@ -436,7 +452,7 @@ function ItemsTab({ storeId, items }: { storeId: string; items: SupplyItem[] }) 
           <div style={groupTitle}>{g}</div>
           {list.map(i => (
             <div key={i.id} style={{ ...row, opacity: i.active ? 1 : 0.5 }}>
-              <div style={{ flex: 1 }}><b>{i.name}</b> <span style={{ color: '#888' }}>· {i.unit}</span>{!i.active && ' (đã ẩn)'}</div>
+              <div style={{ flex: 1 }}>{i.code && <span style={codeTag}>{i.code}</span>}<b>{i.name}</b> <span style={{ color: '#888' }}>· {i.unit}</span>{!i.active && ' (đã ẩn)'}</div>
               <button className="btn btn-sm btn-ghost" onClick={() => setForm(i)}>Sửa</button>
               <button className="btn btn-sm btn-ghost" onClick={() => setSupplyItemActive(storeId, i.id, !i.active).catch(alertError)}>
                 {i.active ? 'Ẩn' : 'Hiện lại'}
