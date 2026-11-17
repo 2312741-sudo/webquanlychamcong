@@ -1,7 +1,7 @@
 'use client';
 /**
  * Nút + hộp thoại MỞ KÉT — mã dùng 1 lần (xem lib/cashDrawer.ts):
- *  - Quản lý 1: chọn lý do → gửi yêu cầu cho Chủ → nhập mã 6 số Chủ gửi → két bật.
+ *  - Quản lý (QL1 / QL2): chọn lý do → gửi yêu cầu cho Chủ → nhập mã 6 số Chủ gửi → két bật.
  *  - Chủ: thấy mã các yêu cầu đang chờ (gửi cho quản lý); tự mở két không cần nhập mã.
  */
 import { useEffect, useMemo, useState } from 'react';
@@ -259,7 +259,7 @@ export function CashDrawerModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-/** Nút trên thanh trên cùng (Chủ / Quản lý 1). Chủ: có chấm đỏ khi có yêu cầu đang chờ mã */
+/** Nút trên thanh trên cùng (Chủ / Quản lý). Chủ: có chấm đỏ khi có yêu cầu đang chờ mã */
 export function CashDrawerButton() {
   const { role, storeId, user } = useApp();
   const [open, setOpen] = useState(false);

@@ -1,6 +1,6 @@
 'use client';
 /**
- * KÉT TIỀN (Chủ / Quản lý 1): ghép nối laptop cắm máy in KV804 (phần mềm Trạm Mở Két — chỉ Chủ), chọn máy in /
+ * KÉT TIỀN (Chủ / Quản lý): ghép nối laptop cắm máy in KV804 (phần mềm Trạm Mở Két — chỉ Chủ), chọn máy in /
  * chân két, mã mở két của các yêu cầu đang chờ (Chủ), mở két và nhật ký mở két (web + app).
  */
 import { useCallback, useEffect, useState } from 'react';
@@ -81,7 +81,7 @@ export default function CashDrawerPage() {
 
   if (!user || !storeId) return null;
   if (!allowed) {
-    return <div className="card" style={{ padding: 24 }}>Chỉ Chủ và Quản lý 1 dùng được tính năng két tiền.</div>;
+    return <div className="card" style={{ padding: 24 }}>Chỉ Chủ và Quản lý dùng được tính năng két tiền.</div>;
   }
 
   const run = async (fn: () => Promise<string>) => {

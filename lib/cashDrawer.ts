@@ -4,11 +4,11 @@
  * Laptop chạy phần mềm "Trạm Mở Két" (tools/tram-mo-ket, tải ở /downloads/TramMoKet.zip) ở cổng 8787:
  *   web trên chính laptop gọi http://127.0.0.1:8787, app điện thoại gọi http://<IP LAN laptop>:8787 (cùng wifi).
  * Quy trình:
- *   - Quản lý 1 tạo YÊU CẦU (stores/{id}/cash_drawer_requests, nonce = "<id>.<thời điểm ms>") → thông báo cho Chủ.
+ *   - Quản lý (QL1 / QL2) tạo YÊU CẦU (stores/{id}/cash_drawer_requests, nonce = "<id>.<thời điểm ms>") → thông báo cho Chủ.
  *   - Chủ thấy MÃ 6 SỐ = HMAC-SHA256(khóa bí mật của Chủ, nonce) trên app / web → gửi quản lý → quản lý nhập mã.
  *   - Laptop tự kiểm tra mã (biết khóa bí mật), mỗi mã chỉ mở 1 lần, hết hạn 15 phút. Chủ tự mở không cần nhập mã.
  * Khóa bí mật: laptop giao cho CHỦ ở lần ghép nối đầu, lưu stores/{id}/owner_private/cash_drawer (chỉ Chủ đọc).
- * Cấu hình chung (mã ghép nối, IP, máy in): stores/{id}/private/cash_drawer (Chủ / Quản lý 1).
+ * Cấu hình chung (mã ghép nối, IP, máy in): stores/{id}/private/cash_drawer (đọc: Chủ / QL1 / QL2; ghi: Chủ / QL1).
  * Nhật ký: stores/{id}/cash_drawer_logs.  Bản Dart song song: appchamcong lib/core/services/cash_drawer_service.dart
  */
 import { db } from './firebase';
@@ -78,10 +78,10 @@ export interface CashDrawerLog {
   at?: { toDate?: () => Date; seconds?: number } | null;
 }
 
-/** Chủ và Quản lý 1 được mở két (Quản lý 1 phải có mã của Chủ) */
+/** Chủ, Quản lý 1 và Quản lý 2 được mở két (Quản lý phải có mã của Chủ) */
 export function canOpenCashDrawer(role?: string | null): boolean {
   const r = normalizeRole(role);
-  return r === 'owner' || r === 'manager1';
+  return r === 'owner' || r === 'manager1' || r === 'manager2';
 }
 
 export function isOwnerRole(role?: string | null): boolean {

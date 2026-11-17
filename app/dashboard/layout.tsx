@@ -180,7 +180,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         router.replace('/dashboard/checkin');
       }
     } else if (norm === 'manager2') {
-      const allowed = ['/dashboard/checkin', '/dashboard/schedule', '/dashboard/tasks', '/dashboard/attendance', '/dashboard/supply'];
+      const allowed = ['/dashboard/checkin', '/dashboard/schedule', '/dashboard/tasks', '/dashboard/attendance', '/dashboard/supply', '/dashboard/cash-drawer'];
       if (!allowed.some(p => pathname === p || pathname.startsWith(p))) {
         router.replace('/dashboard/schedule');
       }
@@ -253,7 +253,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       return item.href === '/dashboard/checkin' || item.href === '/dashboard/schedule' || item.href === '/dashboard/tasks' || item.href === '/dashboard/attendance' || item.href === '/dashboard/supply';
     }
     if (normRole === 'manager2') {
-      return item.href === '/dashboard/checkin' || item.href === '/dashboard/schedule' || item.href === '/dashboard/tasks' || item.href === '/dashboard/attendance' || item.href === '/dashboard/supply';
+      return item.href === '/dashboard/checkin' || item.href === '/dashboard/schedule' || item.href === '/dashboard/tasks' || item.href === '/dashboard/attendance' || item.href === '/dashboard/supply' || item.href === '/dashboard/cash-drawer';
     }
     if (normRole === 'manager1') {
       return item.href === '/dashboard' || item.href === '/dashboard/checkin' || item.href === '/dashboard/schedule' || item.href === '/dashboard/tasks' || item.href === '/dashboard/members' || item.href === '/dashboard/attendance' || item.href === '/dashboard/supply' || item.href === '/dashboard/cash-drawer';
@@ -461,7 +461,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               )}
             </div>
 
-            {/* Mở két tiền (Chủ / Quản lý 1) */}
+            {/* Mở két tiền (Chủ / Quản lý 1 / Quản lý 2) */}
             <CashDrawerButton />
 
             {/* Notification Bell */}
