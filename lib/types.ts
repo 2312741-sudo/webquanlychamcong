@@ -255,6 +255,7 @@ export type AppNotificationType =
   | 'birthday'
   | 'check_in'
   | 'check_out'
+  | 'cash_drawer_request'
   | 'general';
 
 export interface AppNotification {

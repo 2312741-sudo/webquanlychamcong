@@ -160,7 +160,7 @@ export async function notificationDestination(item: AppNotification): Promise<st
     '/monthly-attendance': '/dashboard/attendance',
     '/attendance-history': '/dashboard/checkin',
     ...(canApproveMembers(role) ? { '/pending-members': '/dashboard/members' } : {}),
-    ...(normalizeRole(role) === 'owner' ? { '/manage-advances': '/dashboard/salary', '/salary': '/dashboard/salary' } : {}),
+    ...(normalizeRole(role) === 'owner' ? { '/manage-advances': '/dashboard/salary', '/salary': '/dashboard/salary', '/cash-drawer': '/dashboard/cash-drawer' } : {}),
   };
 
   let destination = routes[item.routePath || ''];

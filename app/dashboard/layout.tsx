@@ -40,6 +40,7 @@ const NOTIFICATION_ICONS: Record<string, LucideIcon> = {
   schedule_registration_reminder: CalendarClock,
   checklist_reminder: ListChecks,
   delivery_update: Truck,
+  cash_drawer_request: Vault,
 };
 
 function NavIcon({ href, size = 18 }: { href: string; size?: number }) {

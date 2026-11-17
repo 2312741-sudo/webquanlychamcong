@@ -37,7 +37,7 @@ start "" "http://localhost:8787/status"
 echo.
 echo ================================================================
 echo  XONG! Trinh duyet vua mo trang tinh trang: thay "ok":true la chay roi.
-echo  Tiep theo: mo web Cham Cong tren CHINH laptop nay
-echo    Cai dat ^> Ket tien ^> bam "Ghep noi voi laptop nay".
+echo  Tiep theo: CHU dang nhap web Cham Cong tren CHINH laptop nay
+echo    Ket tien ^> bam "Ghep noi voi laptop nay" (lam ngay).
 echo ================================================================
 pause

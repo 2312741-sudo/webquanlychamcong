@@ -1,17 +1,16 @@
 'use client';
 /**
- * KÉT TIỀN (Chủ / Quản lý 1): ghép nối laptop cắm máy in KV804 (phần mềm Trạm Mở Két), chọn máy in / chân két,
- * đặt PIN mở két của mình, thử mở két và xem nhật ký mở két (web + app).
+ * KÉT TIỀN (Chủ / Quản lý 1): ghép nối laptop cắm máy in KV804 (phần mềm Trạm Mở Két — chỉ Chủ), chọn máy in /
+ * chân két, mã mở két của các yêu cầu đang chờ (Chủ), mở két và nhật ký mở két (web + app).
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useApp } from '../layout';
-import { normalizeRole } from '@/lib/types';
 import {
-  AGENT_DOWNLOAD_URL, asList, canOpenCashDrawer, checkCashDrawerPin, isValidPin, localAgentStatus, pairLocalAgent,
-  readLocalAgentPair, setMyCashDrawerPin, unpairCashDrawer, updateLocalAgent, watchCashDrawerConfig, watchCashDrawerLogs,
-  type AgentPairInfo, type CashDrawerConfig, type CashDrawerLog,
+  AGENT_DOWNLOAD_URL, asList, canOpenCashDrawer, isOwnerRole, localAgentStatus, pairLocalAgent, readLocalAgentPair,
+  unpairCashDrawer, updateLocalAgent, watchCashDrawerConfig, watchCashDrawerLogs, watchCashDrawerRequests,
+  type AgentPairInfo, type CashDrawerConfig, type CashDrawerLog, type CashDrawerRequest,
 } from '@/lib/cashDrawer';
-import { CashDrawerModal } from '../components/CashDrawer';
+import { CashDrawerModal, OwnerCodesPanel } from '../components/CashDrawer';
 
 function fmtTime(at: CashDrawerLog['at']): string {
   try {
@@ -32,23 +31,23 @@ export default function CashDrawerPage() {
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const [logs, setLogs] = useState<CashDrawerLog[]>([]);
   const [logError, setLogError] = useState('');
+  const [requests, setRequests] = useState<CashDrawerRequest[]>([]);
   const [showOpen, setShowOpen] = useState(false);
   const [printer, setPrinter] = useState('');
   const [drawerPin, setDrawerPin] = useState(0);
-  const [oldPin, setOldPin] = useState('');
-  const [newPin, setNewPin] = useState('');
-  const [newPin2, setNewPin2] = useState('');
 
   const allowed = canOpenCashDrawer(role);
-  const isOwner = normalizeRole(role) === 'owner';
+  const owner = isOwnerRole(role);
 
   useEffect(() => {
     if (!storeId || !allowed) return;
     const u1 = watchCashDrawerConfig(storeId, setCfg, (e) => setError(e.message));
     const u2 = watchCashDrawerLogs(storeId, setLogs, (e) => setLogError(e.message));
+    const u3 = watchCashDrawerRequests(storeId, setRequests, () => {});
     return () => {
       u1();
       u2();
+      u3();
     };
   }, [storeId, allowed]);
 
@@ -99,7 +98,6 @@ export default function CashDrawerPage() {
 
   const name = currentMember?.name || user.displayName || user.email || user.uid;
   const paired = !!cfg?.token;
-  const hasPin = !!cfg?.pins?.[user.uid];
   const sameLaptop = !!local && paired && local.token === cfg?.token;
 
   return (
@@ -111,12 +109,24 @@ export default function CashDrawerPage() {
         </div>
       )}
 
+      {/* Mã cho các yêu cầu đang chờ (Chủ) */}
+      {owner && (
+        <div className="card" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 700 }}>Yêu cầu mở két đang chờ mã</h3>
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+            Gửi mã 6 số cho đúng quản lý đã xin. Mỗi mã chỉ mở két 1 lần, hết hạn sau 15 phút.
+          </p>
+          <OwnerCodesPanel storeId={storeId} requests={requests} />
+        </div>
+      )}
+
       {/* 1. Ghép nối */}
       <div className="card" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
         <h3 style={{ fontSize: 16, fontWeight: 700 }}>1. Laptop mở két</h3>
         <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
           Két tiền cắm vào máy in hóa đơn KV804, máy in cắm USB vào laptop. Cài phần mềm <b>Trạm Mở Két</b> trên laptop đó
-          (giải nén, chạy <code>CaiDat.bat</code>), rồi mở trang này <b>trên chính laptop đó</b> để ghép nối.
+          (giải nén, chạy <code>CaiDat.bat</code>), rồi <b>Chủ</b> đăng nhập trang này <b>trên chính laptop đó</b> và bấm ghép nối ngay
+          (lần ghép nối đầu tiên nhận khóa bí mật để tạo mã mở két).
         </p>
         <div style={{ fontSize: 14 }}>
           {paired ? (
@@ -139,7 +149,7 @@ export default function CashDrawerPage() {
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <a className="btn btn-secondary btn-sm" href={AGENT_DOWNLOAD_URL} download>Tải phần mềm (Windows)</a>
           <button className="btn btn-ghost btn-sm" onClick={checkLocal} disabled={busy}>Kiểm tra lại</button>
-          {local && (
+          {local && owner && (
             <button
               className="btn btn-primary btn-sm"
               disabled={busy}
@@ -152,7 +162,8 @@ export default function CashDrawerPage() {
               {sameLaptop ? 'Ghép nối lại (cập nhật IP)' : 'Ghép nối với laptop này'}
             </button>
           )}
-          {paired && isOwner && (
+          {local && !owner && <span style={{ fontSize: 12, color: 'var(--text-secondary)', alignSelf: 'center' }}>Chỉ Chủ ghép nối được.</span>}
+          {paired && owner && (
             <button
               className="btn btn-ghost btn-sm"
               disabled={busy}
@@ -202,43 +213,10 @@ export default function CashDrawerPage() {
         </div>
       )}
 
-      {/* 3. PIN */}
-      <div className="card" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <h3 style={{ fontSize: 16, fontWeight: 700 }}>3. PIN mở két của tôi</h3>
-        <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-          Mỗi Chủ / Quản lý 1 có PIN riêng (4–6 số), nhập mỗi lần mở két trên web và app. {hasPin ? 'Bạn đã có PIN.' : 'Bạn chưa đặt PIN.'}
-        </p>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {hasPin && (
-            <input className="input" type="password" inputMode="numeric" maxLength={6} placeholder="PIN hiện tại" value={oldPin}
-              onChange={(e) => setOldPin(e.target.value.replace(/\D/g, ''))} style={{ width: 140 }} />
-          )}
-          <input className="input" type="password" inputMode="numeric" maxLength={6} placeholder="PIN mới" value={newPin}
-            onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))} style={{ width: 140 }} />
-          <input className="input" type="password" inputMode="numeric" maxLength={6} placeholder="Nhập lại PIN mới" value={newPin2}
-            onChange={(e) => setNewPin2(e.target.value.replace(/\D/g, ''))} style={{ width: 160 }} />
-          <button
-            className="btn btn-primary btn-sm"
-            disabled={busy || !isValidPin(newPin)}
-            onClick={() => run(async () => {
-              if (newPin !== newPin2) throw new Error('Hai lần nhập PIN mới không khớp');
-              if (hasPin && !(await checkCashDrawerPin(cfg ?? null, storeId, user.uid, oldPin))) throw new Error('PIN hiện tại không đúng');
-              await setMyCashDrawerPin(storeId, user.uid, newPin);
-              setOldPin('');
-              setNewPin('');
-              setNewPin2('');
-              return 'Đã lưu PIN mở két';
-            })}
-          >
-            {hasPin ? 'Đổi PIN' : 'Đặt PIN'}
-          </button>
-        </div>
-      </div>
-
-      {/* 4. Mở két + nhật ký */}
+      {/* 3. Mở két + nhật ký */}
       <div className="card" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700 }}>4. Nhật ký mở két</h3>
+          <h3 style={{ fontSize: 16, fontWeight: 700 }}>{local ? '3' : '2'}. Nhật ký mở két</h3>
           <button className="btn btn-primary btn-sm" onClick={() => setShowOpen(true)}>Mở két</button>
         </div>
         {logError && <p style={{ fontSize: 13, color: 'var(--danger)' }}>Không đọc được nhật ký: {logError}</p>}

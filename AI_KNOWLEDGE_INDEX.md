@@ -244,13 +244,17 @@ Hệ thống phân cấp chặt chẽ thành **4 vai trò độc lập** (`AppPe
 
 ---
 
-## 9. MỞ KÉT TIỀN QUA MÁY IN (KiotViet KV804) — `cash_drawer`
+## 9. MỞ KÉT TIỀN QUA MÁY IN (KiotViet KV804) — `cash_drawer` — MÃ DÙNG 1 LẦN
 
-- **Mục đích**: Chủ / Quản lý 1 mở két tiền (két KiotViet cắm cổng DK của máy in hóa đơn KV804, máy in cắm USB vào laptop Windows) từ **web trên laptop** hoặc **app điện thoại cùng wifi**, có **PIN riêng từng người** và **nhật ký**.
-- **Phần mềm trên laptop**: "Trạm Mở Két" (repo web: `tools/tram-mo-ket`, tải tại `/downloads/TramMoKet.zip`; PowerShell, cổng 8787). `POST /open` (header `X-Drawer-Token`) gửi lệnh ESC/POS `ESC p m 25 250` RAW tới máy in. `/pair` + `/config` chỉ trả cho web Chấm Công mở trên chính laptop.
+- **Mục đích**: mở két tiền (két KiotViet cắm cổng DK của máy in hóa đơn KV804, máy in cắm USB vào laptop Windows) từ **web trên laptop** hoặc **app điện thoại cùng wifi**. **Quản lý 1 phải xin mã của Chủ**; Chủ tự mở không cần mã. Mọi lần mở ghi nhật ký.
+- **Quy trình**: QL1 bấm Mở két → chọn lý do → tạo yêu cầu (`cash_drawer_requests`, `nonce = "<id>.<createdAtMs>"`) + thông báo cho Chủ (type `cash_drawer_request`, `routePath: /cash-drawer`, KHÔNG chứa mã) → Chủ mở app / web thấy **mã 6 số** = HMAC-SHA256(khóa bí mật, nonce) → gửi QL1 → QL1 nhập mã → laptop tự kiểm tra mã (dùng 1 lần, hết hạn 15 phút, sai 5 lần hủy mã, chặn dò mã) → két bật.
+- **Thuật toán mã**: HMAC-SHA256(khóa = UTF8(secret), dữ liệu = UTF8(nonce)) → 4 byte đầu big-endian, `& 0x7fffffff`, `% 1000000`, đủ 6 số. Mẫu đối chiếu: secret `secret-abc`, nonce `REQ123abc.1793606400000` → `910788` (test app + đã kiểm web).
+- **Phần mềm trên laptop**: "Trạm Mở Két" 1.1.0 (repo web: `tools/tram-mo-ket`, tải `/downloads/TramMoKet.zip`; PowerShell, cổng 8787). `POST /open` (header `X-Drawer-Token`, body `{nonce, otp, by, source}`) gửi ESC/POS `ESC p m 25 250` RAW. `/pair` + `/config` chỉ trả cho web Chấm Công mở trên chính laptop; **khóa bí mật chỉ giao ở lần ghép nối đầu** (header `X-Claim: 1`) hoặc khi gửi kèm `X-Owner-Secret` đúng.
 - **Firestore**:
-  - `/stores/{storeId}/private/cash_drawer` — `token`, `port`, `lanIps[]`, `printer`, `computer`, `pairedBy…`, `pins.{uid}` = SHA-256(`tram-mo-ket|storeId|uid|PIN`). Luật: như `private/*` (Chủ / QL1).
-  - `/stores/{storeId}/cash_drawer_logs/{id}` — `uid, name, role, reason, ok, error, source ('web'|'app'), at`. Luật: Chủ / QL1 tạo log của chính mình + đọc; không sửa / xóa.
-- **Phân quyền**: `AppPermissions.canOpenCashDrawer` (Chủ, QL1, Quản lý cũ) ↔ web `canOpenCashDrawer`.
-- **App**: `core/services/cash_drawer_service.dart` (gọi `http://<IP LAN>:8787/open`), `core/widgets/cash_drawer_button.dart` (nút trên đầu dashboard Chủ / Quản lý). Android `network_security_config` cho phép HTTP nội bộ; iOS `NSAllowsLocalNetworking` + `NSLocalNetworkUsageDescription`. Test: `test/cash_drawer_service_test.dart`.
-- **Web**: `lib/cashDrawer.ts`, nút "Mở két" trên thanh trên cùng (`app/dashboard/components/CashDrawer.tsx`), trang `/dashboard/cash-drawer` (ghép nối, máy in & chân két, PIN, nhật ký). Web chỉ mở két được khi mở trên chính laptop (trình duyệt chỉ cho gọi http tới 127.0.0.1).
+  - `/stores/{storeId}/private/cash_drawer` — `token`, `port`, `lanIps[]`, `printer`, `computer`, `pairedBy…` (Chủ / QL1).
+  - `/stores/{storeId}/owner_private/cash_drawer` — `secret` (CHỈ Chủ đọc / ghi).
+  - `/stores/{storeId}/cash_drawer_requests/{id}` — `uid, name, role, reason, nonce, createdAtMs, status (pending|opened|cancelled), source`. Tạo: Chủ / QL1 (của mình, pending); sửa: chỉ `status/openedAt` (người gửi hoặc Chủ); không xóa.
+  - `/stores/{storeId}/cash_drawer_logs/{id}` — `uid, name, role, reason, ok, error, requestId, source, at`. Chủ / QL1 tạo log của chính mình + đọc; không sửa / xóa.
+- **Phân quyền**: `AppPermissions.canOpenCashDrawer` (Chủ, QL1, Quản lý cũ) ↔ web `canOpenCashDrawer`. Ghép nối laptop: chỉ Chủ.
+- **App**: `core/services/cash_drawer_service.dart`, `core/widgets/cash_drawer_button.dart` (nút trên đầu dashboard Chủ / Quản lý, chấm đỏ cho Chủ khi có yêu cầu chờ; `CashDrawerScreen` ở route `/cash-drawer` mở từ thông báo). Android `network_security_config` cho phép HTTP nội bộ; iOS `NSAllowsLocalNetworking` + `NSLocalNetworkUsageDescription`. Test: `test/cash_drawer_service_test.dart`.
+- **Web**: `lib/cashDrawer.ts`, nút "Mở két" trên thanh trên cùng + hộp thoại (`app/dashboard/components/CashDrawer.tsx`), trang `/dashboard/cash-drawer` (mã các yêu cầu đang chờ cho Chủ, ghép nối, máy in & chân két, nhật ký). Web chỉ gửi lệnh mở két được khi mở trên chính laptop (trình duyệt chỉ cho gọi http tới 127.0.0.1).

@@ -1,22 +1,28 @@
 /**
- * MỞ KÉT TIỀN (KiotViet) qua máy in hóa đơn KV804 cắm USB vào laptop.
+ * MỞ KÉT TIỀN (KiotViet) qua máy in hóa đơn KV804 cắm USB vào laptop — MÃ MỞ KÉT DÙNG 1 LẦN.
  *
- * Laptop chạy phần mềm "Trạm Mở Két" (tools/tram-mo-ket, tải ở /downloads/TramMoKet.zip) lắng nghe cổng 8787:
+ * Laptop chạy phần mềm "Trạm Mở Két" (tools/tram-mo-ket, tải ở /downloads/TramMoKet.zip) ở cổng 8787:
  *   web trên chính laptop gọi http://127.0.0.1:8787, app điện thoại gọi http://<IP LAN laptop>:8787 (cùng wifi).
- * Ghép nối: web trên laptop đọc mã ghép nối (/pair, chỉ trả cho web Chấm Công trên chính laptop) rồi lưu vào
- *   stores/{storeId}/private/cash_drawer  (chỉ Chủ / Quản lý 1 đọc được) để web + app dùng.
- * Mỗi Chủ / Quản lý 1 có PIN riêng (lưu dạng băm SHA-256 trong cùng tài liệu, trường pins.{uid}).
- * Mỗi lần mở két ghi stores/{storeId}/cash_drawer_logs.  Bản Dart song song: appchamcong lib/core/services/cash_drawer_service.dart
+ * Quy trình:
+ *   - Quản lý 1 tạo YÊU CẦU (stores/{id}/cash_drawer_requests, nonce = "<id>.<thời điểm ms>") → thông báo cho Chủ.
+ *   - Chủ thấy MÃ 6 SỐ = HMAC-SHA256(khóa bí mật của Chủ, nonce) trên app / web → gửi quản lý → quản lý nhập mã.
+ *   - Laptop tự kiểm tra mã (biết khóa bí mật), mỗi mã chỉ mở 1 lần, hết hạn 15 phút. Chủ tự mở không cần nhập mã.
+ * Khóa bí mật: laptop giao cho CHỦ ở lần ghép nối đầu, lưu stores/{id}/owner_private/cash_drawer (chỉ Chủ đọc).
+ * Cấu hình chung (mã ghép nối, IP, máy in): stores/{id}/private/cash_drawer (Chủ / Quản lý 1).
+ * Nhật ký: stores/{id}/cash_drawer_logs.  Bản Dart song song: appchamcong lib/core/services/cash_drawer_service.dart
  */
 import { db } from './firebase';
 import {
-  addDoc, collection, doc, getDoc, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, deleteField,
+  addDoc, collection, deleteField, doc, getDoc, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc,
 } from 'firebase/firestore';
 import { normalizeRole } from './types';
 
 export const AGENT_PORT = 8787;
 export const LOCAL_AGENT = `http://127.0.0.1:${AGENT_PORT}`;
 export const AGENT_DOWNLOAD_URL = '/downloads/TramMoKet.zip';
+/** Mã hết hạn sau 15 phút (khớp phần mềm trên laptop) */
+export const OTP_TTL_MS = 15 * 60 * 1000;
+export const CASH_DRAWER_REASONS = ['Đổi tiền lẻ', 'Thối tiền cho khách', 'Nộp tiền vào két', 'Kiểm két / giao ca', 'Khác'];
 
 export interface CashDrawerConfig {
   token: string;
@@ -27,8 +33,6 @@ export interface CashDrawerConfig {
   pairedAt?: unknown;
   pairedBy?: string;
   pairedByName?: string;
-  /** uid → SHA-256(PIN) */
-  pins?: Record<string, string>;
 }
 
 export interface AgentPairInfo {
@@ -42,6 +46,23 @@ export interface AgentPairInfo {
   drawerPin: number;
   enabled: boolean;
   computer: string;
+  claimed?: boolean;
+  ownerVerified?: boolean;
+  ownerSecret?: string;
+}
+
+export type CashDrawerRequestStatus = 'pending' | 'opened' | 'cancelled';
+
+export interface CashDrawerRequest {
+  id: string;
+  uid: string;
+  name: string;
+  role: string;
+  reason: string;
+  nonce: string;
+  createdAtMs: number;
+  status: CashDrawerRequestStatus;
+  source: 'web' | 'app';
 }
 
 export interface CashDrawerLog {
@@ -53,13 +74,18 @@ export interface CashDrawerLog {
   reason: string;
   ok: boolean;
   error?: string;
+  requestId?: string;
   at?: { toDate?: () => Date; seconds?: number } | null;
 }
 
-/** Chủ và Quản lý 1 được mở két (đọc được cấu hình riêng của cửa hàng) */
+/** Chủ và Quản lý 1 được mở két (Quản lý 1 phải có mã của Chủ) */
 export function canOpenCashDrawer(role?: string | null): boolean {
   const r = normalizeRole(role);
   return r === 'owner' || r === 'manager1';
+}
+
+export function isOwnerRole(role?: string | null): boolean {
+  return normalizeRole(role) === 'owner';
 }
 
 /** PowerShell có thể trả chuỗi thay vì mảng 1 phần tử */
@@ -68,18 +94,32 @@ export function asList(v: string[] | string | null | undefined): string[] {
   return v ? [String(v)] : [];
 }
 
-export function isValidPin(pin: string): boolean {
-  return /^\d{4,6}$/.test(pin);
+export function fullReason(reason: string, note: string): string {
+  const n = note.trim();
+  if (reason === 'Khác') return n || 'Khác';
+  return n ? `${reason} — ${n}` : reason;
 }
 
-/** Băm PIN gắn với cửa hàng + người dùng (khớp CashDrawerService.pinHash bên app) */
-export async function pinHash(storeId: string, uid: string, pin: string): Promise<string> {
-  const data = new TextEncoder().encode(`tram-mo-ket|${storeId}|${uid}|${pin}`);
-  const buf = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+/** Yêu cầu còn hạn dùng mã (15 phút kể từ lúc tạo) */
+export function isRequestAlive(r: Pick<CashDrawerRequest, 'status' | 'createdAtMs'>, nowMs = Date.now()): boolean {
+  return r.status === 'pending' && nowMs - r.createdAtMs < OTP_TTL_MS;
+}
+
+/**
+ * Mã 6 số dùng 1 lần: HMAC-SHA256(khóa = UTF8(secret), dữ liệu = UTF8(nonce)) → 4 byte đầu (big-endian), bỏ bit dấu,
+ * chia dư 1.000.000. Khớp phần mềm trên laptop (Get-Otp) và app (CashDrawerService.otpFor).
+ */
+export async function otpFor(secret: string, nonce: string): Promise<string> {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const h = new Uint8Array(await crypto.subtle.sign('HMAC', key, enc.encode(nonce)));
+  const v = ((h[0] << 24) | (h[1] << 16) | (h[2] << 8) | h[3]) & 0x7fffffff;
+  return String(v % 1_000_000).padStart(6, '0');
 }
 
 const configRef = (storeId: string) => doc(db, 'stores', storeId, 'private', 'cash_drawer');
+const secretRef = (storeId: string) => doc(db, 'stores', storeId, 'owner_private', 'cash_drawer');
+const requestsCol = (storeId: string) => collection(db, 'stores', storeId, 'cash_drawer_requests');
 
 export async function getCashDrawerConfig(storeId: string): Promise<CashDrawerConfig | null> {
   const snap = await getDoc(configRef(storeId));
@@ -88,6 +128,13 @@ export async function getCashDrawerConfig(storeId: string): Promise<CashDrawerCo
 
 export function watchCashDrawerConfig(storeId: string, cb: (c: CashDrawerConfig | null) => void, onError?: (e: Error) => void) {
   return onSnapshot(configRef(storeId), (s) => cb(s.exists() ? (s.data() as CashDrawerConfig) : null), (e) => onError?.(e));
+}
+
+/** Khóa bí mật (chỉ Chủ đọc được — người khác gọi sẽ lỗi quyền) */
+export async function getOwnerSecret(storeId: string): Promise<string | null> {
+  const snap = await getDoc(secretRef(storeId));
+  const v = snap.exists() ? snap.data()?.secret : null;
+  return typeof v === 'string' && v ? v : null;
 }
 
 async function fetchWithTimeout(url: string, init: RequestInit = {}, ms = 4000): Promise<Response> {
@@ -110,22 +157,36 @@ export async function localAgentStatus(): Promise<{ ok: boolean; version?: strin
   }
 }
 
-/** Đọc thông tin ghép nối từ phần mềm trên chính laptop (chỉ trả cho web Chấm Công) */
-export async function readLocalAgentPair(): Promise<AgentPairInfo> {
+/** Đọc thông tin phần mềm trên chính laptop (không lấy khóa bí mật trừ khi [claim]) */
+export async function readLocalAgentPair(opts: { claim?: boolean; ownerSecret?: string | null } = {}): Promise<AgentPairInfo> {
+  const headers: Record<string, string> = {};
+  if (opts.claim) headers['X-Claim'] = '1';
+  if (opts.ownerSecret) headers['X-Owner-Secret'] = opts.ownerSecret;
   let r: Response;
   try {
-    r = await fetchWithTimeout(`${LOCAL_AGENT}/pair`, {}, 4000);
+    r = await fetchWithTimeout(`${LOCAL_AGENT}/pair`, { headers }, 4000);
   } catch {
     throw new Error('Không thấy phần mềm Trạm Mở Két trên máy này. Hãy cài và chạy CaiDat.bat trên laptop cắm máy in, rồi mở trang này trên chính laptop đó.');
   }
   const j = await r.json().catch(() => ({}));
-  if (!r.ok || !j.ok) throw new Error(j.error || `Phần mềm từ chối ghép nối (${r.status})`);
+  if (!r.ok || !j.ok) throw new Error(j.error || `Phần mềm từ chối (${r.status})`);
   return j as AgentPairInfo;
 }
 
-/** Ghép nối: lưu mã + IP LAN của laptop vào cấu hình riêng của cửa hàng */
+/**
+ * Ghép nối (CHỈ CHỦ, trên chính laptop): nhận khóa bí mật (lần đầu) hoặc xác nhận khóa đã có, rồi lưu mã ghép nối
+ * + IP LAN để web / app gửi lệnh.
+ */
 export async function pairLocalAgent(storeId: string, by: { uid: string; name: string }): Promise<AgentPairInfo> {
-  const info = await readLocalAgentPair();
+  const saved = await getOwnerSecret(storeId).catch(() => null);
+  const info = await readLocalAgentPair({ claim: true, ownerSecret: saved });
+  if (info.ownerSecret) {
+    await setDoc(secretRef(storeId), { secret: info.ownerSecret, updatedAt: serverTimestamp() }, { merge: true });
+  } else if (!info.ownerVerified) {
+    throw new Error(
+      'Laptop này đã giao khóa bí mật cho một lần ghép nối khác. Để an toàn: chạy GoCaiDat.bat rồi CaiDat.bat trên laptop, sau đó CHỦ ghép nối ngay.',
+    );
+  }
   await setDoc(
     configRef(storeId),
     {
@@ -137,6 +198,7 @@ export async function pairLocalAgent(storeId: string, by: { uid: string; name: s
       pairedAt: serverTimestamp(),
       pairedBy: by.uid,
       pairedByName: by.name,
+      pins: deleteField(), // PIN cũ (bản trước) không còn dùng
     },
     { merge: true },
   );
@@ -150,10 +212,7 @@ export async function unpairCashDrawer(storeId: string): Promise<void> {
 }
 
 /** Đổi máy in / chân két trên phần mềm (chỉ từ chính laptop) và cập nhật cấu hình cửa hàng */
-export async function updateLocalAgent(
-  storeId: string,
-  body: { printerName?: string; drawerPin?: number; enabled?: boolean; newToken?: boolean },
-): Promise<void> {
+export async function updateLocalAgent(storeId: string, body: { printerName?: string; drawerPin?: number }): Promise<void> {
   let r: Response;
   try {
     r = await fetchWithTimeout(`${LOCAL_AGENT}/config`, {
@@ -166,26 +225,55 @@ export async function updateLocalAgent(
   }
   const j = await r.json().catch(() => ({}));
   if (!r.ok || !j.ok) throw new Error(j.error || `Phần mềm báo lỗi (${r.status})`);
-  await setDoc(configRef(storeId), { token: j.token, printer: j.printer || '' }, { merge: true });
+  await setDoc(configRef(storeId), { printer: j.printer || '' }, { merge: true });
 }
 
-export async function setMyCashDrawerPin(storeId: string, uid: string, pin: string): Promise<void> {
-  if (!isValidPin(pin)) throw new Error('PIN gồm 4–6 chữ số');
-  await setDoc(configRef(storeId), { pins: { [uid]: await pinHash(storeId, uid, pin) } }, { merge: true });
+/** Tạo yêu cầu mở két (nonce = id + thời điểm). Quản lý: kèm thông báo cho Chủ (không chứa mã) */
+export async function createOpenRequest(
+  storeId: string,
+  by: { uid: string; name: string; role: string },
+  reason: string,
+  notifyOwner: boolean,
+): Promise<CashDrawerRequest> {
+  const ref = doc(requestsCol(storeId));
+  const createdAtMs = Date.now();
+  const req: CashDrawerRequest = {
+    id: ref.id, uid: by.uid, name: by.name, role: by.role, reason,
+    nonce: `${ref.id}.${createdAtMs}`, createdAtMs, status: 'pending', source: 'web',
+  };
+  const { id: _id, ...data } = req;
+  void _id;
+  await setDoc(ref, { ...data, createdAt: serverTimestamp() });
+  if (notifyOwner) {
+    await addDoc(collection(db, 'stores', storeId, 'notifications'), {
+      storeId,
+      title: 'Yêu cầu mở két',
+      body: `${by.name} xin mở két: ${reason}. Mở app / web (Két tiền) để xem mã gửi cho quản lý.`,
+      type: 'cash_drawer_request',
+      createdAt: serverTimestamp(),
+      targetRoles: ['owner'],
+      readBy: [by.uid],
+      routePath: '/cash-drawer',
+      routeExtra: { requestId: ref.id },
+    }).catch((e) => console.warn('[CashDrawer] Không gửi được thông báo cho Chủ:', e));
+  }
+  return req;
 }
 
-export async function checkCashDrawerPin(cfg: CashDrawerConfig | null, storeId: string, uid: string, pin: string): Promise<boolean> {
-  const saved = cfg?.pins?.[uid];
-  if (!saved || !isValidPin(pin)) return false;
-  return saved === (await pinHash(storeId, uid, pin));
+export async function setRequestStatus(storeId: string, id: string, status: CashDrawerRequestStatus): Promise<void> {
+  await updateDoc(doc(requestsCol(storeId), id), {
+    status,
+    ...(status === 'opened' ? { openedAt: serverTimestamp() } : {}),
+  });
 }
 
-/** Thứ tự thử: phần mềm trên chính máy này (web mở trên laptop) rồi tới IP LAN của laptop */
-export function agentUrls(cfg: Pick<CashDrawerConfig, 'port' | 'lanIps'>, includeLocal = true): string[] {
-  const port = cfg.port || AGENT_PORT;
-  const urls = includeLocal ? [`http://127.0.0.1:${port}`] : [];
-  for (const ip of asList(cfg.lanIps)) urls.push(`http://${ip}:${port}`);
-  return [...new Set(urls)];
+export function watchCashDrawerRequests(storeId: string, cb: (r: CashDrawerRequest[]) => void, onError?: (e: Error) => void) {
+  const q = query(requestsCol(storeId), orderBy('createdAtMs', 'desc'), limit(30));
+  return onSnapshot(
+    q,
+    (s) => cb(s.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<CashDrawerRequest, 'id'>) }))),
+    (e) => onError?.(e),
+  );
 }
 
 /**
@@ -193,35 +281,30 @@ export function agentUrls(cfg: Pick<CashDrawerConfig, 'port' | 'lanIps'>, includ
  * được khi mở trên laptop cắm máy in; máy khác dùng app điện thoại (gọi IP LAN của laptop).
  * Trả về null nếu mở được, ngược lại là thông báo lỗi.
  */
-export async function sendOpenCommand(cfg: CashDrawerConfig, by: string): Promise<string | null> {
-  if (!cfg?.token) return 'Chưa ghép nối laptop mở két (Két tiền → Ghép nối)';
-  const lastErr =
-    'Không thấy phần mềm mở két trên máy này. Web chỉ mở két được trên chính laptop cắm máy in (đang bật phần mềm Trạm Mở Két); ở máy khác hãy dùng app điện thoại.';
-  for (const base of agentUrls({ port: cfg.port, lanIps: [] })) {
-    try {
-      const r = await fetchWithTimeout(`${base}/open`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Drawer-Token': cfg.token },
-        body: JSON.stringify({ by, source: 'web' }),
-      }, 4000);
-      const j = await r.json().catch(() => ({}));
-      if (r.ok && j.ok) return null;
-      // Laptop trả lời nhưng báo lỗi (sai mã ghép nối, lỗi máy in) → không thử địa chỉ khác
-      return j.error || `Laptop báo lỗi (${r.status})`;
-    } catch {
-      // thử địa chỉ tiếp theo
-    }
+export async function sendOpenCommand(cfg: CashDrawerConfig, args: { nonce: string; otp: string; by: string }): Promise<string | null> {
+  if (!cfg?.token) return 'Chưa ghép nối laptop mở két (Chủ vào Két tiền → Ghép nối trên laptop)';
+  try {
+    const r = await fetchWithTimeout(`http://127.0.0.1:${cfg.port || AGENT_PORT}/open`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Drawer-Token': cfg.token },
+      body: JSON.stringify({ ...args, source: 'web' }),
+    }, 5000);
+    const j = await r.json().catch(() => ({}));
+    if (r.ok && j.ok) return null;
+    return j.error || `Laptop báo lỗi (${r.status})`;
+  } catch {
+    return 'Không thấy phần mềm mở két trên máy này. Web chỉ mở két được trên chính laptop cắm máy in (đang chạy Trạm Mở Két); ở máy khác hãy dùng app điện thoại.';
   }
-  return lastErr;
 }
 
 export async function logCashDrawerOpen(
   storeId: string,
-  entry: { uid: string; name: string; role: string; reason: string; ok: boolean; error?: string },
+  entry: { uid: string; name: string; role: string; reason: string; ok: boolean; error?: string; requestId?: string },
 ): Promise<void> {
   await addDoc(collection(db, 'stores', storeId, 'cash_drawer_logs'), {
     ...entry,
     error: entry.error || null,
+    requestId: entry.requestId || null,
     source: 'web',
     at: serverTimestamp(),
   });
