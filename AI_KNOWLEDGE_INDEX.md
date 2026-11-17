@@ -241,3 +241,16 @@ Hệ thống phân cấp chặt chẽ thành **4 vai trò độc lập** (`AppPe
 
 ---
 *Tài liệu được cập nhật tự động và đồng bộ định kỳ theo tiến trình phát triển hệ thống Chấm Công Trạm.*
+
+---
+
+## 9. MỞ KÉT TIỀN QUA MÁY IN (KiotViet KV804) — `cash_drawer`
+
+- **Mục đích**: Chủ / Quản lý 1 mở két tiền (két KiotViet cắm cổng DK của máy in hóa đơn KV804, máy in cắm USB vào laptop Windows) từ **web trên laptop** hoặc **app điện thoại cùng wifi**, có **PIN riêng từng người** và **nhật ký**.
+- **Phần mềm trên laptop**: "Trạm Mở Két" (repo web: `tools/tram-mo-ket`, tải tại `/downloads/TramMoKet.zip`; PowerShell, cổng 8787). `POST /open` (header `X-Drawer-Token`) gửi lệnh ESC/POS `ESC p m 25 250` RAW tới máy in. `/pair` + `/config` chỉ trả cho web Chấm Công mở trên chính laptop.
+- **Firestore**:
+  - `/stores/{storeId}/private/cash_drawer` — `token`, `port`, `lanIps[]`, `printer`, `computer`, `pairedBy…`, `pins.{uid}` = SHA-256(`tram-mo-ket|storeId|uid|PIN`). Luật: như `private/*` (Chủ / QL1).
+  - `/stores/{storeId}/cash_drawer_logs/{id}` — `uid, name, role, reason, ok, error, source ('web'|'app'), at`. Luật: Chủ / QL1 tạo log của chính mình + đọc; không sửa / xóa.
+- **Phân quyền**: `AppPermissions.canOpenCashDrawer` (Chủ, QL1, Quản lý cũ) ↔ web `canOpenCashDrawer`.
+- **App**: `core/services/cash_drawer_service.dart` (gọi `http://<IP LAN>:8787/open`), `core/widgets/cash_drawer_button.dart` (nút trên đầu dashboard Chủ / Quản lý). Android `network_security_config` cho phép HTTP nội bộ; iOS `NSAllowsLocalNetworking` + `NSLocalNetworkUsageDescription`. Test: `test/cash_drawer_service_test.dart`.
+- **Web**: `lib/cashDrawer.ts`, nút "Mở két" trên thanh trên cùng (`app/dashboard/components/CashDrawer.tsx`), trang `/dashboard/cash-drawer` (ghép nối, máy in & chân két, PIN, nhật ký). Web chỉ mở két được khi mở trên chính laptop (trình duyệt chỉ cho gọi http tới 127.0.0.1).

@@ -7,9 +7,10 @@ import { watchStore, watchMembers, watchCurrentMember, getUserStoresData, switch
 import { Store, Member, UserRole, AppNotification, getRoleLabel, normalizeRole, canManageSchedule, canApproveMembers, canAccessWeb } from '@/lib/types';
 import { User } from 'firebase/auth';
 import { notificationDestination } from '@/lib/notifications';
+import { CashDrawerButton } from './components/CashDrawer';
 import {
   LayoutDashboard, Clock, CalendarDays, ClipboardList, Sheet, Wallet, Users, Package, Factory, Gauge, Settings,
-  Bell, Menu, Cake, UserPlus, UserCheck, HandCoins, CircleDollarSign, CalendarClock, ListChecks, Truck, Info,
+  Bell, Menu, Cake, UserPlus, UserCheck, HandCoins, CircleDollarSign, CalendarClock, ListChecks, Truck, Info, Vault,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -25,6 +26,7 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   '/dashboard/supply': Package,
   '/dashboard/production': Factory,
   '/dashboard/performance': Gauge,
+  '/dashboard/cash-drawer': Vault,
   '/dashboard/settings': Settings,
 };
 
@@ -67,6 +69,7 @@ const NAV = [
   { href: '/dashboard/supply', label: 'Đặt & soạn hàng' },
   { href: '/dashboard/production', label: 'Sản xuất' },
   { href: '/dashboard/performance', label: 'Đo hiệu năng' },
+  { href: '/dashboard/cash-drawer', label: 'Két tiền' },
   { href: '/dashboard/settings', label: 'Cài đặt' },
 ];
 
@@ -181,7 +184,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         router.replace('/dashboard/schedule');
       }
     } else if (norm === 'manager1') {
-      const allowed = ['/dashboard', '/dashboard/checkin', '/dashboard/schedule', '/dashboard/tasks', '/dashboard/members', '/dashboard/attendance', '/dashboard/supply'];
+      const allowed = ['/dashboard', '/dashboard/checkin', '/dashboard/schedule', '/dashboard/tasks', '/dashboard/members', '/dashboard/attendance', '/dashboard/supply', '/dashboard/cash-drawer'];
       if (!allowed.some(p => pathname === p || pathname.startsWith(p))) {
         router.replace('/dashboard/schedule');
       }
@@ -252,7 +255,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       return item.href === '/dashboard/checkin' || item.href === '/dashboard/schedule' || item.href === '/dashboard/tasks' || item.href === '/dashboard/attendance' || item.href === '/dashboard/supply';
     }
     if (normRole === 'manager1') {
-      return item.href === '/dashboard' || item.href === '/dashboard/checkin' || item.href === '/dashboard/schedule' || item.href === '/dashboard/tasks' || item.href === '/dashboard/members' || item.href === '/dashboard/attendance' || item.href === '/dashboard/supply';
+      return item.href === '/dashboard' || item.href === '/dashboard/checkin' || item.href === '/dashboard/schedule' || item.href === '/dashboard/tasks' || item.href === '/dashboard/members' || item.href === '/dashboard/attendance' || item.href === '/dashboard/supply' || item.href === '/dashboard/cash-drawer';
     }
     return true; // owner has full access
   });
@@ -456,6 +459,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </button>
               )}
             </div>
+
+            {/* Mở két tiền (Chủ / Quản lý 1) */}
+            <CashDrawerButton />
 
             {/* Notification Bell */}
             <div style={{ position: 'relative' }} ref={notifDropdownRef}>

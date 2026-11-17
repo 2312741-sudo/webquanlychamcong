@@ -517,3 +517,8 @@ input, select, textarea { font-family: inherit; }
 }
 
 
+
+/* Nút "Mở két" trên thanh trên cùng: màn hẹp chỉ hiện biểu tượng */
+@media (max-width: 640px) {
+  .cash-drawer-label { display: none; }
+}
