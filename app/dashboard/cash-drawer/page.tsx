@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useApp } from '../layout';
 import {
-  AGENT_DOWNLOAD_URL, asList, canOpenCashDrawer, isOwnerRole, localAgentStatus, pairLocalAgent, readLocalAgentPair,
+  AGENT_DOWNLOAD_URL, asList, isVirtualPrinter, looksLikeReceiptPrinter, canOpenCashDrawer, isOwnerRole, localAgentStatus, pairLocalAgent, readLocalAgentPair,
   unpairCashDrawer, updateLocalAgent, watchCashDrawerConfig, watchCashDrawerLogs, watchCashDrawerRequests,
   type AgentPairInfo, type CashDrawerConfig, type CashDrawerLog, type CashDrawerRequest,
 } from '@/lib/cashDrawer';
@@ -191,7 +191,14 @@ export default function CashDrawerPage() {
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
             <select className="input" value={printer} onChange={(e) => setPrinter(e.target.value)} style={{ width: 'auto', minWidth: 240 }}>
               <option value="">— Chọn máy in KV804 —</option>
-              {asList(local.printers).map((p) => <option key={p} value={p}>{p}</option>)}
+              {/* Máy in hóa đơn lên đầu; máy in ảo (Fax / PDF / XPS) không chọn được */}
+              {[...asList(local.printers)]
+                .sort((a, b) => Number(looksLikeReceiptPrinter(b)) - Number(looksLikeReceiptPrinter(a)))
+                .map((p) => (
+                  <option key={p} value={p} disabled={isVirtualPrinter(p)}>
+                    {looksLikeReceiptPrinter(p) ? `★ ${p} (máy in hóa đơn)` : isVirtualPrinter(p) ? `${p} — máy in ảo, không dùng được` : p}
+                  </option>
+                ))}
             </select>
             <select className="input" value={drawerPin} onChange={(e) => setDrawerPin(Number(e.target.value))} style={{ width: 'auto' }}>
               <option value={0}>Chân két 2 (thường dùng)</option>
@@ -199,7 +206,7 @@ export default function CashDrawerPage() {
             </select>
             <button
               className="btn btn-primary btn-sm"
-              disabled={busy || !printer}
+              disabled={busy || !printer || isVirtualPrinter(printer)}
               onClick={() => run(async () => {
                 await updateLocalAgent(storeId, { printerName: printer, drawerPin });
                 await checkLocal();
@@ -209,7 +216,18 @@ export default function CashDrawerPage() {
               Lưu
             </button>
           </div>
-          <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Bấm thử mở két mà két không bật: đổi sang chân két còn lại.</p>
+          {!asList(local.printers).some(looksLikeReceiptPrinter) && (
+            <p style={{ fontSize: 13, color: 'var(--danger)' }}>
+              Laptop chưa có máy in hóa đơn KV804 (danh sách chỉ là máy in ảo / máy in văn phòng của Windows). Cắm USB máy in KV804,
+              cài driver máy in (đi kèm máy hoặc tải từ KiotViet — thường tên XP-80 / POS-80), in thử được rồi bấm &quot;Kiểm tra lại&quot;.
+            </p>
+          )}
+          {printer && isVirtualPrinter(printer) && (
+            <p style={{ fontSize: 13, color: 'var(--danger)' }}>&quot;{printer}&quot; là máy in ảo của Windows — két sẽ không mở. Hãy chọn máy in hóa đơn.</p>
+          )}
+          <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+            Danh sách là mọi máy in đã cài trên laptop. Chọn đúng máy in hóa đơn (★). Bấm thử mở két mà két không bật: đổi sang chân két còn lại.
+          </p>
         </div>
       )}
 

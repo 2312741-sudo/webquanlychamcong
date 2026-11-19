@@ -88,6 +88,16 @@ export function isOwnerRole(role?: string | null): boolean {
   return normalizeRole(role) === 'owner';
 }
 
+/** Máy in ảo của Windows (Fax, PDF, XPS, OneNote) — gửi lệnh mở két vào đây không có tác dụng. Khớp Trạm Mở Két. */
+export function isVirtualPrinter(name: string): boolean {
+  return /^(Fax|Microsoft Print to PDF|Microsoft XPS Document Writer|OneNote.*|Send To OneNote.*|Adobe PDF|.*PDF.*Printer.*)$/i.test(name.trim());
+}
+
+/** Tên giống máy in hóa đơn (KV804 / Xprinter / POS-80…) */
+export function looksLikeReceiptPrinter(name: string): boolean {
+  return !isVirtualPrinter(name) && /KV|KIOT|POS|XP-|XPRINTER|RECEIPT|THERMAL|80MM|80C|TM-T|RONGTA|GPRINTER|SUNMI/i.test(name);
+}
+
 /** PowerShell có thể trả chuỗi thay vì mảng 1 phần tử */
 export function asList(v: string[] | string | null | undefined): string[] {
   if (Array.isArray(v)) return v.filter(Boolean).map(String);

@@ -17,7 +17,7 @@
 #  Cau hinh: %ProgramData%\TramMoKet\config.json   Nhat ky: %ProgramData%\TramMoKet\log.txt
 # =============================================================================
 $ErrorActionPreference = 'Stop'
-$Version = '1.1.0'
+$Version = '1.1.1'
 $Dir = Join-Path $env:ProgramData 'TramMoKet'
 $ConfigPath = Join-Path $Dir 'config.json'
 $LogPath = Join-Path $Dir 'log.txt'
@@ -85,11 +85,16 @@ function Get-Printers {
   catch { @(Get-WmiObject Win32_Printer | Select-Object -ExpandProperty Name) }
 }
 
+# May in ao cua Windows - khong bao gio la may in hoa don (gui lenh mo ket vao day se khong co tac dung)
+$VirtualPrinterPattern = '^(Fax|Microsoft Print to PDF|Microsoft XPS Document Writer|OneNote.*|Send To OneNote.*|Adobe PDF|.*PDF.*Printer.*)$'
+
+function Is-VirtualPrinter([string]$name) { return $name -match $VirtualPrinterPattern }
+
+# Chi tu chon khi ten giong may in hoa don; KHONG lay may in mac dinh (thuong la Fax / may in van phong)
 function Find-ReceiptPrinter {
-  $all = Get-Printers
-  $hit = $all | Where-Object { $_ -match 'KV|KIOT|80|POS|XP-|XPRINTER|RECEIPT|THERMAL' } | Select-Object -First 1
+  $hit = Get-Printers | Where-Object { -not (Is-VirtualPrinter $_) -and $_ -match 'KV|KIOT|POS|XP-|XPRINTER|RECEIPT|THERMAL|80MM|80C|TM-T|RONGTA|GPRINTER|SUNMI' } | Select-Object -First 1
   if ($hit) { return $hit }
-  try { (Get-CimInstance Win32_Printer | Where-Object Default | Select-Object -First 1).Name } catch { '' }
+  return ''
 }
 
 function Load-Config {
@@ -109,7 +114,8 @@ function Load-Config {
   foreach ($k in $defaults.Keys) {
     if (-not ($cfg.PSObject.Properties.Name -contains $k)) { $cfg | Add-Member -NotePropertyName $k -NotePropertyValue $defaults[$k] }
   }
-  if (-not $cfg.printerName) { $cfg.printerName = Find-ReceiptPrinter }
+  # Ban cu tu chon may in mac dinh (vd Fax) -> bo, tim lai may in hoa don
+  if (-not $cfg.printerName -or (Is-VirtualPrinter ([string]$cfg.printerName))) { $cfg.printerName = Find-ReceiptPrinter }
   Save-Config $cfg
   return $cfg
 }
@@ -182,7 +188,9 @@ function Check-Otp($cfg, [string]$nonce, [string]$otp) {
 # ---------------- Mo ket ----------------
 function Open-Drawer($cfg) {
   if (-not $cfg.enabled) { return 'Mo ket dang bi tat tren may nay' }
-  if (-not $cfg.printerName) { return 'Chua chon may in (vao web > Cai dat > Ket tien de chon)' }
+  if (-not $cfg.printerName) { return 'Chua chon may in hoa don KV804 (web > Ket tien > May in). Khong thay KV804 trong danh sach: cai driver may in KV804 truoc' }
+  if (Is-VirtualPrinter ([string]$cfg.printerName)) { return "May in dang chon ('$($cfg.printerName)') la may in ao cua Windows, khong mo duoc ket. Chon may in hoa don KV804 trong web > Ket tien" }
+  if (-not ((Get-Printers) -contains [string]$cfg.printerName)) { return "Khong thay may in '$($cfg.printerName)' tren laptop (da rut / doi ten?). Chon lai trong web > Ket tien" }
   $m = [byte]([int]$cfg.drawerPin -band 1)
   # ESC p m t1 t2 : xung mo ket (t1=25*2ms, t2=250*2ms)
   $bytes = [byte[]](0x1B, 0x70, $m, 0x19, 0xFA)
