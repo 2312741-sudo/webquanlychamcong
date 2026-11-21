@@ -55,8 +55,10 @@ interface AppCtx {
   members: Member[];
   currentMember: Member | null;
   role: UserRole | undefined;
+  /** Mọi cửa hàng của tài khoản (Chủ nhiều cửa hàng: ghép nối 1 laptop mở két cho nhiều cửa hàng) */
+  stores: Store[];
 }
-const AppContext = createContext<AppCtx>({ user: null, storeId: null, store: null, members: [], currentMember: null, role: undefined });
+const AppContext = createContext<AppCtx>({ user: null, storeId: null, store: null, members: [], currentMember: null, role: undefined, stores: [] });
 export const useApp = () => useContext(AppContext);
 
 const NAV = [
@@ -310,7 +312,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   };
 
   return (
-    <AppContext.Provider value={{ user, storeId, store, members, currentMember, role }}>
+    <AppContext.Provider value={{ user, storeId, store, members, currentMember, role, stores: userStores }}>
       <div className={dashboardRoleClass} style={{ display:'flex', minHeight:'100vh', background:'var(--surface)' }}>
         {/* Mobile overlay */}
         {sidebarOpen && (

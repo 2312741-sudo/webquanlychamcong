@@ -8,6 +8,8 @@
  *   - Chủ thấy MÃ 6 SỐ = HMAC-SHA256(khóa bí mật của Chủ, nonce) trên app / web → gửi quản lý → quản lý nhập mã.
  *   - Laptop tự kiểm tra mã (biết khóa bí mật), mỗi mã chỉ mở 1 lần, hết hạn 15 phút. Chủ tự mở không cần nhập mã.
  * Khóa bí mật: laptop giao cho CHỦ ở lần ghép nối đầu, lưu stores/{id}/owner_private/cash_drawer (chỉ Chủ đọc).
+ * NHIỀU CỬA HÀNG, 1 TÀI KHOẢN CHỦ: một laptop ghép nối được cho nhiều cửa hàng — cửa hàng ghép sau dùng khóa bí mật
+ * Chủ đã lưu ở cửa hàng khác (laptop xác nhận khóa rồi mới cho ghép); mọi cửa hàng dùng chung khóa + mã ghép nối của laptop.
  * Cấu hình chung (mã ghép nối, IP, máy in): stores/{id}/private/cash_drawer (đọc: Chủ / QL1 / QL2; ghi: Chủ / QL1).
  * Nhật ký: stores/{id}/cash_drawer_logs.  Bản Dart song song: appchamcong lib/core/services/cash_drawer_service.dart
  */
@@ -186,15 +188,38 @@ export async function readLocalAgentPair(opts: { claim?: boolean; ownerSecret?: 
 /**
  * Ghép nối (CHỈ CHỦ, trên chính laptop): nhận khóa bí mật (lần đầu) hoặc xác nhận khóa đã có, rồi lưu mã ghép nối
  * + IP LAN để web / app gửi lệnh.
+ * [otherStoreIds]: các cửa hàng khác của Chủ — laptop đã ghép cho cửa hàng khác thì dùng khóa bí mật Chủ lưu ở đó
+ * (1 laptop mở két cho nhiều cửa hàng của cùng tài khoản Chủ).
  */
-export async function pairLocalAgent(storeId: string, by: { uid: string; name: string }): Promise<AgentPairInfo> {
+export async function pairLocalAgent(
+  storeId: string,
+  by: { uid: string; name: string },
+  otherStoreIds: string[] = [],
+): Promise<AgentPairInfo> {
   const saved = await getOwnerSecret(storeId).catch(() => null);
-  const info = await readLocalAgentPair({ claim: true, ownerSecret: saved });
+  let info = await readLocalAgentPair({ claim: true, ownerSecret: saved });
+  if (!info.ownerSecret && !info.ownerVerified) {
+    // Laptop đã giao khóa cho lần ghép nối trước → thử khóa Chủ đã lưu ở các cửa hàng khác
+    const tried = new Set<string>(saved ? [saved] : []);
+    for (const id of otherStoreIds) {
+      if (!id || id === storeId) continue;
+      const s = await getOwnerSecret(id).catch(() => null);
+      if (!s || tried.has(s)) continue;
+      tried.add(s);
+      const r = await readLocalAgentPair({ claim: true, ownerSecret: s });
+      if (r.ownerVerified) {
+        info = { ...r, ownerSecret: r.ownerSecret || s };
+        break;
+      }
+    }
+  }
   if (info.ownerSecret) {
     await setDoc(secretRef(storeId), { secret: info.ownerSecret, updatedAt: serverTimestamp() }, { merge: true });
   } else if (!info.ownerVerified) {
     throw new Error(
-      'Laptop này đã giao khóa bí mật cho một lần ghép nối khác. Để an toàn: chạy GoCaiDat.bat rồi CaiDat.bat trên laptop, sau đó CHỦ ghép nối ngay.',
+      'Laptop này đã giao khóa bí mật cho một lần ghép nối khác, và không cửa hàng nào của tài khoản Chủ này giữ khóa đó. ' +
+        'Nếu laptop đang ghép cho cửa hàng của bạn: đăng nhập đúng tài khoản Chủ của cửa hàng đó. ' +
+        'Nếu không: chạy GoCaiDat.bat rồi CaiDat.bat trên laptop, sau đó CHỦ ghép nối ngay.',
     );
   }
   await setDoc(
@@ -213,6 +238,15 @@ export async function pairLocalAgent(storeId: string, by: { uid: string; name: s
     { merge: true },
   );
   return info;
+}
+
+/** Các cửa hàng (trong [storeIds]) đang ghép nối với laptop có mã ghép nối [token] */
+export async function storesPairedWith(token: string, storeIds: string[]): Promise<string[]> {
+  if (!token) return [];
+  const hits = await Promise.all(
+    storeIds.map(async (id) => ((await getCashDrawerConfig(id).catch(() => null))?.token === token ? id : null)),
+  );
+  return hits.filter((x): x is string => !!x);
 }
 
 export async function unpairCashDrawer(storeId: string): Promise<void> {

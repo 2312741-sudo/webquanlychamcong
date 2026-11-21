@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useApp } from '../layout';
 import {
   AGENT_DOWNLOAD_URL, asList, isVirtualPrinter, looksLikeReceiptPrinter, canOpenCashDrawer, isOwnerRole, localAgentStatus, pairLocalAgent, readLocalAgentPair,
-  unpairCashDrawer, updateLocalAgent, watchCashDrawerConfig, watchCashDrawerLogs, watchCashDrawerRequests,
+  storesPairedWith, unpairCashDrawer, updateLocalAgent, watchCashDrawerConfig, watchCashDrawerLogs, watchCashDrawerRequests,
   type AgentPairInfo, type CashDrawerConfig, type CashDrawerLog, type CashDrawerRequest,
 } from '@/lib/cashDrawer';
 import { CashDrawerModal, OwnerCodesPanel } from '../components/CashDrawer';
@@ -22,7 +22,7 @@ function fmtTime(at: CashDrawerLog['at']): string {
 }
 
 export default function CashDrawerPage() {
-  const { user, storeId, currentMember, role } = useApp();
+  const { user, storeId, currentMember, role, stores } = useApp();
   const [cfg, setCfg] = useState<CashDrawerConfig | null | undefined>(undefined);
   const [error, setError] = useState('');
   const [local, setLocal] = useState<AgentPairInfo | null>(null);
@@ -35,6 +35,8 @@ export default function CashDrawerPage() {
   const [showOpen, setShowOpen] = useState(false);
   const [printer, setPrinter] = useState('');
   const [drawerPin, setDrawerPin] = useState(0);
+  // Cửa hàng (của tài khoản này) đang dùng laptop đang mở trang — 1 laptop mở két cho nhiều cửa hàng
+  const [pairedHere, setPairedHere] = useState<string[]>([]);
 
   const allowed = canOpenCashDrawer(role);
   const owner = isOwnerRole(role);
@@ -78,6 +80,21 @@ export default function CashDrawerPage() {
       alive = false;
     };
   }, [checkLocal]);
+
+  const storeIdsKey = stores.map((s) => s.id).join(',');
+  const localToken = local?.token || '';
+  useEffect(() => {
+    let alive = true;
+    const ids = storeIdsKey ? storeIdsKey.split(',') : [];
+    if (!localToken || ids.length === 0) {
+      Promise.resolve().then(() => alive && setPairedHere([]));
+    } else {
+      storesPairedWith(localToken, ids).then((r) => alive && setPairedHere(r));
+    }
+    return () => {
+      alive = false;
+    };
+  }, [localToken, storeIdsKey, cfg?.token]);
 
   if (!user || !storeId) return null;
   if (!allowed) {
@@ -154,7 +171,7 @@ export default function CashDrawerPage() {
               className="btn btn-primary btn-sm"
               disabled={busy}
               onClick={() => run(async () => {
-                const info = await pairLocalAgent(storeId, { uid: user.uid, name });
+                const info = await pairLocalAgent(storeId, { uid: user.uid, name }, stores.map((s) => s.id));
                 setLocal(info);
                 return `Đã ghép nối với ${info.computer}. App điện thoại (cùng wifi) sẽ mở két qua IP ${asList(info.lanIps).join(', ')}.`;
               })}
@@ -179,6 +196,18 @@ export default function CashDrawerPage() {
             </button>
           )}
         </div>
+        {local && pairedHere.length > 0 && (
+          <div style={{ fontSize: 13 }}>
+            Laptop này đang mở két cho:{' '}
+            <b>{pairedHere.map((id) => stores.find((s) => s.id === id)?.name || id).join(', ')}</b>
+          </div>
+        )}
+        {owner && stores.length > 1 && (
+          <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+            Nhiều cửa hàng dùng chung 1 laptop / 1 két: chọn từng cửa hàng ở menu cửa hàng rồi bấm ghép nối trên trang này (cùng tài khoản Chủ).
+            Mỗi cửa hàng có yêu cầu và nhật ký mở két riêng.
+          </p>
+        )}
         <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
           Mẹo: đặt IP cố định cho laptop trong router (hoặc ghép nối lại khi IP đổi) để app luôn tìm thấy laptop.
         </p>
