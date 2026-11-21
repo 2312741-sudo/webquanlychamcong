@@ -1,8 +1,9 @@
 /**
  * MỞ KÉT TIỀN (KiotViet) qua máy in hóa đơn KV804 cắm USB vào laptop — MÃ MỞ KÉT DÙNG 1 LẦN.
  *
- * Laptop chạy phần mềm "Trạm Mở Két" (tools/tram-mo-ket, tải ở /downloads/TramMoKet.zip) ở cổng 8787:
- *   web trên chính laptop gọi http://127.0.0.1:8787, app điện thoại gọi http://<IP LAN laptop>:8787 (cùng wifi).
+ * Laptop chạy phần mềm "Trạm Mở Két" (tools/tram-mo-ket, tải ở /downloads/TramMoKet.zip) ở cổng 8787.
+ * CHỈ APP ĐIỆN THOẠI MỞ KÉT (gọi http://<IP LAN laptop>:8787, cùng wifi). Web KHÔNG mở két: web trên chính laptop chỉ
+ * ghép nối / chọn máy in (http://127.0.0.1:8787) và cho Chủ xem mã.
  * Quy trình:
  *   - Quản lý (QL1 / QL2) tạo YÊU CẦU (stores/{id}/cash_drawer_requests, nonce = "<id>.<thời điểm ms>") → thông báo cho Chủ.
  *   - Chủ thấy MÃ 6 SỐ = HMAC-SHA256(khóa bí mật của Chủ, nonce) trên app / web → gửi quản lý → quản lý nhập mã.
@@ -15,7 +16,7 @@
  */
 import { db } from './firebase';
 import {
-  addDoc, collection, deleteField, doc, getDoc, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc,
+  collection, deleteField, doc, getDoc, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc,
 } from 'firebase/firestore';
 import { normalizeRole } from './types';
 
@@ -272,38 +273,6 @@ export async function updateLocalAgent(storeId: string, body: { printerName?: st
   await setDoc(configRef(storeId), { printer: j.printer || '' }, { merge: true });
 }
 
-/** Tạo yêu cầu mở két (nonce = id + thời điểm). Quản lý: kèm thông báo cho Chủ (không chứa mã) */
-export async function createOpenRequest(
-  storeId: string,
-  by: { uid: string; name: string; role: string },
-  reason: string,
-  notifyOwner: boolean,
-): Promise<CashDrawerRequest> {
-  const ref = doc(requestsCol(storeId));
-  const createdAtMs = Date.now();
-  const req: CashDrawerRequest = {
-    id: ref.id, uid: by.uid, name: by.name, role: by.role, reason,
-    nonce: `${ref.id}.${createdAtMs}`, createdAtMs, status: 'pending', source: 'web',
-  };
-  const { id: _id, ...data } = req;
-  void _id;
-  await setDoc(ref, { ...data, createdAt: serverTimestamp() });
-  if (notifyOwner) {
-    await addDoc(collection(db, 'stores', storeId, 'notifications'), {
-      storeId,
-      title: 'Yêu cầu mở két',
-      body: `${by.name} xin mở két: ${reason}. Mở app / web (Két tiền) để xem mã gửi cho quản lý.`,
-      type: 'cash_drawer_request',
-      createdAt: serverTimestamp(),
-      targetRoles: ['owner'],
-      readBy: [by.uid],
-      routePath: '/cash-drawer',
-      routeExtra: { requestId: ref.id },
-    }).catch((e) => console.warn('[CashDrawer] Không gửi được thông báo cho Chủ:', e));
-  }
-  return req;
-}
-
 export async function setRequestStatus(storeId: string, id: string, status: CashDrawerRequestStatus): Promise<void> {
   await updateDoc(doc(requestsCol(storeId), id), {
     status,
@@ -318,40 +287,6 @@ export function watchCashDrawerRequests(storeId: string, cb: (r: CashDrawerReque
     (s) => cb(s.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<CashDrawerRequest, 'id'>) }))),
     (e) => onError?.(e),
   );
-}
-
-/**
- * Gửi lệnh mở két TỪ WEB. Trình duyệt chỉ cho trang https gọi http tới chính máy (127.0.0.1), nên web chỉ mở két
- * được khi mở trên laptop cắm máy in; máy khác dùng app điện thoại (gọi IP LAN của laptop).
- * Trả về null nếu mở được, ngược lại là thông báo lỗi.
- */
-export async function sendOpenCommand(cfg: CashDrawerConfig, args: { nonce: string; otp: string; by: string }): Promise<string | null> {
-  if (!cfg?.token) return 'Chưa ghép nối laptop mở két (Chủ vào Két tiền → Ghép nối trên laptop)';
-  try {
-    const r = await fetchWithTimeout(`http://127.0.0.1:${cfg.port || AGENT_PORT}/open`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Drawer-Token': cfg.token },
-      body: JSON.stringify({ ...args, source: 'web' }),
-    }, 5000);
-    const j = await r.json().catch(() => ({}));
-    if (r.ok && j.ok) return null;
-    return j.error || `Laptop báo lỗi (${r.status})`;
-  } catch {
-    return 'Không thấy phần mềm mở két trên máy này. Web chỉ mở két được trên chính laptop cắm máy in (đang chạy Trạm Mở Két); ở máy khác hãy dùng app điện thoại.';
-  }
-}
-
-export async function logCashDrawerOpen(
-  storeId: string,
-  entry: { uid: string; name: string; role: string; reason: string; ok: boolean; error?: string; requestId?: string },
-): Promise<void> {
-  await addDoc(collection(db, 'stores', storeId, 'cash_drawer_logs'), {
-    ...entry,
-    error: entry.error || null,
-    requestId: entry.requestId || null,
-    source: 'web',
-    at: serverTimestamp(),
-  });
 }
 
 export function watchCashDrawerLogs(storeId: string, cb: (logs: CashDrawerLog[]) => void, onError?: (e: Error) => void, max = 200) {

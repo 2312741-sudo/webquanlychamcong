@@ -3,10 +3,11 @@
 Phần mềm nhỏ chạy nền trên **laptop Windows** đang cắm máy in hóa đơn **KV804** (USB).
 Két tiền cắm vào máy in (cổng DK / dây điện thoại).
 
-## Cách mở két (mã dùng 1 lần)
-- **Quản lý 1**: bấm **Mở két** (web trên laptop hoặc app cùng wifi) → chọn lý do → **Gửi yêu cầu cho Chủ**.
-  Chủ nhận thông báo, mở app / web thấy **mã 6 số** → gửi cho quản lý → quản lý nhập mã → két bật.
-- **Chủ**: bấm **Mở két** → chọn lý do → két bật ngay (không cần nhập mã).
+## Cách mở két (mã dùng 1 lần) — CHỈ BẰNG APP ĐIỆN THOẠI
+Web **không** mở két (web chỉ để ghép nối, chọn máy in, xem mã và nhật ký). Điện thoại phải **cùng wifi** với laptop.
+- **Quản lý**: trên app bấm **Mở két** → chọn lý do → **Gửi yêu cầu cho Chủ**.
+  Chủ nhận thông báo, mở app / web thấy **mã 6 số** → gửi cho quản lý → quản lý nhập mã trên app → két bật.
+- **Chủ**: trên app bấm **Mở két** → chọn lý do → két bật ngay (không cần nhập mã).
 - Mỗi mã chỉ mở **1 lần**, hết hạn sau **15 phút**; sai 5 lần thì mã bị hủy. Mọi lần mở đều ghi nhật ký.
 - Mã được tạo từ **khóa bí mật chỉ Chủ và laptop biết** — laptop tự kiểm tra mã, quản lý không tự mở được.
 
@@ -16,7 +17,8 @@ Két tiền cắm vào máy in (cổng DK / dây điện thoại).
 3. Bấm đúp **`CaiDat.bat`** → đồng ý quyền Admin. Trình duyệt mở `http://localhost:8787/status`,
    thấy `"ok":true` là chạy rồi. Phần mềm tự chạy lại mỗi lần bật máy.
 4. **CHỦ** đăng nhập web Chấm Công **trên chính laptop đó** → **Két tiền** → **Ghép nối với laptop này**
-   (làm ngay sau khi cài — lần ghép nối đầu tiên nhận khóa bí mật của Chủ), chọn đúng máy in, bấm **Mở két** để thử.
+   (làm ngay sau khi cài — lần ghép nối đầu tiên nhận khóa bí mật của Chủ), chọn đúng máy in, rồi bấm **Mở két** trên app để thử.
+5. Nhiều cửa hàng dùng chung laptop / két (cùng tài khoản Chủ): đổi sang từng cửa hàng trên web rồi ghép nối lại trên trang Két tiền.
 
 ## Lỗi thường gặp
 | Hiện tượng | Cách xử lý |

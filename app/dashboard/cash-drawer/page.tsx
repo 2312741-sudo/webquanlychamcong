@@ -10,7 +10,7 @@ import {
   storesPairedWith, unpairCashDrawer, updateLocalAgent, watchCashDrawerConfig, watchCashDrawerLogs, watchCashDrawerRequests,
   type AgentPairInfo, type CashDrawerConfig, type CashDrawerLog, type CashDrawerRequest,
 } from '@/lib/cashDrawer';
-import { CashDrawerModal, OwnerCodesPanel } from '../components/CashDrawer';
+import { OwnerCodesPanel } from '../components/CashDrawer';
 
 function fmtTime(at: CashDrawerLog['at']): string {
   try {
@@ -32,7 +32,6 @@ export default function CashDrawerPage() {
   const [logs, setLogs] = useState<CashDrawerLog[]>([]);
   const [logError, setLogError] = useState('');
   const [requests, setRequests] = useState<CashDrawerRequest[]>([]);
-  const [showOpen, setShowOpen] = useState(false);
   const [printer, setPrinter] = useState('');
   const [drawerPin, setDrawerPin] = useState(0);
   // Cửa hàng (của tài khoản này) đang dùng laptop đang mở trang — 1 laptop mở két cho nhiều cửa hàng
@@ -264,8 +263,10 @@ export default function CashDrawerPage() {
       <div className="card" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <h3 style={{ fontSize: 16, fontWeight: 700 }}>{local ? '3' : '2'}. Nhật ký mở két</h3>
-          <button className="btn btn-primary btn-sm" onClick={() => setShowOpen(true)}>Mở két</button>
         </div>
+        <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+          Mở két bằng <b>app Chấm Công trên điện thoại</b> (cùng wifi với laptop) — web không mở két. Quản lý gửi yêu cầu và nhập mã trên app; Chủ mở trực tiếp trên app.
+        </p>
         {logError && <p style={{ fontSize: 13, color: 'var(--danger)' }}>Không đọc được nhật ký: {logError}</p>}
         {logs.length === 0 && !logError ? (
           <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Chưa có lần mở két nào.</p>
@@ -291,7 +292,6 @@ export default function CashDrawerPage() {
         )}
       </div>
 
-      {showOpen && <CashDrawerModal onClose={() => setShowOpen(false)} />}
     </div>
   );
 }
